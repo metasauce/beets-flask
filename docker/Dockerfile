@@ -1,40 +1,36 @@
-FROM python:3.11-alpine3.20 AS base
+FROM python:3.12-slim AS base
 
 FROM base AS deps
 
+# Create user and group
+RUN groupadd -g 1000 beetle && \
+    useradd -m -u 1000 -g beetle beetle
 
-RUN addgroup -g 1000 beetle && \
-    adduser -D -u 1000 -G beetle beetle
 
 ENV HOSTNAME="beets-container"
 ENV EDITOR="vi"
 # need to set some cli editor so `beet edit` works, vi comes with alpine
 
 # map beets directory and our configs to /config
-RUN mkdir -p /config/beets
-RUN mkdir -p /config/beets-flask
-RUN mkdir -p /logs
-RUN chown -R beetle:beetle /config
-RUN chown -R beetle:beetle /logs
+RUN mkdir -p /config/beets /config/beets-flask /logs && \
+    chown -R beetle:beetle /config /logs
+
 ENV BEETSDIR="/config/beets"
 ENV BEETSFLASKDIR="/config/beets-flask"
 ENV BEETSFLASKLOG="/logs/beets-flask.log"
 
 # our default folders they should not be used in production
-RUN mkdir -p /music/inbox
-RUN mkdir -p /music/imported
-RUN chown -R beetle:beetle /music
+RUN mkdir -p /music/inbox /music/imported && \
+    chown -R beetle:beetle /music
 
 # dependencies
-# RUN --mount=type=cache,target=/var/cache/apk \
-RUN apk update
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add \
+RUN apt update
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt install -y --no-install-recommends \
     imagemagick \
     redis  \
     bash \
     tmux \
-    shadow \
     git \
     ffmpeg
 
@@ -76,8 +72,8 @@ RUN python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyproject.
 
 FROM deps AS dev
 
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add \
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt install -y --no-install-recommends \
     npm
 
 RUN npm install -g pnpm
@@ -103,9 +99,11 @@ WORKDIR /repo
 USER root
 ENTRYPOINT [ \
     "/bin/sh", "-c", \
-    "./docker/entrypoints/entrypoint_fix_permissions.sh && \
+    "./docker/entrypoints/entrypoint_fix_permissions.sh && \ 
+     ./docker/entrypoints/entrypoint_user_scripts.sh && \
     su beetle -c ./docker/entrypoints/entrypoint_dev.sh" \
     ]
+
 
 # ------------------------------------------------------------------------------------ #
 #                                         Build                                        #
@@ -114,8 +112,8 @@ ENTRYPOINT [ \
 FROM deps AS build
 # Build frontend files
 
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add \
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt install -y --no-install-recommends \
     npm
 
 RUN npm install -g pnpm
@@ -135,7 +133,6 @@ WORKDIR /repo/frontend
 # RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 RUN pnpm install
 RUN pnpm run build
-
 
 
 
