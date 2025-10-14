@@ -21,11 +21,12 @@ Place the following in a `startup.sh` file in either the `/config` folder or `/c
 ```sh
 #!/bin/sh
 
-apk update
-apk add \
-    build-base \
-    ffmpeg-dev \
+apt-get update
+apt-get install -y \
+    build-essential \
+    ffmpeg \
     libkeyfinder-dev \
+    git
 
 git clone https://github.com/evanpurkhiser/keyfinder-cli.git
 cd keyfinder-cli/
