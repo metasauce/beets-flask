@@ -1,5 +1,5 @@
 #!/bin/sh
-source ./docker/entrypoints/common.sh
+. ./docker/entrypoints/common.sh
 
 log_current_user
 log_version_info
