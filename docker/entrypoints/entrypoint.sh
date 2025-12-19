@@ -1,13 +1,13 @@
 
-#!/bin/sh
-source ./common.sh
+#!/bin/bash
+. ./common.sh
 
 log_current_user
 log_version_info
 
 cd /repo
 
-mkdir -p /repo/log
+mkdir -p /logs
 mkdir -p /config/beets
 mkdir -p /config/beets-flask
 
@@ -22,7 +22,6 @@ export PYTHONWARNINGS="ignore"
 cd /repo/backend
 
 redis-server --daemonize yes >/dev/null 2>&1
-
 
 # blocking
 python ./launch_db_init.py

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 . ./docker/entrypoints/common.sh
 
 log_current_user
@@ -12,7 +12,7 @@ pnpm run dev & # normal dev, port 5173
 vite_pid=$!
 sleep 3  # Give Vite a moment to start
 if ! kill -0 $vite_pid 2>/dev/null; then
-    echo "starting vite failed, will try to fix this by installing dependencies ..."
+    log_warning "starting vite failed, will try to fix this by installing dependencies ..."
     pnpm install
     pnpm run dev &
 fi

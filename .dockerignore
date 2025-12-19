@@ -9,6 +9,7 @@
 
 !backend/beets_flask
 !backend/pyproject.toml
+!backend/uv.lock
 !backend/main.py
 !backend/launch_*.py
 !backend/generate_types.py

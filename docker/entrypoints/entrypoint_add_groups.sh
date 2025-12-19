@@ -1,12 +1,6 @@
-
-# this script runs both, in dev and in prod, so we have to check where we
-# can source common.sh from.
-if [ -f ./common.sh ]; then
-    source ./common.sh
-elif [ -f ./docker/entrypoints/common.sh ]; then
-    source ./docker/entrypoints/common.sh
-fi
-
+#!/bin/bash
+SCRIPT_DIR=$(dirname "$0")
+. "$SCRIPT_DIR/common.sh"
 
 # ---------------------------------- Helper ---------------------------------- #
 
