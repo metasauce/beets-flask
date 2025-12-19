@@ -138,28 +138,34 @@ ENTRYPOINT [ \
 # ------------------------------------------------------------------------------------ #
 
 FROM base AS dev
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt/lists \
+    apt update && \
+    apt install -y --no-install-recommends \
+        curl \
+        build-essential && \ 
+    rm -rf /var/lib/apt/lists/*
 
 # Install nodejs
-RUN curl -sL https://deb.nodesource.com/setup_22.x
-RUN --mount=type=cache,target=/var/cache/apt \
-    apt install -y --no-install-recommends \
-    nodejs
-
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+RUN apt-get install -y nodejs
 # Install pnpm
-RUN curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10 sh -
-RUN pnpm config set store-dir /repo/frontend/.pnpm-store
+RUN npm install --global corepack@latest
+RUN corepack enable pnpm
+RUN corepack use pnpm@latest-10
 
 # Copy the lock files and install dependencies
 WORKDIR /repo
-COPY ./frontend/package.json /repo/frontend/
-COPY ./frontend/pnpm-lock.yaml /repo/frontend/
-
+COPY ./frontend/package.json ./frontend/pnpm-lock.yaml /repo/frontend/
+COPY ./backend/pyproject.toml ./backend/uv.lock /repo/backend/
 WORKDIR /repo/frontend
-# RUN pnpm i
 
 # Extract version from package.json
 RUN mkdir -p /version
 RUN node -p "require('/repo/frontend/package.json').version" > /version/frontend.txt
+RUN python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyproject.toml', 'rb'))['project']['version'])" > /version/backend.txt
 
 ENV IB_SERVER_CONFIG="dev_docker"
 

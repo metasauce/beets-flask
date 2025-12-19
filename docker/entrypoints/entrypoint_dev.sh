@@ -5,6 +5,11 @@ log_current_user
 log_version_info
 log "Starting development environment..."
 
+# We rely on live mounting the /repo folder
+# and expect the developer to have the dependencies installed
+# locally
+
+
 cd /repo/frontend
 
 # pnpm run build:dev &  # use this for debugging with ios, port 5001 (no cors allowed)
@@ -36,6 +41,9 @@ export FLASK_DEBUG=1
 
 # running the server from inside the backend dir makes imports and redis easier
 cd /repo/backend
+
+uv sync --locked
+source .venv/bin/activate
 
 redis-server --daemonize yes
 
