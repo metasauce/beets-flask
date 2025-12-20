@@ -5,8 +5,7 @@
 FROM debian:trixie-slim AS builder_ffmpeg
 
 # Install required tools
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt/lists \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     apt-get update && apt-get install -y --no-install-recommends \
         xz-utils \
         curl \
@@ -15,7 +14,8 @@ RUN --mount=type=cache,target=/var/cache/apt \
 
 WORKDIR /tmp
 RUN mkdir -p /tmp/ffmpeg
-RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \
+ARG TARGETARCH
+RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${TARGETARCH}-static.tar.xz \
     | tar -xJ -C /tmp/ffmpeg --strip-components=1
 
 # -------------------------------- Base image -------------------------------- #
@@ -34,17 +34,16 @@ RUN groupadd -g 1000 beetle && \
 
 # map beets directory and our configs to /config
 RUN mkdir -p /config/beets /config/beets-flask /logs && \
-chown -R beetle:beetle /config /logs
+    chown -R beetle:beetle /config /logs
 
 # our default folders they should not be used in production
 RUN mkdir -p /music/inbox /music/imported && \
     chown -R beetle:beetle /music
 
 # Install dependencies:
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt/lists \
-    apt update && \
-    apt install -y --no-install-recommends \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
         redis \
         tmux \
         imagemagick && \ 
@@ -96,7 +95,7 @@ RUN corepack enable
 COPY ./frontend /repo/frontend/
 
 WORKDIR /repo/frontend
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+RUN --mount=type=cache,sharing=locked,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 # Extract version from package.json
@@ -140,10 +139,9 @@ ENTRYPOINT [ \
 FROM base AS dev
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt/lists \
-    apt update && \
-    apt install -y --no-install-recommends \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
         curl \
         build-essential && \ 
     rm -rf /var/lib/apt/lists/*
