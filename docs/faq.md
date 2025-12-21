@@ -4,14 +4,17 @@
 
 Beets by default does not support 7z and rar files. However, you can enable support for these formats by installing the `unrar` and/or `py7zr` packages in your container. (See also [beets documentation](https://beets.readthedocs.io/en/stable/reference/cli.html#import)).
 
-As we are running an alpine image this is not as straightforward as it sounds.
-
 ### `rar` support
 
-To enable `rar` support, you can install the `unrar` package directly from the Debian repositories:
+To enable `rar` support, you can install the `unrar` package from the (non-free) Debian repositories.
 
 ```bash
 # /config/startup.sh
+
+# add `contrib non-free non-free-firmware` to components
+sed -i '/Components:/s/main\b[^c]*$/main contrib non-free non-free-firmware/' \
+    /etc/apt/sources.list.d/debian.sources
+
 apt-get update
 apt-get install -y unrar
 ```

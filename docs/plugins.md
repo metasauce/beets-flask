@@ -14,26 +14,46 @@ On startup, the container will run the startup script if it exists, and afterwar
 
 ## Example startup.sh: keyfinder
 
-For example, we can install the [keyfinder plugin](https://docs.beets.io/en/latest/plugins/keyfinder.html) via `startup.sh`, as  it requires quite a few build steps.
+For example, we can install the [keyfinder plugin](https://docs.beets.io/en/latest/plugins/keyfinder.html) via `startup.sh`.
+It requires quite a few build steps, and you have to manually compile from two repos.
 
 Place the following in a `startup.sh` file in either the `/config` folder or `/config/beets-flask` folder.
 
 ```sh
 #!/bin/sh
 
+# get build dependencies
 apt-get update
 apt-get install -y \
     build-essential \
     ffmpeg \
-    libkeyfinder-dev \
-    git
+    libavformat-dev \
+    libavcodec-dev \
+    libswresample-dev \
+    libavutil-dev \
+    git \
+    cmake \
+    libfftw3-dev \
+    pkg-config \
 
+# clone and build the library
+git clone https://github.com/mixxxdj/libkeyfinder.git
+cd libkeyfinder
+
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local -S . -B build
+cmake --build build --parallel "$(nproc)"
+cmake --install build
+
+# clone and build the cli tool
+cd ..
 git clone https://github.com/evanpurkhiser/keyfinder-cli.git
 cd keyfinder-cli/
-make
-make install
+
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local -S . -B build
+cmake --build build --parallel "$(nproc)"
+cmake --install build
 ```
-Note that the container is based on alpine, so you have to use apk.
+Note that the container is based on debian.
 Make executable
 ```sh
 chmod +x ./startup.sh
