@@ -39,8 +39,8 @@ dependencies = [
     "aiohttp",
     "aiofiles",
     "numpy",
-    "pandas",
     "typing_extensions",
+    "polars>=1.36.1",
 ]
 
 [project.optional-dependencies]
@@ -132,6 +132,11 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.report]
 omit = ["*/tests/*"]
+exclude_also = [
+    "if TYPE_CHECKING",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
 
 [tool.mypy]
 check_untyped_defs = true
