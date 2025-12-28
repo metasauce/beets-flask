@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Base image changed**: The container base image is now `python:3.12-slim` (previously `python:3.11-alpine`). If you use a custom `startup.sh`, please verify compatibility, as Alpine-specific tooling and shell behavior may differ [#212](https://github.com/pSpitzner/beets-flask/issues/212)
 
+### Other (dev)
+
+- We now use `uv` (Universal Virtualenv) to manage python dependencies and run scripts in CI/CD. This should improve dependency resolution and installation times.
+- We now ship a static ffmpeg binary instead of installing ffmpeg via apt. This should reduce image size and improve compatibility across different host systems.
+
 ## [1.2.1] - 25-12-28
 
 ### Fixed

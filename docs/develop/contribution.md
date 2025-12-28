@@ -23,10 +23,13 @@ cd beets-flask
 ```
 
 2.1 **Install the dependencies (backend):**
-We recommend using a virtual environment to manage the dependencies.
+We recommend using uv to manage the python dependencies but you can also use pip and a virtual environment of your choice.
 
 ```bash
 cd backend
+uv sync --all-extras --dev
+source .venv/bin/activate
+# or
 pip install -e .[dev]
 ```
 
@@ -64,8 +67,11 @@ Run [Ruff](https://docs.astral.sh/ruff/) manually or use the pre-commit hooks to
 
 ```bash
 cd backend
-# Run Ruff manually
+# Code formatting and linting
 ruff check
+ruff lint
+# Typing checks
+mypy .
 # Run the tests
 pytest
 ```
