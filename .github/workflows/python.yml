@@ -17,35 +17,34 @@ jobs:
         name: Python checks
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - name: Install Python
-              uses: actions/setup-python@v5
+            - uses: actions/checkout@v5
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v7
               with:
                   python-version: "3.12"
             - name: Install dependencies
               run: |
                   cd ./backend
-                  python -m pip install --upgrade pip
-                  pip install ruff
-                  pip install .[typed,test]
+                  uv sync --all-extras --dev
             - name: Check style with Ruff
               continue-on-error: true
               id: ruff
               run: |
                   cd ./backend
-                  ruff check --output-format=github .
+                  uv run ruff check --output-format=github .
             - name: Check type hints with mypy
               continue-on-error: true
               id: mypy
               run: |
                   cd ./backend
-                  mypy --show-error-codes --check-untyped-defs --config-file ./pyproject.toml .
+                  uv run mypy --show-error-codes --check-untyped-defs --config-file ./pyproject.toml .
             - name: Test with pytest
               env:
                   PYTEST_ADDOPTS: "--color=yes"
               run: |
                   cd ./backend
-                  coverage run -m pytest -v
+                  uv run coverage run -m pytest -v
             - name: Check for failures
               if: steps.ruff.outcome == 'failure' || steps.mypy.outcome == 'failure'
               run: |
