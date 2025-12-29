@@ -1,6 +1,7 @@
 from py2ts.builder import TSBuilder
 from py2ts.config import CONFIG
 
+from beets_flask.config.schema import BeetsSchema
 from beets_flask.disk import Archive, File, FileSystemItem, Folder
 from beets_flask.importer.session import CandidateChoiceFallback
 from beets_flask.importer.states import (
@@ -79,6 +80,10 @@ builder.add(FolderStatusUpdate)
 builder.add(JobStatusUpdate)
 builder.add(FileSystemUpdate)
 
+
+# ---------------------------------- Config ---------------------------------- #
+
+builder.add(BeetsSchema)
 
 builder.save_file("../frontend/src/pythonTypes.ts")
 print("✅ Typescript types generated successfully!")

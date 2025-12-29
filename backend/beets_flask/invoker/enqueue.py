@@ -655,6 +655,6 @@ def _get_live_state_by_folder(
 
 
 def delete_items(task_ids: list[str], delete_files: bool = True):
-    lib = _open_library(get_config())
+    lib = _open_library(get_config().beets_config)
     for task_id in task_ids:
         delete_from_beets(task_id, delete_files=delete_files, lib=lib)

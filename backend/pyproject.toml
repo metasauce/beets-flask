@@ -32,6 +32,7 @@ dependencies = [
     # beets plugin dependencies
     "pylast>=5.2.0",
     "python2ts>=0.6.1",
+    "eyconf>=0.5.0",
     #"scantree>=0.0.4",
     "natsort",
     "tinytag",
@@ -40,13 +41,14 @@ dependencies = [
     "aiofiles",
     "numpy",
     "typing_extensions",
-    "polars>=1.36.1",
+    "polars>=1.36.1"
 ]
 
 [project.optional-dependencies]
 # Can be install with e.g. `pip install -e .[dev]`
 test = [
     "pytest>=8.2.2",
+    "pytest-benchmark>=5.2.3",
     "pytest-asyncio>=0.23.8",
     "pytest-cov>=5.0.0",
     "fakeredis",
@@ -60,9 +62,10 @@ typed = [
     "types-Deprecated",
     "types-aiofiles",
     "types-pytz",
+    "types-pyyaml",
     "pandas-stubs",
 ]
-all = ["beets_flask[dev,test]"]
+all = ["beets_flask[dev,test,typed]"]
 docs = [
     "sphinx>=8.0.2",
     "furo>=2024.8.6",
@@ -151,5 +154,7 @@ module = [
     "mediafile.*",
     "nest_asyncio",
     "beetsplug.*",
+    "eyconf.*",
 ]
 ignore_missing_imports = true
+follow_untyped_imports = true

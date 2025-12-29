@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     # ensue beets own db is created
     config = get_config()
-    _open_library(config)
+    _open_library(config.beets_config)
 
     # ensure beets-flask db is created
     setup_database()

@@ -44,7 +44,7 @@ jobs:
                   PYTEST_ADDOPTS: "--color=yes"
               run: |
                   cd ./backend
-                  uv run coverage run -m pytest -v
+                  uv run coverage run -m pytest -v --benchmark-skip -W ignore::ResourceWarning
             - name: Check for failures
               if: steps.ruff.outcome == 'failure' || steps.mypy.outcome == 'failure'
               run: |

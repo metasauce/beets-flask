@@ -27,7 +27,7 @@ gui:
             Inbox1:
                 name: "Dummy inbox"
                 path: "/music/dummy"
-                autotag: no
+                autotag: "off"
                 # do not automatically trigger tagging and do not automatically import
             Inbox2:
                 name: "Auto Inbox"

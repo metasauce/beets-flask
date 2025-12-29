@@ -22,12 +22,8 @@ if TYPE_CHECKING:
 # Currently artist_sort is completely ignored. Im not even sure what it is supposed to do.
 # Also artistids are not used, but they are in the database.
 
-# Note: I wanted to use polars first but it does not support alpine images yet, so we use pandas instead.
 
-
-ARTIST_SEPARATORS: list[str] = get_config()["gui"]["library"][
-    "artist_separators"
-].as_str_seq()
+ARTIST_SEPARATORS: list[str] = get_config().data.gui.library.artist_separators
 
 
 def _split_pattern(separators: list[str]) -> str:
@@ -57,7 +53,7 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
             SELECT
                 albumartist AS artist,
                 added
-                
+
             FROM
                 albums
         """

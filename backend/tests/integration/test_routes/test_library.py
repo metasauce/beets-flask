@@ -10,6 +10,7 @@ import pytest
 from beets.library import Album
 from quart.typing import TestClientProtocol as Client
 
+from beets_flask.config import get_config
 from tests.conftest import beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
@@ -127,10 +128,10 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
 
     async def test_no_separators(self, client: Client):
         # Validate that the logic works if no separators are defined
-        from beets_flask.config.beets_config import refresh_config
 
-        config = refresh_config()
-        config["gui"]["artist_separators"] = []
+        config = get_config()
+        config.reload()
+        config.data.gui.library.artist_separators = []
 
         # Mock artist_seperators
         with mock.patch(

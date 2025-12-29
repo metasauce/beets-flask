@@ -18,6 +18,10 @@ def test_config():
     """Test that config is correctly set up for testing."""
     import tempfile
 
-    dir = os.environ.get("BEETSFLASKDIR")
-    assert dir is not None
-    assert str(tempfile.tempdir) in dir
+    dir_bf = os.environ.get("BEETSFLASKDIR")
+    assert dir_bf is not None
+    assert str(tempfile.tempdir) in dir_bf
+
+    dir_b = os.environ.get("BEETSDIR")
+    assert dir_b is not None
+    assert str(tempfile.tempdir) in dir_b

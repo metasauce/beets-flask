@@ -2,45 +2,13 @@ import { useMemo } from 'react';
 import { queryOptions, useSuspenseQuery } from '@tanstack/react-query';
 
 import { useLocalStorage } from '@/components/common/hooks/useLocalStorage';
+import { BeetsSchema } from '@/pythonTypes';
 
-export interface MinimalConfig {
-    gui: {
-        inbox: {
-            concat_nested_folders: boolean;
-            expand_files: boolean;
-            folders: Record<
-                string,
-                {
-                    autotag: false | 'preview' | 'auto' | 'bootleg';
-                    auto_threshold?: number;
-                    name: string;
-                    path: string;
-                }
-            >;
-        };
-        library: {
-            include_paths: boolean;
-            readonly: boolean;
-        };
-        num_workers_preview: number;
-        tags: {
-            recent_days: number;
-            expand_tags: boolean;
-            order_by: string;
-            show_unchanged_tracks: boolean;
-        };
-    };
-    import: {
-        duplicate_action: string;
-    };
-    match: {
-        medium_rec_thresh: number;
-        strong_rec_thresh: number;
-        album_disambig_fields: string[];
-        singleton_disambig_fields: string[];
-    };
-    plugins: Array<string>;
-    data_sources: Array<string>;
+import { APIError } from './common';
+
+export interface MinimalConfig extends BeetsSchema {
+    // extra fields that are not in the schema:
+    beets_metadata_sources: Array<string>;
     beets_version: string;
 }
 
@@ -61,7 +29,7 @@ export const useConfig = () => {
 /* ---------------------------- Raw config files ---------------------------- */
 
 export const configYamlQueryOptions = (type: 'beets' | 'beetsflask') =>
-    queryOptions({
+    queryOptions<{ path: string; content: string }, APIError>({
         queryKey: ['config_yaml', type],
         queryFn: async () => {
             const url =

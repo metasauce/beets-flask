@@ -9,6 +9,8 @@ from unittest import mock
 
 import pytest
 
+from beets_flask.config import get_config
+
 if TYPE_CHECKING:
     from beets_flask.importer.types import BeetsLibrary
 
@@ -74,8 +76,6 @@ class IsolatedBeetsLibraryMixin(ABC):
         """Automatically reset the beets library before and after ALL tests in this class."""
         import beets.library
 
-        from beets_flask.config.beets_config import refresh_config
-
         try:
             os.remove(os.environ["BEETSDIR"] + "/library.db")
         except OSError:
@@ -84,8 +84,9 @@ class IsolatedBeetsLibraryMixin(ABC):
             path=os.environ["BEETSDIR"] + "/library.db",
             directory=os.environ["BEETSDIR"] + "/imported",
         )
-        config = refresh_config()
-        config["directory"] = os.environ["BEETSDIR"] + "/imported"
+        config = get_config().reload()
+        config.data.directory = os.environ["BEETSDIR"] + "/imported"
+        config.commit_to_beets()
         # Reset the beets library to a clean state
         yield
         print("Resetting beets library to a clean state...")
@@ -100,13 +101,13 @@ class IsolatedBeetsLibraryMixin(ABC):
         """Return the beets library instance."""
         import beets.library
 
-        from beets_flask.config.beets_config import refresh_config
-
         lib = beets.library.Library(
             path=os.environ["BEETSDIR"] + "/library.db",
             directory=os.environ["BEETSDIR"] + "/imported",
         )
-        refresh_config()
+        config = get_config().reload()
+        config.data.directory = os.environ["BEETSDIR"] + "/imported"
+        config.commit_to_beets()
 
         # mock needed for the library to be available in the resources endpoints
         with mock.patch(

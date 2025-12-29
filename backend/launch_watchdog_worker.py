@@ -12,11 +12,8 @@ from beets_flask.watchdog.inbox import register_inboxes
 
 async def main():
     log.debug(f"Launching inbox watchdog worker")
-    config = get_config()
-    debounce = int(
-        config["gui"]["inbox"]["debounce_before_autotag"].as_number()  # type: ignore
-    )
-    watchdog = register_inboxes(debounce=debounce)
+    debounce_config = get_config().data.gui.inbox.debounce_before_autotag
+    watchdog = register_inboxes(debounce=debounce_config)
 
 
 if __name__ == "__main__":

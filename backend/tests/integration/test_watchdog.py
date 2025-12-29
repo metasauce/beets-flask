@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from beets_flask.config import get_config
-from beets_flask.config.beets_config import refresh_config
+from beets_flask.config.schema import InboxFolderSchema
 from beets_flask.watchdog.inbox import InboxHandler, register_inboxes
 
 
@@ -16,14 +16,15 @@ def preview_autotag(tmpdir_factory):
     This fixture will run before and after all tests in this module.
     """
     config = get_config()
-    config["gui"]["inbox"]["folders"] = {
-        "inbox1": {
-            "path": tmpdir_factory.mktemp("inbox").strpath,
-            "autotag": "preview",
-        },
+    config.data.gui.inbox.folders = {
+        "inbox1": InboxFolderSchema(
+            name="inbox1",
+            path=tmpdir_factory.mktemp("inbox").strpath,
+            autotag="preview",
+        ),
     }
     yield
-    refresh_config()
+    config.reload()
 
 
 from unittest import mock
@@ -50,9 +51,8 @@ async def test_watchdog(preview_autotag, mp_en):
     """Start watching the inbox folder"""
 
     config = get_config()
-    print("foo")
-    inbox_path = Path(str(config["gui"]["inbox"]["folders"]["inbox1"]["path"].get()))
-    inbox_autotag = config["gui"]["inbox"]["folders"]["inbox1"]["autotag"].get()
+    inbox_path = Path(str(config.data.gui.inbox.folders["inbox1"].path))
+    inbox_autotag = config.data.gui.inbox.folders["inbox1"].autotag
 
     assert inbox_path.is_dir(), "Inbox path should be a directory"
     assert inbox_autotag == "preview", "Inbox autotag should be set to 'preview'"

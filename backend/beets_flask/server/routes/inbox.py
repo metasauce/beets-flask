@@ -282,8 +282,8 @@ def compute_stats(folder: str):
         last_created = session.execute(stmt).scalars().first()
 
     ret_map: InboxStats = {
-        "name": inbox["name"],
-        "path": inbox["path"],
+        "name": inbox.name,
+        "path": inbox.path,
         "nFiles": dir_files(p),
         "size": dir_size(p),
         "tagged_via_gui": n_tagged,

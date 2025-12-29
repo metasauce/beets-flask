@@ -5,7 +5,7 @@ from beets_flask.logger import log
 
 num_preview_workers: int = 1  # Default value
 try:
-    num_preview_workers = get_config()["gui"]["num_preview_workers"].get(int)  # type: ignore
+    num_preview_workers = get_config().data.gui.num_preview_workers
     log.debug(f"Got num_preview_workers from config: {num_preview_workers}")
 except:
     pass

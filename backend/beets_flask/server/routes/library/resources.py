@@ -382,7 +382,7 @@ async def items_by_artist(artist_name: str):
 
 def delete_entities(entities: Sequence[Item | Album], delete_files=False) -> None:
     """Helper function to delete entities."""
-    if get_config()["gui"]["library"]["readonly"].get(bool):
+    if get_config().data.gui.library.readonly:
         raise ValueError("Library is read-only")
 
     # Remove
@@ -391,7 +391,7 @@ def delete_entities(entities: Sequence[Item | Album], delete_files=False) -> Non
 
 def update_entities(entities: Sequence[T], data: dict) -> Sequence[T]:
     """Helper function to update entities."""
-    if get_config()["gui"]["library"]["readonly"].get(bool):
+    if get_config().data.gui.library.readonly:
         raise ValueError("Library is read-only")
 
     # Update

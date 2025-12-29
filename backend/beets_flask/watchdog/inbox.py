@@ -1,14 +1,15 @@
 import asyncio
 import os
 import signal
-from collections import OrderedDict
 from pathlib import Path
+from typing import Any, Literal
 
 from watchdog.events import FileMovedEvent, FileSystemEvent
 from watchdog.observers.polling import PollingObserver
 
 from beets_flask import invoker
 from beets_flask.config import get_config
+from beets_flask.config.schema import InboxFolderSchema
 from beets_flask.database.models.states import SessionStateInDb
 from beets_flask.disk import (
     album_folders_from_track_paths,
@@ -58,7 +59,7 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
         return None
     log.info(
         f"Registering watchdog with debounce of {debounce} seconds for "
-        + f"inboxes: {[i['path'] for i in _inboxes]}"
+        + f"inboxes: {[i.path for i in _inboxes]}"
     )
 
     # One observer for all inboxes.
@@ -67,7 +68,7 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
     # timeout/debounce in seconds
 
     watchdog = AIOWatchdog(
-        paths=[Path(i["path"]) for i in _inboxes],
+        paths=[Path(i.path) for i in _inboxes],
         handler=handler,
         observer=observer,
     )
@@ -86,10 +87,10 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
         await asyncio.sleep(10)
         await auto_tag(f)
 
-    auto_inboxes = [i for i in _inboxes if i.get("autotag", None)]
+    auto_inboxes = [i for i in _inboxes if i.autotag not in (False, "off")]
 
     for inbox in auto_inboxes:
-        album_folders = all_album_folders(inbox["path"])
+        album_folders = all_album_folders(inbox.path)
         for f in album_folders:
             asyncio.create_task(auto_tag_wait_for_workers(f))
 
@@ -144,7 +145,10 @@ class InboxHandler(AIOEventHandler):
             log.exception(f"Error in inbox handler task for {album_folder}", e)
 
 
-async def auto_tag(folder_path: Path, inbox_kind: str | None = None):
+async def auto_tag(
+    folder_path: Path,
+    inbox_kind: Literal["auto", "preview", "bootleg", "off"] | None = None,
+):
     """Retag a (taggable) folder.
 
     Parameters
@@ -160,20 +164,20 @@ async def auto_tag(folder_path: Path, inbox_kind: str | None = None):
         return
 
     if inbox_kind is None:
-        inbox_kind = inbox.get("autotag", None)
+        inbox_kind = inbox.autotag
 
     # Infer enqueue kind from inbox kind
     enq_kind: invoker.EnqueueKind
-    enq_kwargs = {}
+    enq_kwargs: dict[str, Any] = {}
     match inbox_kind:
         case "preview":
             enq_kind = invoker.EnqueueKind.PREVIEW
         case "auto":
             enq_kind = invoker.EnqueueKind.IMPORT_AUTO
-            enq_kwargs["import_threshold"] = inbox.get("auto_threshold", None)
+            enq_kwargs["import_threshold"] = inbox.auto_threshold
         case "bootleg":
             enq_kind = invoker.EnqueueKind.IMPORT_BOOTLEG
-        case False | None:
+        case "off" | False | None:
             log.debug(f"Autotagging disabled for {folder_path}, skipping.")
             return
         case _:
@@ -209,12 +213,12 @@ async def auto_tag(folder_path: Path, inbox_kind: str | None = None):
 # ------------------------------------------------------------------------------------ #
 
 
-def get_inbox_for_path(path: str | Path):
+def get_inbox_for_path(path: str | Path) -> InboxFolderSchema | None:
     if isinstance(path, str):
         path = Path(path)
     inbox = None
     for i in get_inboxes():
-        ipath = Path(i["path"])
+        ipath = Path(i.path)
         if path.is_relative_to(ipath) or path == ipath:
             inbox = i
             break
@@ -222,12 +226,12 @@ def get_inbox_for_path(path: str | Path):
 
 
 def get_inbox_folders() -> list[str]:
-    return [i["path"] for i in get_inboxes()]
+    return [i.path for i in get_inboxes()]
 
 
 def is_inbox_folder(path: str) -> bool:
     return path in get_inbox_folders()
 
 
-def get_inboxes() -> list[OrderedDict]:
-    return get_config()["gui"]["inbox"]["folders"].flatten().values()  # type: ignore
+def get_inboxes() -> list[InboxFolderSchema]:
+    return list(get_config().data.gui.inbox.folders.values())

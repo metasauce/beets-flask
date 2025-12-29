@@ -73,3 +73,15 @@ class DummyObject:
     def __getattr__(self, name):
         """Return None for any attribute accessed."""
         return None
+
+
+# -------------------------------- Deprecation ------------------------------- #
+
+
+def deprecation_warning(msg: str, alt_text: str | None = None):
+    """Raises a deprecation warning in the logs."""
+
+    msg = msg + " is deprecated and will not be supported from the v2.0.0 release."
+    if alt_text:
+        msg += " " + alt_text
+    log.warning(msg)

@@ -675,7 +675,7 @@ class CandidateState(BaseState):
         # FIXME: Tracks are not checked for duplicates. Tbh noone cares about tracks anyways
         """
         if lib is None:
-            lib = _open_library(get_config())
+            lib = _open_library(get_config().beets_config)
 
         info = self.match.info.copy()
         info["albumartist"] = info["artist"]
@@ -689,7 +689,7 @@ class CandidateState(BaseState):
         tmp_album = BeetsAlbum(lib, **info)
         keys: list[str] = cast(
             list[str],
-            get_config()["import"]["duplicate_keys"]["album"].as_str_seq() or [],
+            get_config().data.import_.duplicate_keys.album or [],
         )
         dup_query = tmp_album.duplicates_query(keys)
 
@@ -796,7 +796,6 @@ def _index_mapping(
         tdxs.append(found_tdx)
 
     if None in idxs or None in tdxs:
-        # breakpoint()
         raise ValueError(
             f"Index mapping failed: {idxs=} {tdxs=} {len(items)=} {len(tracks)=}"
         )

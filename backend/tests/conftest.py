@@ -6,6 +6,7 @@ from contextlib import _GeneratorContextManager
 from pathlib import Path
 
 import pytest
+import yaml
 from quart import Quart
 from quart.typing import TestClientProtocol
 from sqlalchemy.orm import Session
@@ -35,6 +36,17 @@ def setup_and_teardown(tmpdir_factory):
     os.environ["BEETSFLASKDIR"] = str(tmp_dir / "beets-flask")
     os.makedirs(name=tmp_dir / "beets-flask", exist_ok=True)
     os.environ["IB_SERVER_CONFIG"] = "test"
+
+    # ---------------------- Overwrite default settings ---------------------- #
+
+    # Let's not create default configs that wouldnt pass our tests
+    with open(tmp_dir / "beets-flask/config.yaml", "w") as f:
+        yaml.dump({"gui": {"num_preview_workers": 4}}, f)
+
+    # we have one test that does replacements on this file
+    # and assumes the default 4 workers
+    with open(tmp_dir / "beets/config.yaml", "w") as f:
+        yaml.dump({"plugins": ["musicbrainz"]}, f)
 
     yield
 
@@ -83,11 +95,7 @@ def db_session(db_session_factory):
 def beets_lib() -> Generator[BeetsLibrary, None, None]:
     import beets.library
 
-    from beets_flask.config.beets_config import refresh_config
-
     lib = beets.library.Library(path=os.environ["BEETSDIR"] + "/library.db")
-
-    refresh_config()
 
     # Copy test audio data
     source = Path(__file__).parent / "data" / "audio"

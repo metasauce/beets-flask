@@ -76,6 +76,54 @@ export interface FileSystemUpdate {
     event: 'file_system_update';
 }
 
+export interface MatchSectionSchema {
+    strong_rec_thresh: number;
+    medium_rec_thresh: number;
+}
+
+export interface ImportDuplicateKeys {
+    album: Array<string> | string;
+    item: Array<string> | string;
+}
+
+export interface ImportSection {
+    duplicate_action: 'ask' | 'keep' | 'merge' | 'remove' | 'skip';
+    move: 'False';
+    copy: 'True';
+    duplicate_keys: ImportDuplicateKeys;
+}
+
+export interface BeetsSchema {
+    gui: BeetsFlaskSchema;
+    directory: string;
+    ignore: Array<string>;
+    plugins: Array<string>;
+    import_: ImportSection;
+    match: MatchSectionSchema;
+}
+
+export interface TerminalSectionSchema {
+    start_path: string;
+}
+
+export interface LibrarySectionSchema {
+    readonly: boolean;
+    artist_separators: Array<string>;
+}
+
+export interface InboxSectionSchema {
+    ignore: '_use_beets_ignore' | Array<string>;
+    debounce_before_autotag: number;
+    folders: Record<string, InboxFolderSchema>;
+}
+
+export interface BeetsFlaskSchema {
+    inbox: InboxSectionSchema;
+    library: LibrarySectionSchema;
+    terminal: TerminalSectionSchema;
+    num_preview_workers: number;
+}
+
 export interface Archive extends FileSystemItem {
     is_album: boolean;
 }
@@ -178,6 +226,13 @@ export interface SerializedException {
     message: string;
     description?: null | string;
     trace?: null | string;
+}
+
+export interface InboxFolderSchema {
+    path: string;
+    name: string;
+    auto_threshold: null | number;
+    autotag: 'auto' | 'bootleg' | 'off' | 'preview';
 }
 
 export interface Metadata {

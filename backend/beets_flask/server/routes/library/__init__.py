@@ -41,7 +41,7 @@ async def attach_library():
 
     This allows to reuse an open library for each request in the same thread.
     """
-    config = get_config()
+    config = get_config().beets_config
     # we will need to see if keeping the db open from each thread is what we want,
     # the importer may want to write.
     if not hasattr(g, "lib") or g.lib is None:
