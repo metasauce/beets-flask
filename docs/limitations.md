@@ -28,3 +28,10 @@ We are thinking about workarounds that add back the convenience of automatic del
 
 See also:
 - [#193](https://github.com/pSpitzner/beets-flask/issues/193)
+
+
+## Upload via webfrontend only supports files
+
+This is a design choice, as folder uploads would require users to set up ssl.
+
+To upload whole albums, simply zip them on your host machine before uploading.

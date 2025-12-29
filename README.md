@@ -25,6 +25,7 @@
 -   Undo imports
 -   Web-Terminal
 -   Monitor multiple inboxes
+-   Drag-and-drop files to upload into inboxes
 -   Library view and search
 
 <!-- end features -->

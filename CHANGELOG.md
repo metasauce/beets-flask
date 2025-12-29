@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ⚠️ Breaking Changes ⚠️
 
 - **Base image changed**: The container base image is now `python:3.12-slim` (previously `python:3.11-alpine`). If you use a custom `startup.sh`, please verify compatibility, as Alpine-specific tooling and shell behavior may differ [#212](https://github.com/pSpitzner/beets-flask/issues/212)
+- Changed config option: `gui.inbox.folders.your_inbox.autotag` no longer accepts `false`, use `"off"` instead. (This was needed for consistency for the new config validation)
 
 ### Added
 
 - Config validation. When loading config files we now check that specified options will work. If not, the frontend will show an error message with details on what's wrong. This applies to `gui` settings (i.e. our own ones, `beets-flask/config.yaml`) and very select ones from native beets (only those which we use directly). Hopefully, this will eventually cover all config options of beets native, but this is more of an upsream task. [#224](https://github.com/pSpitzner/beets-flask/pull/224).
+- Upload Files via the WebUI. You can now drag-and-drop single files into an inbox. To upload whole albums, zip them on your host first (uploading of folders directly is not implemented, as it would require a secure context).
 
 
 ### Other (dev)
