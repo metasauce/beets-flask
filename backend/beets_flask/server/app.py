@@ -4,6 +4,7 @@ import json
 import os
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quart import Quart
@@ -82,5 +83,9 @@ class Encoder(json.JSONEncoder):
         # Enum values are not serializable by default
         if isinstance(o, Enum):
             return o.value
+
+        # Path to string
+        if isinstance(o, Path):
+            return str(o)
 
         return json.JSONEncoder.default(self, o)

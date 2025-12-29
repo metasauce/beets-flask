@@ -23,14 +23,12 @@ if TYPE_CHECKING:
 # Also artistids are not used, but they are in the database.
 
 
-ARTIST_SEPARATORS: list[str] = get_config().data.gui.library.artist_separators
+def artist_separators() -> list[str]:
+    return get_config().data.gui.library.artist_separators
 
 
-def _split_pattern(separators: list[str]) -> str:
+def split_pattern(separators: list[str]) -> str:
     return "|".join(map(re.escape, separators))
-
-
-ARTIST_SPLIT_PATTERN = _split_pattern(ARTIST_SEPARATORS)
 
 
 def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
@@ -62,8 +60,10 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
 
     # Split the artist string by the specified separators
     artists: list[str] | None
-    if len(ARTIST_SEPARATORS) > 0 and artist is not None:
-        artists = [a.strip() for a in re.split(ARTIST_SPLIT_PATTERN, artist)]
+    if len(artist_separators()) > 0 and artist is not None:
+        artists = [
+            a.strip() for a in re.split(split_pattern(artist_separators()), artist)
+        ]
     elif artist is not None:
         artists = [artist.strip()]
     else:
@@ -99,14 +99,14 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
     df = df.with_columns((pl.col("added") * 1000).alias("added"))
 
     # Split artist strings into lists and explode into separate rows
-    if len(ARTIST_SEPARATORS) > 0:
+    if len(artist_separators()) > 0:
         # split does not yet support regex...
         # see https://github.com/pola-rs/polars/issues/4819
         # we do a replace workaround
         df = df.with_columns(
             pl.col("artist")
             .str.replace_all("\uffff", "")
-            .str.replace_all(ARTIST_SPLIT_PATTERN, "\uffff")
+            .str.replace_all(split_pattern(artist_separators()), "\uffff")
             .str.split("\uffff")
         ).explode("artist")
 
@@ -122,7 +122,7 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
 
     if artists is not None:
         # If an artist is specified, filter the result
-        pattern = _split_pattern(artists)
+        pattern = split_pattern(artists)
         df = df.filter(pl.col("artist").str.contains(pattern, literal=False))
         # Overwrite if there are multiple artists (i.e. joined by a separator)
         if len(artists) > 1:

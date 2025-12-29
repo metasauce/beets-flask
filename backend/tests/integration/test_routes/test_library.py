@@ -135,8 +135,8 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
 
         # Mock artist_seperators
         with mock.patch(
-            "beets_flask.server.routes.library.artists.ARTIST_SEPARATORS",
-            [],
+            "beets_flask.server.routes.library.artists.artist_separators",
+            lambda: [],
         ):
             response = await client.get("/api_v1/library/artists/Foo; Bar")
             data = await response.get_json()

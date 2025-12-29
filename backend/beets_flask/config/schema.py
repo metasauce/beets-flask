@@ -17,8 +17,10 @@ class BeetsSchema:
     # Besides the beets-flask specific config, we want to ensure type safety
     # for those fields of the native beets config that we use ourself.
     directory: str = field(default="/music/imported")
-    ignore: list[str] = field(default_factory=lambda: [])
-    plugins: list[str] = field(default_factory=lambda: [])
+    ignore: list[str] = field(
+        default_factory=lambda: [".*", "*~", "System Volume Information", "lost+found"]
+    )
+    plugins: list[str] = field(default_factory=lambda: ["musicbrainz"])
 
     # `import` is a reserved keyword in Python. Eyconf's workaround is an alias.
     import_: ImportSection = field(
