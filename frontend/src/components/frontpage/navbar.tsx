@@ -106,6 +106,7 @@ const StyledTab = styled(createLink(Tab))<StyledTabProps>(({ theme }) => ({
         marginTop: 0,
         height: NAVBAR_HEIGHT.mobile,
         display: 'flex',
+        zIndex: 1,
         flexDirection: 'column',
 
         '& svg': {
@@ -196,7 +197,7 @@ export default function NavBar(props: BoxProps) {
             sx={(theme) => ({
                 position: 'fixed',
                 bottom: 0,
-                zIndex: 10,
+                zIndex: 2,
                 width: '100dvw',
                 height: NAVBAR_HEIGHT.mobile,
                 display: 'flex',

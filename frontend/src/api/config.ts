@@ -56,6 +56,7 @@ type ActionOptionMap = {
     undo: {
         delete_files: boolean;
     };
+    upload: undefined;
     import_best: undefined;
     import_bootleg: undefined;
     import_terminal: undefined;
@@ -93,7 +94,6 @@ export interface InboxFolderFrontendConfig {
 export const ACTIONS: Record<string, Action> = {
     retag: {
         name: 'retag',
-        label: 'Retag',
         options: {
             group_albums: false,
             autotag: true,
@@ -104,6 +104,9 @@ export const ACTIONS: Record<string, Action> = {
         options: {
             delete_files: true,
         },
+    },
+    upload: {
+        name: 'upload',
     },
     import_best: {
         name: 'import_best',
@@ -146,7 +149,7 @@ export const DEFAULT_INBOX_FOLDER_FRONTEND_CONFIG: InboxFolderFrontendConfig = {
         },
         extra: {
             variant: 'text',
-            actions: [ACTIONS.delete_imported_folders],
+            actions: [ACTIONS.delete_imported_folders, ACTIONS.upload],
         },
     },
 };

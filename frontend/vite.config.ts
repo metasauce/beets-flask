@@ -50,6 +50,8 @@ export default defineConfig(({ mode }) => {
                 "^/api_v1/.*": {
                     target: "http://localhost:5001",
                     changeOrigin: true,
+                    // proxyTimeout: 60000, // 60 seconds, possibly needed for file uploads
+                    // timeout: 60000,
                 },
                 "^/socket.io/.*": {
                     target: "http://localhost:5001",

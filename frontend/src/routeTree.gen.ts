@@ -19,6 +19,7 @@ import { Route as LibrarySearchRouteImport } from './routes/library/search'
 import { Route as DebugSortable_multiRouteImport } from './routes/debug/sortable_multi'
 import { Route as DebugSortableRouteImport } from './routes/debug/sortable'
 import { Route as DebugJobsRouteImport } from './routes/debug/jobs'
+import { Route as DebugFile_dragRouteImport } from './routes/debug/file_drag'
 import { Route as DebugErrorRouteImport } from './routes/debug/error'
 import { Route as DebugAudioRouteImport } from './routes/debug/audio'
 import { Route as LibraryBrowseIndexRouteImport } from './routes/library/browse/index'
@@ -89,6 +90,11 @@ const DebugSortableRoute = DebugSortableRouteImport.update({
 const DebugJobsRoute = DebugJobsRouteImport.update({
   id: '/debug/jobs',
   path: '/debug/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DebugFile_dragRoute = DebugFile_dragRouteImport.update({
+  id: '/debug/file_drag',
+  path: '/debug/file_drag',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DebugErrorRoute = DebugErrorRouteImport.update({
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/version': typeof VersionRoute
   '/debug/audio': typeof DebugAudioRoute
   '/debug/error': typeof DebugErrorRoute
+  '/debug/file_drag': typeof DebugFile_dragRoute
   '/debug/jobs': typeof DebugJobsRoute
   '/debug/sortable': typeof DebugSortableRoute
   '/debug/sortable_multi': typeof DebugSortable_multiRoute
@@ -245,6 +252,7 @@ export interface FileRoutesByTo {
   '/version': typeof VersionRoute
   '/debug/audio': typeof DebugAudioRoute
   '/debug/error': typeof DebugErrorRoute
+  '/debug/file_drag': typeof DebugFile_dragRoute
   '/debug/jobs': typeof DebugJobsRoute
   '/debug/sortable': typeof DebugSortableRoute
   '/debug/sortable_multi': typeof DebugSortable_multiRoute
@@ -276,6 +284,7 @@ export interface FileRoutesById {
   '/version': typeof VersionRoute
   '/debug/audio': typeof DebugAudioRoute
   '/debug/error': typeof DebugErrorRoute
+  '/debug/file_drag': typeof DebugFile_dragRoute
   '/debug/jobs': typeof DebugJobsRoute
   '/debug/sortable': typeof DebugSortableRoute
   '/debug/sortable_multi': typeof DebugSortable_multiRoute
@@ -311,6 +320,7 @@ export interface FileRouteTypes {
     | '/version'
     | '/debug/audio'
     | '/debug/error'
+    | '/debug/file_drag'
     | '/debug/jobs'
     | '/debug/sortable'
     | '/debug/sortable_multi'
@@ -344,6 +354,7 @@ export interface FileRouteTypes {
     | '/version'
     | '/debug/audio'
     | '/debug/error'
+    | '/debug/file_drag'
     | '/debug/jobs'
     | '/debug/sortable'
     | '/debug/sortable_multi'
@@ -374,6 +385,7 @@ export interface FileRouteTypes {
     | '/version'
     | '/debug/audio'
     | '/debug/error'
+    | '/debug/file_drag'
     | '/debug/jobs'
     | '/debug/sortable'
     | '/debug/sortable_multi'
@@ -408,6 +420,7 @@ export interface RootRouteChildren {
   VersionRoute: typeof VersionRoute
   DebugAudioRoute: typeof DebugAudioRoute
   DebugErrorRoute: typeof DebugErrorRoute
+  DebugFile_dragRoute: typeof DebugFile_dragRoute
   DebugJobsRoute: typeof DebugJobsRoute
   DebugSortableRoute: typeof DebugSortableRoute
   DebugSortable_multiRoute: typeof DebugSortable_multiRoute
@@ -500,6 +513,13 @@ declare module '@tanstack/react-router' {
       path: '/debug/jobs'
       fullPath: '/debug/jobs'
       preLoaderRoute: typeof DebugJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/debug/file_drag': {
+      id: '/debug/file_drag'
+      path: '/debug/file_drag'
+      fullPath: '/debug/file_drag'
+      preLoaderRoute: typeof DebugFile_dragRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/debug/error': {
@@ -713,6 +733,7 @@ const rootRouteChildren: RootRouteChildren = {
   VersionRoute: VersionRoute,
   DebugAudioRoute: DebugAudioRoute,
   DebugErrorRoute: DebugErrorRoute,
+  DebugFile_dragRoute: DebugFile_dragRoute,
   DebugJobsRoute: DebugJobsRoute,
   DebugSortableRoute: DebugSortableRoute,
   DebugSortable_multiRoute: DebugSortable_multiRoute,

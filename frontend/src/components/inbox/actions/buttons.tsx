@@ -10,6 +10,7 @@ import {
     TerminalIcon,
     Trash2Icon,
     UngroupIcon,
+    UploadIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -231,6 +232,8 @@ export function ActionIcon({ action }: { action: Action | Action['name'] }) {
             return <TagIcon size={size} />;
         case 'undo':
             return <HistoryIcon size={size} />;
+        case 'upload':
+            return <UploadIcon size={size} />;
         case 'import_bootleg':
             return <BootlegIcon size={size} />;
         case 'import_best':

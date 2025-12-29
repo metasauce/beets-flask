@@ -90,6 +90,7 @@ class InboxSectionSchema:
     # Useful to exclude temporary files from being shown in the inbox.
     # To show all files (independent of which files beets will copy) set to []
     debounce_before_autotag: int = 30
+    temp_dir: str = field(default="/tmp/beets-flask/upload")
     folders: dict[str, InboxFolderSchema] = field(
         default_factory=lambda: {
             "placeholder": InboxFolderSchema(

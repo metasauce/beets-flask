@@ -38,6 +38,9 @@ class ServerConfig:
     # FIXME: 2025-06-04 likely we only need this in production.
     FRONTEND_DIST_DIR = "../frontend/dist/"
 
+    # For file uploads
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2 GB
+
     # Not sure if this is even used!
     SECRET_KEY = "secret"
 

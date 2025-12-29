@@ -28,6 +28,8 @@ import {
 } from '@/components/inbox/actions/buttons';
 import { getActionDescription } from '@/components/inbox/actions/descriptions';
 import { InboxCard } from '@/components/inbox/cards/inboxCard';
+import { FileUploadProvider } from '@/components/inbox/fileUpload/context';
+import { DropZone } from '@/components/inbox/fileUpload/dropzone';
 import { FolderSelectionProvider } from '@/components/inbox/folderSelectionContext';
 import { Folder } from '@/pythonTypes';
 
@@ -44,39 +46,44 @@ function RouteComponent() {
     const { data: inboxes } = useSuspenseQuery(inboxQueryOptions());
 
     return (
-        <>
-            <PageWrapper
-                sx={(theme) => ({
+        <PageWrapper
+            sx={(theme) => ({
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '100%',
+                alignItems: 'center',
+                paddingTop: theme.spacing(1),
+                paddingInline: theme.spacing(0.5),
+                [theme.breakpoints.up('laptop')]: {
+                    height: 'auto',
+                    paddingTop: theme.spacing(2),
+                    paddingInline: theme.spacing(1),
+                },
+            })}
+        >
+            <PageHeader inboxes={inboxes} />
+            <Box
+                sx={{
+                    width: '100%',
                     display: 'flex',
+                    gap: 2,
                     flexDirection: 'column',
-                    minHeight: '100%',
-                    alignItems: 'center',
-                    paddingTop: theme.spacing(1),
-                    paddingInline: theme.spacing(0.5),
-                    [theme.breakpoints.up('laptop')]: {
-                        height: 'auto',
-                        paddingTop: theme.spacing(2),
-                        paddingInline: theme.spacing(1),
-                    },
-                })}
+                }}
             >
-                <PageHeader inboxes={inboxes} />
-                <Box
-                    sx={{
-                        width: '100%',
-                        display: 'flex',
-                        gap: 2,
-                        flexDirection: 'column',
-                    }}
-                >
+                <FileUploadProvider>
                     {inboxes.map((folder) => (
                         <FolderSelectionProvider key={folder.full_path}>
-                            <InboxCard folder={folder} />
+                            <DropZone inboxDir={folder.full_path}>
+                                <InboxCard
+                                    key={folder.full_path}
+                                    folder={folder}
+                                />
+                            </DropZone>
                         </FolderSelectionProvider>
                     ))}
-                </Box>
-            </PageWrapper>
-        </>
+                </FileUploadProvider>
+            </Box>
+        </PageWrapper>
     );
 }
 
@@ -121,7 +128,6 @@ function PageHeader({ inboxes, ...props }: { inboxes: Folder[] } & BoxProps) {
                     alignSelf: 'center',
                     display: 'flex',
                     gap: 1,
-                    zIndex: 1,
                     borderRadius: 1,
                     color: 'secondary.muted',
                     gridColumn: '1',
@@ -136,7 +142,6 @@ function PageHeader({ inboxes, ...props }: { inboxes: Folder[] } & BoxProps) {
                     alignSelf: 'center',
                     display: 'flex',
                     gap: 1,
-                    zIndex: 1,
                     borderRadius: 1,
                     color: 'secondary.muted',
                     gridColumn: '1',
@@ -256,6 +261,7 @@ function InfoDescription() {
                         <ActionInfo action="copy_path" />
                         <ActionInfo action="delete" />
                         <ActionInfo action="undo" />
+                        <ActionInfo action="upload" />
                     </Box>
                     {/* Tree view */}
                     <Typography sx={{ fontWeight: 'bold', marginBottom: 0.5 }}>
@@ -306,6 +312,29 @@ function InfoDescription() {
                             />
                             <Typography>
                                 Music album (identified as such by beets)
+                            </Typography>
+                        </Box>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                gap: 1,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <FolderTypeIcon
+                                isAlbum={true}
+                                isOpen={false}
+                                isArchive={true}
+                                size={theme.iconSize.lg}
+                            />
+                            <FolderTypeIcon
+                                isAlbum={true}
+                                isOpen={true}
+                                isArchive={true}
+                                size={theme.iconSize.lg}
+                            />
+                            <Typography>
+                                Archive file (identified as such by beets)
                             </Typography>
                         </Box>
                         <Box
