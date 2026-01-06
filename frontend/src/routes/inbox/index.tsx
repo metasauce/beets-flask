@@ -256,14 +256,16 @@ function InfoDescription() {
                         }}
                         component="p"
                     >
-                        <ActionInfo action="retag"/>
-                        <ActionInfo action="import_best"/>
-                        <ActionInfo action="import_bootleg"/>
-                        {config.gui.terminal.enable ?? <ActionInfo action="import_terminal"/>}
-                        <ActionInfo action="copy_path"/>
-                        <ActionInfo action="delete"/>
-                        <ActionInfo action="undo"/>
-                        <ActionInfo action="upload"/>
+                        <ActionInfo action="retag" />
+                        <ActionInfo action="import_best" />
+                        <ActionInfo action="import_bootleg" />
+                        {config.gui.terminal.enable ?? (
+                            <ActionInfo action="import_terminal" />
+                        )}
+                        <ActionInfo action="copy_path" />
+                        <ActionInfo action="delete" />
+                        <ActionInfo action="undo" />
+                        <ActionInfo action="upload" />
                     </Box>
                     {/* Tree view */}
                     <Typography sx={{ fontWeight: 'bold', marginBottom: 0.5 }}>

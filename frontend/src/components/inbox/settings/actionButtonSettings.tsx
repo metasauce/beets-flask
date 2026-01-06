@@ -47,7 +47,8 @@ import {
     Action,
     ACTIONS,
     DEFAULT_INBOX_FOLDER_FRONTEND_CONFIG,
-    InboxFolderFrontendConfig, useConfig,
+    InboxFolderFrontendConfig,
+    useConfig,
 } from '@/api/config';
 import { Dialog } from '@/components/common/dialogs';
 

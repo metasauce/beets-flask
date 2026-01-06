@@ -5,7 +5,7 @@ import { styled } from '@mui/material/styles';
 import Tab, { tabClasses, TabProps } from '@mui/material/Tab';
 import Tabs, { tabsClasses } from '@mui/material/Tabs';
 import { createLink, LinkProps, useRouterState } from '@tanstack/react-router';
-import { useConfig } from "@/api/config.ts";
+import { useConfig } from '@/api/config.ts';
 
 export const NAVBAR_HEIGHT = {
     desktop: '48px',
@@ -145,7 +145,7 @@ function NavTabs() {
     const theme = useTheme();
     const config = useConfig();
 
-    const location = useRouterState({select: (s) => s.location});
+    const location = useRouterState({ select: (s) => s.location });
     let basePath = location.pathname.split('/')[1];
 
     // only needed temporarily until search gets an icon in the toolbar!
@@ -155,10 +155,10 @@ function NavTabs() {
 
     const navItems: StyledTabProps[] = [
         { label: 'Home', icon: <Home />, to: '/' },
-        { label: 'Inbox', icon: <Inbox />, to: '/inbox'},
+        { label: 'Inbox', icon: <Inbox />, to: '/inbox' },
         //{ label: "Session", icon: <Inbox />, to: '/sessiondraft'},
-        {label: 'Library', icon: <Library/>, to: '/library/browse'},
-        {label: 'Search', icon: <Search/>, to: '/library/search'},
+        { label: 'Library', icon: <Library />, to: '/library/browse' },
+        { label: 'Search', icon: <Search />, to: '/library/search' },
     ];
 
     if (config.gui.terminal.enable) {

@@ -14,7 +14,7 @@ import { Terminal as xTerminal } from '@xterm/xterm';
 import useSocket from '@/components/common/websocket/useSocket';
 
 import 'node_modules/@xterm/xterm/css/xterm.css';
-import { useConfig } from "@/api/config.ts";
+import { useConfig } from '@/api/config.ts';
 import { Socket } from 'socket.io-client';
 
 // match our style - this is somewhat redundant with main.css
@@ -143,19 +143,20 @@ export function TerminalContextProvider({
     const config = useConfig();
 
     if (!config.gui.terminal.enable) {
-        const noop = () => {
-        };
+        const noop = () => {};
 
         return (
-            <TerminalContext.Provider value={{
-                open: false,
-                toggle: noop,
-                resetTerm: noop,
-                setOpen: noop,
-                inputText: noop,
-                clearInput: noop,
-                socket: null,
-            }}>
+            <TerminalContext.Provider
+                value={{
+                    open: false,
+                    toggle: noop,
+                    resetTerm: noop,
+                    setOpen: noop,
+                    inputText: noop,
+                    clearInput: noop,
+                    socket: null,
+                }}
+            >
                 {children}
             </TerminalContext.Provider>
         );
@@ -164,11 +165,7 @@ export function TerminalContextProvider({
     return <InitTerminalContext>{children}</InitTerminalContext>;
 }
 
-function InitTerminalContext({
-    children,
- }: {
-    children: React.ReactNode;
-}) {
+function InitTerminalContext({ children }: { children: React.ReactNode }) {
     const { socket, isConnected } = useSocket('terminal');
     const [open, setOpen] = useState(false);
     const [term, setTerm] = useState<xTerminal>();
