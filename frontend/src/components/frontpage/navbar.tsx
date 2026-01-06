@@ -5,6 +5,7 @@ import { styled } from '@mui/material/styles';
 import Tab, { tabClasses, TabProps } from '@mui/material/Tab';
 import Tabs, { tabsClasses } from '@mui/material/Tabs';
 import { createLink, LinkProps, useRouterState } from '@tanstack/react-router';
+
 import { useConfig } from '@/api/config.ts';
 
 export const NAVBAR_HEIGHT = {
