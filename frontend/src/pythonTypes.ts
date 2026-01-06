@@ -103,6 +103,7 @@ export interface BeetsSchema {
 }
 
 export interface TerminalSectionSchema {
+    enable: boolean;
     start_path: string;
 }
 

@@ -4,6 +4,8 @@ from typing import cast
 
 import socketio
 
+from beets_flask.config import get_config
+
 old_on = socketio.AsyncServer.on
 
 
@@ -33,8 +35,13 @@ def register_socketio(app):
     app.asgi_app = socketio.ASGIApp(sio, app.asgi_app, socketio_path="/socket.io")
 
     # Register all socketio namespaces
+    # fmt: off
     from .status import register_status
-    from .terminal import register_tmux
-
-    register_tmux()
     register_status()
+    # fmt: on
+
+    if get_config().data.gui.terminal.enable:
+        # fmt: off
+        from .terminal import register_tmux
+        register_tmux()
+        # fmt: on

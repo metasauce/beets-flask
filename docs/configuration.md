@@ -134,6 +134,11 @@ The default is `[";", ",", "&"]`.
 
 ## Terminal
 
+### `gui.terminal.enable`
+
+A boolean to enable or disable the terminal in the web interface.
+By default, the terminal is enabled. 
+
 ### `gui.terminal.start_path`
 
 Specifies the path that is used when starting the terminal in the web interface.

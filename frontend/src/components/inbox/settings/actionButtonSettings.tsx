@@ -47,7 +47,7 @@ import {
     Action,
     ACTIONS,
     DEFAULT_INBOX_FOLDER_FRONTEND_CONFIG,
-    InboxFolderFrontendConfig,
+    InboxFolderFrontendConfig, useConfig,
 } from '@/api/config';
 import { Dialog } from '@/components/common/dialogs';
 
@@ -775,11 +775,22 @@ function AddActionButton({
     onAdd: (action: Action) => void;
 } & ButtonProps) {
     const theme = useTheme();
+    const config = useConfig();
     const [open, setOpen] = useState(false);
 
-    const defaultActions: Array<Action> = Object.entries(ACTIONS).map(
-        ([_, a]) => a
-    );
+    function isEnabled([actionName, _action]: [string, Action]) {
+        switch (actionName) {
+            case 'import_terminal':
+                return config.gui.terminal.enable;
+            default:
+                return true;
+        }
+    }
+
+    const defaultActions: Array<Action> = Object.entries(ACTIONS)
+        .filter(isEnabled)
+        .map(([_, a]) => a);
+
     const [action, setAction] = useState<Action>(defaultActions[0]);
 
     return (
