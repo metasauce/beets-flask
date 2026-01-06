@@ -143,7 +143,11 @@ export function TerminalContextProvider({
     const config = useConfig();
 
     if (!config.gui.terminal.enable) {
-        const noop = () => {};
+        const noop = () => {
+            console.warn(
+                'Terminal is not available (disabled in server config).'
+            );
+        };
 
         return (
             <TerminalContext.Provider
