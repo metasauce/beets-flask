@@ -8,9 +8,16 @@ Plugin support is experimental.
 Installing beets plugins varies depending on the particular plugin.
 [See the official docs](https://docs.beets.io/en/latest/plugins/index.html).
 
-We might automate this in the future, but for now you can place a `requirements.txt` and/or `startup.sh` in either the `/config` folder or `/config/beets-flask` folder. The `requirements.txt` may include [python dependencies](https://pip.pypa.io/en/stable/reference/requirements-file-format/), and the `startup.sh` file may be an executable shell script that is compatible with the container's alpine linux base.
+We might automate this in the future, but for now you can place a `requirements.txt` and/or `startup.sh` in either the `/config` folder or `/config/beets-flask` folder. The `requirements.txt` may include [python dependencies](https://pip.pypa.io/en/stable/reference/requirements-file-format/), and the `startup.sh` file may be an executable shell script that is compatible with the container's debian linux base.
 
-On startup, the container will run the startup script if it exists, and afterwards install the requirements from the `requirements.txt` file using pip.
+On startup, the container will run the startup script if it exists, and afterwards install the requirements from the `requirements.txt` file using [uv](https://docs.astral.sh/uv/pip/).
+
+```{note}
+We use uv to manage python dependecies in a virtual environment at `/repo/backend/.venv`.
+This should by default be activated already (`which python`), but note that, to install
+more dependencies you need to use `uv pip install`. A normal `pip install` will not place
+packages at the right location.
+```
 
 ## Example startup.sh: keyfinder
 
