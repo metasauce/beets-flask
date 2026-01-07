@@ -43,7 +43,7 @@ export FLASK_DEBUG=1
 cd /repo/backend
 
 uv sync --locked
-source .venv/bin/activate
+# No need to activate, we have this in PATH
 
 redis-server --daemonize yes
 
