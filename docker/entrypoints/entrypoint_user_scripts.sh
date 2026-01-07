@@ -19,9 +19,9 @@ fi
 # check for requirements.txt
 if [ -f /config/requirements.txt ]; then
     log "Installing pip requirements from /config/requirements.txt"
-    pip install -r /config/requirements.txt
+    uv pip install -r /config/requirements.txt
 fi
 if [ -f /config/beets-flask/requirements.txt ]; then
     log "Installing pip requirements from /config/beets-flask/requirements.txt"
-    pip install -r /config/beets-flask/requirements.txt
+    uv pip install -r /config/beets-flask/requirements.txt
 fi
