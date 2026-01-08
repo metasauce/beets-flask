@@ -120,7 +120,8 @@ RUN echo '#!/bin/sh\n\
     echo "Beets-Flask relies on uv for package management. Please avoid pip and use:"\n\
     echo "uv pip install <package>"\n\
     exit 1' > /usr/local/bin/pip
-RUN chmod +x /usr/local/bin/pip
+RUN chmod 755 /usr/local/bin/pip
+RUN chown root:root /usr/local/bin/pip
 RUN ln -sf /usr/local/bin/pip /usr/local/bin/pip3
 
 # ------------------------------------------------------------------------------------ #
