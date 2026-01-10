@@ -1,4 +1,4 @@
-import { Stack, Typography } from '@mui/material';
+import { Alert, AlertTitle, Box } from '@mui/material';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { useConfig } from '@/api/config';
@@ -13,11 +13,19 @@ function TerminalPage() {
     const config = useConfig();
     if (!config.gui.terminal.enable) {
         return (
-            <Stack justifyContent={'center'} height={'75vh'}>
-                <Typography variant={'h5'} align={'center'}>
-                    The terminal is not enabled in the server configuration.
-                </Typography>
-            </Stack>
+            <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                minHeight="75vh"
+            >
+                <Alert severity="warning">
+                    <AlertTitle>Terminal Disabled</AlertTitle>
+                    <Box>
+                        The terminal is not enabled in the server configuration.
+                    </Box>
+                </Alert>
+            </Box>
         );
     }
 
