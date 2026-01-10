@@ -52,7 +52,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
 
         This loads the user config from yaml files after resetting to defaults.
 
-        The `extra_yaml_path` argument is mainly for testing puproses, to add a last
+        The `extra_yaml_path` argument is mainly for testing purposes, to add a last
         yaml layer with high priority.
         """
         log.debug("Resetting/Reloading config")

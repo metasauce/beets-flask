@@ -3,6 +3,7 @@ from collections.abc import Callable
 from typing import cast
 
 import socketio
+from eyconf.validation import ConfigurationError, MultiConfigurationError
 
 from beets_flask.config import get_config
 
@@ -40,7 +41,15 @@ def register_socketio(app):
     register_status()
     # fmt: on
 
-    if get_config().data.gui.terminal.enable:
+    terminal_enabled = True
+    try:
+        terminal_enabled = get_config().data.gui.terminal.enabled
+    except (MultiConfigurationError, ConfigurationError):
+        # We don't want to let the exception propagate here as it won't reach the frontend.
+        # It will get triggered again on the next call to get_config().
+        pass
+
+    if terminal_enabled:
         # fmt: off
         from .terminal import register_tmux
         register_tmux()
