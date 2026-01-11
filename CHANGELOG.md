@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config validation. When loading config files we now check that specified options will work. If not, the frontend will show an error message with details on what's wrong. This applies to `gui` settings (i.e. our own ones, `beets-flask/config.yaml`) and very select ones from native beets (only those which we use directly). Hopefully, this will eventually cover all config options of beets native, but this is more of an upsream task. [#224](https://github.com/pSpitzner/beets-flask/pull/224).
 - Upload Files via the WebUI. You can now drag-and-drop single files into an inbox. To upload whole albums, zip them on your host first (uploading of folders directly is not implemented, as it would require a secure context).
 
+### Fixed
+- Missing library stats dont cause a crash on first launch anymore [#264](https://github.com/pSpitzner/beets-flask/issues/264)
 
 ### Other (dev)
 
