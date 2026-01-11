@@ -96,8 +96,12 @@ RUN mkdir -p /config/beets /config/beets-flask /logs && \
     chown -R beetle:beetle /config /logs
 
 # our default folders they should not be used in production
-RUN mkdir -p /music/inbox /music/imported && \
-    chown -R beetle:beetle /music
+RUN mkdir -p \
+    /music/beets_flask_config_example/imported \
+    /music/beets_flask_config_example/inbox_off \
+    /music/beets_flask_config_example/inbox_auto \
+    /music/beets_flask_config_example/inbox_preview
+RUN chown -R beetle:beetle /music
 
 # Install dependencies:
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \

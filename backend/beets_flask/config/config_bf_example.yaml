@@ -26,12 +26,12 @@ gui:
 
             Inbox1:
                 name: "Dummy inbox"
-                path: "/music/dummy"
+                path: "/music/beets_flask_config_example/inbox_off"
                 autotag: "off"
                 # do not automatically trigger tagging and do not automatically import
             Inbox2:
                 name: "Auto Inbox"
-                path: "/music/inbox_auto"
+                path: "/music/beets_flask_config_example/inbox_auto"
                 autotag: "auto"
                 # trigger tag and import if a good match is found based on `auto_threshold`
                 auto_threshold: null
@@ -40,6 +40,6 @@ gui:
                 # matches with 90% similarity or better.
             Inbox3:
                 name: "An Inbox that only generates the previews"
-                path: "/music/inbox_preview"
+                path: "/music/beets_flask_config_example/inbox_preview"
                 autotag: "preview"
                 # trigger tag but do not import, recommended for most control

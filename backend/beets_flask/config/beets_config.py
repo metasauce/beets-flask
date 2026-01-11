@@ -175,8 +175,11 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
                 )
 
             if (
-                folder.name != "Please check your config!"
-                and not Path(folder.path).exists()
+                not Path(folder.path).exists()
+                and not str(folder.path).startswith(
+                    "/music/beets_flask_config_example/"
+                )
+                # prevent validation errors on our user examples and default value
             ):
                 missing_folder_errors.append(
                     ConfigurationError(
@@ -203,7 +206,9 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
 
         # Check if the user config exists
         # if not, copy the example config to the user config location
+        did_copy = False
         if not os.path.exists(bf_config_path):
+            did_copy = True
             os.makedirs(os.path.dirname(bf_config_path), exist_ok=True)
             # Copy the default config to the user config location
             log.info(f"Beets-flask config not found at {bf_config_path}")
@@ -214,10 +219,23 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         # if it does not exist
         beets_config_path = cls.get_beets_config_path()
         if not os.path.exists(beets_config_path):
+            did_copy = True
             os.makedirs(os.path.dirname(beets_config_path), exist_ok=True)
             log.info(f"Beets config not found at {beets_config_path}")
             log.info(f"Copying default config to {beets_config_path}")
             shutil.copy2(_BEETS_EXAMPLE_PATH, beets_config_path)
+
+        # To pass validation checks, we also need the folders shown in the config demo
+        # to be present. Otherwise the frontend wont be usable on first start.
+        if did_copy:
+            log.info(f"Creating demo inboxes at /music/beets_flask_config_example/")
+            for dir in [
+                "/music/beets_flask_config_example/imported",
+                "/music/beets_flask_config_example/inbox_off",
+                "/music/beets_flask_config_example/inbox_auto",
+                "/music/beets_flask_config_example/inbox_preview",
+            ]:
+                os.makedirs(dir, exist_ok=True)
 
     # ------------------------------ Utility getters ----------------------------- #
 

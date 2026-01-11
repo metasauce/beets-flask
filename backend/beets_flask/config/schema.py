@@ -95,7 +95,7 @@ class InboxSectionSchema:
         default_factory=lambda: {
             "placeholder": InboxFolderSchema(
                 name="Please check your config!",
-                path="/music/inbox",
+                path="/music/beets_flask_config_example/inbox_placeholder",
                 autotag="off",
             )
         }

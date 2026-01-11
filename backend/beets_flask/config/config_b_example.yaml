@@ -27,14 +27,14 @@ plugins: [
         musicbrainz, # needs to be enabled explicitly since beets 2.4.0
     ]
 
-directory: /music/imported
+directory: /music/beets_flask_config_example/imported
 # library: /config/beets/library.db # default location in the container
 
 import:
     move: no
     copy: yes
     write: yes
-    log: /music/last_beets_imports.log
+    log: /music/beets_flask_config_example/last_beets_imports.log
     quiet_fallback: skip
     detail: yes
     duplicate_action: ask # ask|skip|merge|keep|remove
