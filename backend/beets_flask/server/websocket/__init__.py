@@ -43,7 +43,7 @@ def register_socketio(app):
 
     terminal_enabled = True
     try:
-        terminal_enabled = get_config().data.gui.terminal.enabled
+        terminal_enabled = get_config().data.gui.terminal.enable
     except (MultiConfigurationError, ConfigurationError):
         # We don't want to let the exception propagate here as it won't reach the frontend.
         # It will get triggered again on the next call to get_config().
