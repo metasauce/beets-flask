@@ -124,5 +124,5 @@ class LibrarySectionSchema:
 
 @dataclass
 class TerminalSectionSchema:
-    enable: bool = True
+    enabled: bool = True
     start_path: str = "/repo"

@@ -11,7 +11,7 @@ export const Route = createFileRoute('/terminal/')({
 
 function TerminalPage() {
     const config = useConfig();
-    if (!config.gui.terminal.enable) {
+    if (!config.gui.terminal.enabled) {
         return (
             <Box
                 display="flex"
