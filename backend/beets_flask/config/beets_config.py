@@ -235,7 +235,13 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
                 "/music/beets_flask_config_example/inbox_auto",
                 "/music/beets_flask_config_example/inbox_preview",
             ]:
-                os.makedirs(dir, exist_ok=True)
+                try:
+                    os.makedirs(dir, exist_ok=True)
+                except OSError:
+                    log.info(
+                        "Could not create beets_flask_config_example directories, "
+                        + "likely because this was not run inside the docker container."
+                    )
 
     # ------------------------------ Utility getters ----------------------------- #
 
