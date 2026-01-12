@@ -134,10 +134,10 @@ The default is `[";", ",", "&"]`.
 
 ## Terminal
 
-### `gui.terminal.enable`
+### `gui.terminal.enabled`
 
 A boolean to enable or disable the terminal in the web interface.
-By default, the terminal is enabled. 
+By default, the terminal is enabled.
 
 ### `gui.terminal.start_path`
 
@@ -160,8 +160,8 @@ However, the import itself is always done sequentially.
 This is to ensure that the import process is not interrupted by other operations.
 ```
 
-### `gui.inbox.temp_dir` 
-Specifies the temporary directory that is used to store files during the upload process. 
+### `gui.inbox.temp_dir`
+Specifies the temporary directory that is used to store files during the upload process.
 This is useful to ensure that files are uploaded to a filesystem that is fast and has enough
 space. The default value is `/tmp/beets-flask/upload`.
 

@@ -259,7 +259,7 @@ function InfoDescription() {
                         <ActionInfo action="retag" />
                         <ActionInfo action="import_best" />
                         <ActionInfo action="import_bootleg" />
-                        {config.gui.terminal.enable ?? (
+                        {config.gui.terminal.enabled ?? (
                             <ActionInfo action="import_terminal" />
                         )}
                         <ActionInfo action="copy_path" />

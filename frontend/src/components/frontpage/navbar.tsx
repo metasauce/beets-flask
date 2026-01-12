@@ -162,7 +162,7 @@ function NavTabs() {
         { label: 'Search', icon: <Search />, to: '/library/search' },
     ];
 
-    if (config.gui.terminal.enable) {
+    if (config.gui.terminal.enabled) {
         navItems.push({
             label: '',
             icon: <Terminal stroke={theme.palette.primary.main} />,

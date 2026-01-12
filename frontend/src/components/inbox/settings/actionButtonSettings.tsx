@@ -782,7 +782,7 @@ function AddActionButton({
     function isEnabled([actionName, _action]: [string, Action]) {
         switch (actionName) {
             case 'import_terminal':
-                return config.gui.terminal.enable;
+                return config.gui.terminal.enabled;
             default:
                 return true;
         }
