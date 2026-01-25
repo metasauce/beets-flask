@@ -173,11 +173,15 @@ These environment variables are set in the `docker-compose.yaml` file and contro
 
 The `USER_ID` and `GROUP_ID` environment variables are used to set the UID and GID of the `beetle` user inside the container. This is useful to match the user and group IDs of the host system. The default value is `1000` for both.
 
+Need to be set together!
+
 ```yaml
 environment:
     USER_ID: 1000
     GROUP_ID: 1000
 ```
+
+For convenience and your yaml anchors, you can also use `PUID` and `PGID` as in [linuxserver.io images](https://docs.linuxserver.io/general/understanding-puid-and-pgid/).
 
 ### `EXTRA_GROUPS`
 
@@ -205,6 +209,37 @@ environment:
 ```
 
 This will allow the beets-flask container to delete and manage those files via the web UI.
+
+### `BEETSFLASKLOG`
+
+Location and Filename for our log file
+
+Default: `/logs/beets-flask.log`
+
+### `LOG_LEVEL_BEETSFLASK`
+
+Log level for our own logs. Uses Python log level notation (DEBUG, INFO, WARNING etc)
+
+Default: `INFO`
+
+### `LOG_LEVEL_OTHERS`
+
+Log level for our all other modules. Uses Python log level notation (DEBUG, INFO, WARNING etc)
+
+Default: `WARNING`
+
+### `BEETSDIR`
+
+Default: `/config/beets`
+
+Should not be changed.
+
+### `BEETSFLASKDIR`
+
+Default: `/config/beets-flask`
+
+Should not be changed.
+
 
 ## Validation
 
