@@ -21,7 +21,9 @@ export PYTHONWARNINGS="ignore"
 # running the server from inside the backend dir makes imports and redis easier
 cd /repo/backend
 
-redis-server --daemonize yes >/dev/null 2>&1
+if [ -z "$REDIS_URL" ]; then
+  redis-server --daemonize yes >/dev/null 2>&1
+fi
 
 # blocking
 python ./launch_db_init.py
