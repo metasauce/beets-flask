@@ -2,6 +2,14 @@
 SCRIPT_DIR=$(dirname "$0")
 . "$SCRIPT_DIR/common.sh"
 
+# We want to allow both, USER_ID and PUID (the linuxserver.io convention)
+if [ -n "$PUID" ]; then
+    USER_ID=$PUID
+fi
+if [ -n "$PGID" ]; then
+    GROUP_ID=$PGID
+fi
+
 if [ ! -z "$USER_ID" ] && [ ! -z "$GROUP_ID" ]; then
     log "Fixing permissions as '$(whoami)' with UID $(id -u) and GID $(id -g)"
     log "Setting beetle user to $USER_ID:$GROUP_ID"
