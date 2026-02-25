@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upload Files via the WebUI. You can now drag-and-drop single files into an inbox. To upload whole albums, zip them on your host first (uploading of folders directly is not implemented, as it would require a secure context).
 - New config option `gui.terminal.enabled` (default: true) [#254](https://github.com/pSpitzner/beets-flask/pull/224)
 - You can now alternatively use `PUID` and `PGID` instead of `GROUP_ID` and `USER_ID` environment variables. Good for [yaml anchors](https://docs.docker.com/reference/compose-file/fragments/). [#260](https://github.com/pSpitzner/beets-flask/issues/260)
+- Use an external redis server by setting the `REDIS_URL` environment variable. [#277](https://github.com/pSpitzner/beets-flask/pull/277)
 
 ### Fixed
 - Missing library stats dont cause a crash on first launch anymore [#264](https://github.com/pSpitzner/beets-flask/issues/264)
