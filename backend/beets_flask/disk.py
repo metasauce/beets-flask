@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import subprocess
@@ -7,14 +8,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from functools import cache
 from pathlib import Path
 from typing import (
     Literal,
 )
 
-from beets.importer import (
-    ArchiveImportTask,
-)
 from beets.importer.tasks import (
     MULTIDISC_MARKERS,
     MULTIDISC_PAT_FMT,
@@ -222,9 +221,28 @@ class Archive(FileSystemItem):
         )
 
 
+@cache
+def allowed_archive_extensions() -> list[str]:
+    # Tar files
+    ext = [".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"]
+    # Zip files
+    ext += [".zip"]
+    if importlib.util.find_spec("rarfile") is not None:
+        ext += [".rar"]
+    if importlib.util.find_spec("py7zr") is not None:
+        ext += [".7z"]
+    return ext
+
+
 def is_archive_file(path: Path | str) -> bool:
-    """Check if a file is an archive file based on its extension."""
-    return ArchiveImportTask.is_archive(str(path))
+    """Check if a file is an archive file based on its extension.
+
+    It seems like there is a memory issue with `tarfile.is_tarfile`
+    (see https://github.com/pSpitzner/beets-flask/issues/258). We try
+    to avoid this by only checking the file extension here, and not trying to open the file.
+    """
+    allowed_extensions = allowed_archive_extensions()
+    return Path(path).suffix.lower() in allowed_extensions
 
 
 @dataclass
