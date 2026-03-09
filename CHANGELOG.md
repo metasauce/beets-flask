@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Missing library stats dont cause a crash on first launch anymore [#264](https://github.com/pSpitzner/beets-flask/issues/264)
+- Fixed a potential memory leak when checking if files are archives. We now only check the file extension instead of trying to open the file, which should avoid the issue with `tarfile.is_tarfile` [#258](https://github.com/pSpitzner/beets-flask/issues/258)
 
 ### Other (dev)
 
