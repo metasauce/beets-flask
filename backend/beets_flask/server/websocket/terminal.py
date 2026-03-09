@@ -42,7 +42,7 @@ def register_tmux():
     global session, window, pane, server
 
     if server is None:
-        server = libtmux.Server()
+        server = libtmux.Server(socket_name="beets-flask")
 
     try:
         abs_path_lib = get_config().data.gui.terminal.start_path
@@ -51,7 +51,9 @@ def register_tmux():
 
     try:
         session = server.new_session(
-            session_name="beets-socket-term", start_directory=abs_path_lib
+            session_name="beets-socket-term",
+            start_directory=abs_path_lib,
+            window_command="/usr/bin/bash",
         )
     except LibTmuxException:  # DuplicateSessionName
         session = server.sessions.get(session_name="beets-socket-term")  # type: ignore
