@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from functools import cache
+import importlib.util
 import os
 import re
 import subprocess
@@ -8,14 +8,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from functools import cache
 from pathlib import Path
 from typing import (
     Literal,
 )
 
-from beets.importer import (
-    ArchiveImportTask,
-)
 from beets.importer.tasks import (
     MULTIDISC_MARKERS,
     MULTIDISC_PAT_FMT,
@@ -229,19 +227,10 @@ def allowed_archive_extensions() -> list[str]:
     ext = [".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"]
     # Zip files
     ext += [".zip"]
-    try:
-        from rarfile import RarFile
-
+    if importlib.util.find_spec("rarfile") is not None:
         ext += [".rar"]
-    except ImportError:
-        pass
-
-    try:
-        from py7zr import SevenZipFile
-
+    if importlib.util.find_spec("py7zr") is not None:
         ext += [".7z"]
-    except ImportError:
-        pass
     return ext
 
 
