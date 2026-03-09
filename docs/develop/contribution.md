@@ -68,8 +68,8 @@ Run [Ruff](https://docs.astral.sh/ruff/) manually or use the pre-commit hooks to
 ```bash
 cd backend
 # Code formatting and linting
-ruff check
-ruff lint
+ruff check . --fix
+ruff format .
 # Typing checks
 mypy .
 # Run the tests
