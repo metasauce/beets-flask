@@ -76,7 +76,7 @@ RUN pnpm run build
 #                                     Base                                     #
 # ---------------------------------------------------------------------------- #
 
-FROM python:3.12-slim-trixie AS base
+FROM debian:trixie-slim AS base
 COPY --from=builder_py /bin/uv /bin/uvx /bin/
 
 ENV HOSTNAME="beets-container"
@@ -117,16 +117,10 @@ COPY --from=builder_ffmpeg /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=builder_ffmpeg /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
 RUN ffmpeg -version
 
-# Remove pip to avoid confusion (force users to use `uv pip install`)
-RUN rm -f /usr/local/bin/pip /usr/local/bin/pip3
-RUN rm -rf /root/.cache/pip
+# Usability: make uv and pip available globally, but redirect to the ones in the venv
 RUN echo '#!/bin/sh\n\
-    echo "Beets-Flask relies on uv for package management. Please avoid pip and use:"\n\
-    echo "uv pip install <package>"\n\
-    exit 1' > /usr/local/bin/pip
-RUN chmod 755 /usr/local/bin/pip
-RUN chown root:root /usr/local/bin/pip
-RUN ln -sf /usr/local/bin/pip /usr/local/bin/pip3
+    exec uv pip "$@"' > /usr/local/bin/pip && \
+    chmod +x /usr/local/bin/pip
 
 # ------------------------------------------------------------------------------------ #
 #                                      Production                                      #
@@ -167,6 +161,7 @@ ENV UV_LINK_MODE=copy
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     apt-get update && \
     apt-get install -y --no-install-recommends \
+        ca-certificates \
         curl \
         build-essential && \
     rm -rf /var/lib/apt/lists/*
@@ -189,7 +184,7 @@ COPY ./backend/pyproject.toml ./backend/uv.lock /repo/backend/
 WORKDIR /repo/frontend
 RUN mkdir -p /version
 RUN node -p "require('/repo/frontend/package.json').version" > /version/frontend.txt
-RUN python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyproject.toml', 'rb'))['project']['version'])" > /version/backend.txt
+RUN uv run python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyproject.toml', 'rb'))['project']['version'])" > /version/backend.txt
 
 # relies on mounting this volume
 WORKDIR /repo
