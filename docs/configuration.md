@@ -256,7 +256,7 @@ services:
         ...
         environment:
             ...
-            REDIS_URL: "http://redis:3000/"
+            REDIS_URL: "redis://redis:6379/"
 volumes:
     redis:
 ```
