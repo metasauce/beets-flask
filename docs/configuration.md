@@ -240,6 +240,26 @@ Default: `/config/beets-flask`
 
 Should not be changed.
 
+### `REDIS_URL`
+
+Usually, a daemonised Redis server is started within the container. This can cause issues due to the expectation that only one process runs per container, or if you wish to run the beets-flask container with a read-only root filesystem, or want greater control over the persistence of the Redis database. The `REDIS_URL` environment variable makes beets-flask connect to an external Redis instead, ideally one running in another container.
+
+Example: Add a Redis container to your `docker-compose.yaml`, and make beets-flask connect to it:
+
+```yaml
+services:
+    redis:
+        image: docker.io/library/redis:alpine
+        volumes:
+            - redis:/data
+    beets-flask:
+        ...
+        environment:
+            ...
+            REDIS_URL: "redis://redis:6379/"
+volumes:
+    redis:
+```
 
 ## Validation
 
