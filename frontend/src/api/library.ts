@@ -263,6 +263,27 @@ export interface Artist {
     first_album_added?: Date;
 }
 
+const parseApiDate = (value: unknown): Date | undefined => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+
+    const numeric = typeof value === 'number' ? value : Number(value);
+    if (!Number.isNaN(numeric)) {
+        // Some API responses provide UNIX seconds while others use milliseconds.
+        const timestamp = numeric < 1e12 ? numeric * 1000 : numeric;
+        const date = new Date(timestamp);
+        return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+
+    if (typeof value === 'string') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+
+    return undefined;
+};
+
 // List of all artists
 export const artistsQueryOptions = () => ({
     queryKey: ['artists'],
@@ -272,19 +293,10 @@ export const artistsQueryOptions = () => ({
 
         for (let i = 0; i < artists.length; i++) {
             const artist = artists[i];
-            // Convert timestamps to Date objects
-            if (artist.last_item_added) {
-                artist.last_item_added = new Date(artist.last_item_added);
-            }
-            if (artist.last_album_added) {
-                artist.last_album_added = new Date(artist.last_album_added);
-            }
-            if (artist.first_item_added) {
-                artist.first_item_added = new Date(artist.first_item_added);
-            }
-            if (artist.first_album_added) {
-                artist.first_album_added = new Date(artist.first_album_added);
-            }
+            artist.last_item_added = parseApiDate(artist.last_item_added);
+            artist.last_album_added = parseApiDate(artist.last_album_added);
+            artist.first_item_added = parseApiDate(artist.first_item_added);
+            artist.first_album_added = parseApiDate(artist.first_album_added);
         }
         return artists;
         // TODO: fill cache data for single artists queries
