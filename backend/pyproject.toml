@@ -6,8 +6,7 @@ authors = [
     { name = "F. Paul Spitzner", email = "paul.spitzner@gmail.com" },
     { name = "Sebastian B. Mohr", email = "sebastian@mohrenclan.de" },
 ]
-requires-python = ">= 3.11"
-readme = "../README.md"
+requires-python = "==3.12.*"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
