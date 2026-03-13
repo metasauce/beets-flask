@@ -22,7 +22,7 @@ RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${TARGETARC
 
 # ------------------------------ Builder python ------------------------------ #
 
-FROM ghcr.io/astral-sh/uv:python3.12-trixie-slim AS builder_py
+FROM python:3.12-slim AS builder_py
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /repo/backend
@@ -30,18 +30,21 @@ ENV PYTHONUNBUFFERED=1
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV UV_NO_DEV=1
+ENV UV_NO_EDITABLE=1
 ENV UV_PYTHON_DOWNLOADS=0
 
 # Install backend dependencies
-COPY ./backend/pyproject.toml ./backend/uv.lock /repo/backend/
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=backend/uv.lock,target=uv.lock \
+    --mount=type=bind,source=backend/pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project
 
 # Install backend package
-COPY ./README.md /repo/
 COPY ./backend/beets_flask/ /repo/backend/beets_flask/
 COPY ./backend/generate_types.py /repo/backend/
 COPY ./backend/launch_*.py /repo/backend/
+COPY ./backend/pyproject.toml /repo/backend
+COPY ./backend/uv.lock /repo/backend
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
@@ -71,13 +74,12 @@ RUN node -p "require('/repo/frontend/package.json').version" > /version/frontend
 
 RUN pnpm run build
 
-
 # ---------------------------------------------------------------------------- #
 #                                     Base                                     #
 # ---------------------------------------------------------------------------- #
 
-FROM debian:trixie-slim AS base
-COPY --from=builder_py /bin/uv /bin/uvx /bin/
+FROM python:3.12-slim-trixie AS base
+COPY --from=builder_py /bin/uv/ /bin/uvx/ /bin/
 
 ENV HOSTNAME="beets-container"
 ENV EDITOR="vi"
@@ -85,11 +87,15 @@ ENV EDITOR="vi"
 ENV BEETSDIR="/config/beets"
 ENV BEETSFLASKDIR="/config/beets-flask"
 ENV BEETSFLASKLOG="/logs/beets-flask.log"
-ENV PATH="/repo/backend/.venv/bin:$PATH"
 
 # Create user and group
 RUN groupadd -g 1000 beetle && \
-    useradd -m -u 1000 -g beetle beetle
+    useradd -m -u 1000 -g beetle beetle && \
+    usermod -s /bin/bash beetle
+    
+ENV VIRTUAL_ENV_DISABLE_PROMPT=1 
+RUN echo 'if [ -f /repo/backend/.venv/bin/activate ]; then source /repo/backend/.venv/bin/activate; fi' >> /home/beetle/.bashrc
+RUN echo 'alias pip="echo '\''Beets-Flask relies on uv. Use: uv pip install'\''"' >> /home/beetle/.bashrc
 
 # map beets directory and our configs to /config
 RUN mkdir -p /config/beets /config/beets-flask /logs && \
@@ -117,11 +123,6 @@ COPY --from=builder_ffmpeg /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=builder_ffmpeg /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
 RUN ffmpeg -version
 
-# Usability: make uv and pip available globally, but redirect to the ones in the venv
-RUN echo '#!/bin/sh\n\
-    exec uv pip "$@"' > /usr/local/bin/pip && \
-    chmod +x /usr/local/bin/pip
-
 # ------------------------------------------------------------------------------------ #
 #                                      Production                                      #
 # ------------------------------------------------------------------------------------ #
@@ -139,11 +140,10 @@ COPY --from=builder_py --chown=beetle:beetle /version/backend.txt /version/backe
 COPY --chown=beetle:beetle ./docker/entrypoints/*.sh /repo/
 RUN chmod +x /repo/*.sh
 
-USER root
-
 ENTRYPOINT [ \
     "/bin/bash", "-c", \
-    "/repo/entrypoint_fix_permissions.sh && \
+    "source ./backend/.venv/bin/activate && \
+    /repo/entrypoint_fix_permissions.sh && \
     /repo/entrypoint_user_scripts.sh && \
     su beetle -c /repo/entrypoint.sh" \
     ]
@@ -156,7 +156,6 @@ ENTRYPOINT [ \
 FROM base AS dev
 
 ENV IB_SERVER_CONFIG="dev_docker"
-ENV UV_LINK_MODE=copy
 
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     apt-get update && \
@@ -165,6 +164,7 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
         curl \
         build-essential && \
     rm -rf /var/lib/apt/lists/*
+
 
 # Install nodejs
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -188,11 +188,11 @@ RUN uv run python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyp
 
 # relies on mounting this volume
 WORKDIR /repo
-USER root
 ENTRYPOINT [ \
     "/bin/bash", "-c", \
-    "./docker/entrypoints/entrypoint_fix_permissions.sh && \
-     ./docker/entrypoints/entrypoint_user_scripts.sh && \
+    "source ./backend/.venv/bin/activate && \
+    ./docker/entrypoints/entrypoint_fix_permissions.sh && \
+    ./docker/entrypoints/entrypoint_user_scripts.sh && \
     su beetle -c ./docker/entrypoints/entrypoint_dev.sh" \
     ]
 
