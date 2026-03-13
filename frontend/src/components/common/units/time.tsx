@@ -1,3 +1,24 @@
+export const parseApiDate = (value: unknown): Date | undefined => {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+
+    const numeric = typeof value === 'number' ? value : Number(value);
+    if (!Number.isNaN(numeric)) {
+        // Some API responses provide UNIX seconds while others use milliseconds.
+        const timestamp = numeric < 1e12 ? numeric * 1000 : numeric;
+        const date = new Date(timestamp);
+        return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+
+    if (typeof value === 'string') {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+
+    return undefined;
+};
+
 export const relativeTime = (date?: Date | null) => {
     if (!date) return 'never';
 
