@@ -2,9 +2,6 @@
 SCRIPT_DIR=$(dirname "$0")
 . "$SCRIPT_DIR/common.sh"
 
-export PIP_DISABLE_PIP_VERSION_CHECK=1
-export PIP_ROOT_USER_ACTION=ignore
-
 # check for user startup scripts
 if [ -f /config/startup.sh ]; then
     log "Running user startup script from /config/startup.sh"
