@@ -271,10 +271,10 @@ class BaseSession(importer.ImportSession, ABC):
         # get settings from user settings, this is not a dict, but confuse config
         # the confuse config views do not throw key errors, and their .get() is not
         # the same as dict.get(), but rather resolves the value.
-        default = get_config()
+        config_view = get_config()
         for p in path:
-            default = default[p]
-        default = default.get(type_func) if type_func else default.get()
+            config_view = config_view[p]
+        default = config_view.get(type_func) if type_func else config_view.get()
         return default
 
     # -------------------------- State handling helpers -------------------------- #
