@@ -3,7 +3,7 @@
 # FFMPEG comes with a ton of dependencies (e.g. llvm)
 # the full install is over 400mb...
 # we use a static version which is only 50mb
-FROM debian:trixie-slim AS builder_ffmpeg
+FROM python:3.12-slim-trixie AS builder_ffmpeg
 
 # Install required tools
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
@@ -22,7 +22,7 @@ RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${TARGETARC
 
 # ------------------------------ Builder python ------------------------------ #
 
-FROM python:3.12-slim AS builder_py
+FROM python:3.12-slim-trixie AS builder_py
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /repo/backend
@@ -55,6 +55,8 @@ RUN python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyproject.
 
 # ------------------------------- Builder node ------------------------------- #
 
+# Note: there is no tag for node that fixes to debian trixi.
+# we might get inconsistencies after a new debian release
 FROM node:22-slim AS builder_node
 
 # Install pnpm
@@ -92,8 +94,8 @@ ENV BEETSFLASKLOG="/logs/beets-flask.log"
 RUN groupadd -g 1000 beetle && \
     useradd -m -u 1000 -g beetle beetle && \
     usermod -s /bin/bash beetle
-    
-ENV VIRTUAL_ENV_DISABLE_PROMPT=1 
+
+ENV VIRTUAL_ENV_DISABLE_PROMPT=1
 RUN echo 'if [ -f /repo/backend/.venv/bin/activate ]; then source /repo/backend/.venv/bin/activate; fi' >> /home/beetle/.bashrc
 RUN echo 'alias pip="echo '\''Beets-Flask relies on uv. Use: uv pip install'\''"' >> /home/beetle/.bashrc
 
