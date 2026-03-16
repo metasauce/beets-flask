@@ -3,7 +3,7 @@ name = "beets-flask"
 description = "An opinionated web-interface around the music organizer [beets](https://beets.io/)"
 version = "2.0.0-rc2"
 authors = [
-    { name = "F. Paul Spitzner", email = "paul.spitzner@gmail.com" },
+    { name = "F. Paul Spitzner", email = "github@makeitso.one" },
     { name = "Sebastian B. Mohr", email = "sebastian@mohrenclan.de" },
 ]
 requires-python = "==3.12.*"
@@ -29,9 +29,10 @@ dependencies = [
     # Used for hosting the web-interface & api
     "uvicorn>=0.36.0",
     # beets plugin dependencies
+    "beets-aisauce>=0.2.1",
     "pylast>=5.2.0",
     "python2ts>=0.6.1",
-    "eyconf>=0.5.0",
+    "eyconf>=0.5.1",
     #"scantree>=0.0.4",
     "natsort",
     "tinytag",

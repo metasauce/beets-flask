@@ -1,6 +1,7 @@
 import {
     AudioLinesIcon,
     BadgeAlertIcon,
+    BotIcon,
     BrainIcon,
     CalendarIcon,
     CassetteTapeIcon,
@@ -177,6 +178,8 @@ export function SourceTypeIcon({
         case 'mb':
         case 'musicbrainz':
             return <BrainIcon {...props} />;
+        case 'aisauce':
+            return <BotIcon {...props} />;
         case 'asis':
             return <FileMusicIcon {...props} />;
         default:

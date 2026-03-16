@@ -9,13 +9,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+# ---------------------------------------------------------------------------- #
+#                                     Beets                                    #
+# ---------------------------------------------------------------------------- #
+
 
 @dataclass
 class BeetsSchema:
     gui: BeetsFlaskSchema = field(default_factory=lambda: BeetsFlaskSchema())
 
     # Besides the beets-flask specific config, we want to ensure type safety
-    # for those fields of the native beets config that we use ourself.
+    # for those fields of the native beets config that we use ourselves.
     directory: str = field(default="/music/imported")
     ignore: list[str] = field(
         default_factory=lambda: [".*", "*~", "System Volume Information", "lost+found"]
@@ -29,10 +33,12 @@ class BeetsSchema:
     )
     match: MatchSectionSchema = field(default_factory=lambda: MatchSectionSchema())
 
-
-# ---------------------------------------------------------------------------- #
-#                                     Beets                                    #
-# ---------------------------------------------------------------------------- #
+    # known plugins
+    aisauce: PluginAiSauceSchema = field(default_factory=lambda: PluginAiSauceSchema())
+    # Note: we currently set the defaults from the schema in commit_to_beets.
+    # This prevents us from using None as default value in beets root-level entries.
+    # For instance `aisauce: PluginAiSauceSchema | None = None` wont work, we need
+    # to sepcify a default schema - to know the defaults for every plugin we add.
 
 
 @dataclass
@@ -80,6 +86,24 @@ class BeetsFlaskSchema:
     num_preview_workers: int = field(default=4)
 
 
+# ---------------------------------- Library --------------------------------- #
+
+
+@dataclass
+class LibrarySectionSchema:
+    readonly: bool = False
+    artist_separators: list[str] = field(default_factory=lambda: [",", ";", "&"])
+
+
+# --------------------------------- Terminal --------------------------------- #
+
+
+@dataclass
+class TerminalSectionSchema:
+    enabled: bool = True
+    start_path: str = "/repo"
+
+
 # ----------------------------------- Inbox ---------------------------------- #
 
 
@@ -105,24 +129,39 @@ class InboxSectionSchema:
 @dataclass
 class InboxFolderSchema:
     path: str
-    name: str = "_use_heading"
+    name: str = "_use_heading"  # names should be unique
     auto_threshold: float | None = None
     autotag: Literal["auto", "preview", "bootleg", "off"] = "off"
-
-
-# ---------------------------------- Library --------------------------------- #
-
-
-@dataclass
-class LibrarySectionSchema:
-    readonly: bool = False
-    artist_separators: list[str] = field(default_factory=lambda: [",", ";", "&"])
-
-
-# --------------------------------- Terminal --------------------------------- #
+    overrides: InboxSpecificOverridesSchema = field(
+        default_factory=lambda: InboxSpecificOverridesSchema()
+    )
 
 
 @dataclass
-class TerminalSectionSchema:
-    enabled: bool = True
-    start_path: str = "/repo"
+class InboxSpecificOverridesSchema:
+    plugins: list[str] | Literal["_use_all"] = "_use_all"
+    aisauce: PluginAiSauceSchema = field(default_factory=lambda: PluginAiSauceSchema())
+
+
+# ---------------------------------- Plugins --------------------------------- #
+
+
+@dataclass
+class PluginAiSauceSchema:
+    mode: Literal["metadata_source", "metadata_cleanup"] = "metadata_cleanup"
+    providers: list[PluginAiSauceProviderSchema] = field(default_factory=lambda: [])
+    sources: list[PluginAiSauceSourceSchema] = field(default_factory=lambda: [])
+
+
+@dataclass
+class PluginAiSauceProviderSchema:
+    id: str
+    model: str
+    api_key: str
+    api_base_url: str
+
+@dataclass
+class PluginAiSauceSourceSchema:
+    provider_id: str
+    user_prompt: str | None
+    system_prompt: str | None

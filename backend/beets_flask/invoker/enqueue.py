@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from contextlib import contextmanager
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -433,7 +434,7 @@ async def run_preview(
 
     log.info(f"Preview task on {hash=} {path=}")
 
-    with db_session_factory() as db_session:
+    with inbox_config_override(path), db_session_factory() as db_session:
         f_on_disk = FolderInDb.get_current_on_disk(hash, path)
         if hash != f_on_disk.hash:
             log.warning(
@@ -465,7 +466,6 @@ async def run_preview(
             db_session.commit()
 
     log.info(f"Preview done. {hash=} {path=}")
-    return
 
 
 # redis preview queue
@@ -486,7 +486,7 @@ async def run_preview_add_candidates(
     """
     log.info(f"Add preview candidates task on {hash=}")
 
-    with db_session_factory() as db_session:
+    with inbox_config_override(path), db_session_factory() as db_session:
         s_state_live = _get_live_state_by_folder(hash, path, db_session)
 
         a_session = AddCandidatesSession(
@@ -523,7 +523,7 @@ async def run_import_candidate(
     """
     log.info(f"Import task on {hash=} {path=}")
 
-    with db_session_factory() as db_session:
+    with inbox_config_override(path), db_session_factory() as db_session:
         s_state_live = _get_live_state_by_folder(hash, path, db_session)
 
         i_session = ImportSession(
@@ -553,7 +553,7 @@ async def run_import_auto(
 ):
     log.info(f"Auto Import task on {hash=} {path=}")
 
-    with db_session_factory() as db_session:
+    with inbox_config_override(path), db_session_factory() as db_session:
         s_state_live = _get_live_state_by_folder(hash, path, db_session)
         i_session = AutoImportSession(
             s_state_live,
@@ -577,7 +577,7 @@ async def run_import_auto(
 async def run_import_bootleg(hash: str, path: str):
     log.info(f"Bootleg Import task on {hash=} {path=}")
 
-    with db_session_factory() as db_session:
+    with inbox_config_override(path), db_session_factory() as db_session:
         # TODO: add duplicate action
         # TODO: sort out how to generate previews for asis candidates
         s_state_live = _get_live_state_by_folder(
@@ -600,7 +600,7 @@ async def run_import_bootleg(hash: str, path: str):
 async def run_import_undo(hash: str, path: str, delete_files: bool):
     log.info(f"Import Undo task on {hash=} {path=}")
 
-    with db_session_factory() as db_session:
+    with inbox_config_override(path), db_session_factory() as db_session:
         s_state_live = _get_live_state_by_folder(hash, path, db_session)
         i_session = UndoSession(s_state_live, delete_files=delete_files)
 
@@ -612,6 +612,9 @@ async def run_import_undo(hash: str, path: str, delete_files: bool):
             db_session.commit()
 
     log.info(f"Import Undo done. {hash=} {path=}")
+
+
+# ---------------------------------- Helper ---------------------------------- #
 
 
 def _get_live_state_by_folder(
@@ -658,3 +661,25 @@ def delete_items(task_ids: list[str], delete_files: bool = True):
     lib = _open_library(get_config().beets_config)
     for task_id in task_ids:
         delete_from_beets(task_id, delete_files=delete_files, lib=lib)
+
+
+@contextmanager
+def inbox_config_override(path):
+    """
+    Context manager for applying inbox-specific overrides.
+
+    Ensures that overrides are reset even if inner code raises exceptions.
+    """
+    from beets_flask.watchdog.inbox import get_inbox_for_path
+
+    config = get_config()
+    inbox = get_inbox_for_path(path)
+    if inbox is None:
+        log.warning(f"{path} is not in an inbox, this should only happen in tests")
+    else:
+        config.apply_inbox_specific_overrides(inbox.path)
+
+    try:
+        yield config
+    finally:
+        config.reset_inbox_specific_overrides()

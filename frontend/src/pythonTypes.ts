@@ -5,6 +5,7 @@
  */
 export type File = FileSystemItem;
 
+
 export interface SerializedSessionState {
     id: string;
     created_at: Date;
@@ -46,7 +47,7 @@ export interface JobStatusUpdate {
     num_jobs: number;
     job_metas: Array<JobMeta>;
     exc: SerializedException | null;
-    event: 'job_status_update';
+    event: "job_status_update";
 }
 
 export interface InboxStats {
@@ -64,7 +65,7 @@ export interface FolderStatusUpdate {
     hash: string;
     status: FolderStatus;
     exc: SerializedException | null;
-    event: 'folder_status_update';
+    event: "folder_status_update";
 }
 
 export interface Folder extends FileSystemItem {
@@ -73,7 +74,7 @@ export interface Folder extends FileSystemItem {
 
 export interface FileSystemUpdate {
     exc: SerializedException | null;
-    event: 'file_system_update';
+    event: "file_system_update";
 }
 
 export interface MatchSectionSchema {
@@ -87,9 +88,9 @@ export interface ImportDuplicateKeys {
 }
 
 export interface ImportSection {
-    duplicate_action: 'ask' | 'keep' | 'merge' | 'remove' | 'skip';
-    move: 'False';
-    copy: 'True';
+    duplicate_action: "ask" | "keep" | "merge" | "remove" | "skip";
+    move: "False";
+    copy: "True";
     duplicate_keys: ImportDuplicateKeys;
 }
 
@@ -100,6 +101,7 @@ export interface BeetsSchema {
     plugins: Array<string>;
     import_: ImportSection;
     match: MatchSectionSchema;
+    aisauce: PluginAiSauceSchema;
 }
 
 export interface TerminalSectionSchema {
@@ -113,8 +115,9 @@ export interface LibrarySectionSchema {
 }
 
 export interface InboxSectionSchema {
-    ignore: '_use_beets_ignore' | Array<string>;
+    ignore: "_use_beets_ignore" | Array<string>;
     debounce_before_autotag: number;
+    temp_dir: string;
     folders: Record<string, InboxFolderSchema>;
 }
 
@@ -229,11 +232,23 @@ export interface SerializedException {
     trace?: null | string;
 }
 
+export interface PluginAiSauceSchema {
+    mode: "metadata_cleanup" | "metadata_source";
+    providers: Array<PluginAiSauceProviderSchema>;
+    sources: Array<PluginAiSauceSourceSchema>;
+}
+
+export interface InboxSpecificOverridesSchema {
+    plugins: "_use_all" | Array<string>;
+    aisauce: PluginAiSauceSchema;
+}
+
 export interface InboxFolderSchema {
     path: string;
     name: string;
     auto_threshold: null | number;
-    autotag: 'auto' | 'bootleg' | 'off' | 'preview';
+    autotag: "auto" | "bootleg" | "off" | "preview";
+    overrides: InboxSpecificOverridesSchema;
 }
 
 export interface Metadata {
@@ -277,6 +292,19 @@ export interface SerializedCandidateState {
     info: AlbumInfo | ItemInfo | TrackInfo;
     mapping: Record<number, number>;
     tracks: Array<TrackInfo>;
+}
+
+export interface PluginAiSauceSourceSchema {
+    provider_id: string;
+    user_prompt: null | string;
+    system_prompt: null | string;
+}
+
+export interface PluginAiSauceProviderSchema {
+    id: string;
+    model: string;
+    api_key: string;
+    api_base_url: string;
 }
 
 export interface JobMeta {
@@ -339,7 +367,7 @@ export interface ItemResponse {
 }
 
 export interface MusicInfo {
-    type: 'album' | 'item' | 'track';
+    type: "album" | "item" | "track";
     artist: null | string;
     album: null | string;
     data_url: null | string;
@@ -360,7 +388,7 @@ export interface ItemInfo extends MusicInfo {
 }
 
 export interface FileSystemItem {
-    type: 'archive' | 'directory' | 'file';
+    type: "archive" | "directory" | "file";
     full_path: string;
     hash: string;
     is_album: boolean;
@@ -389,3 +417,4 @@ export interface AlbumInfo extends MusicInfo {
     catalognum: null | string;
     albumdisambig: null | string;
 }
+

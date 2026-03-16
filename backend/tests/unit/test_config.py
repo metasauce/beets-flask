@@ -1,11 +1,13 @@
+from ntpath import exists
 import os
 import shutil
 import tempfile
 from pathlib import Path
 
+from beets_flask.invoker.enqueue import run_preview
 import pytest
 import yaml
-from eyconf.validation import MultiConfigurationError
+from eyconf.validation import ConfigurationError, MultiConfigurationError
 
 from beets_flask.config import get_config
 
@@ -162,12 +164,14 @@ class TestValidationFixes:
         config = get_config()
 
         with tempfile.TemporaryDirectory() as temp_dir:
+            os.makedirs(temp_dir + "/1", exist_ok=True)
+            os.makedirs(temp_dir + "/2", exist_ok=True)
             temp = {
                 "gui": {
                     "inbox": {
                         "folders": {
-                            "inbox_1": {"path": temp_dir},
-                            "inbox_2": {"path": temp_dir, "name": "a"},
+                            "inbox_1": {"path": temp_dir + "/1"},
+                            "inbox_2": {"path": temp_dir + "/2", "name": "a"},
                         }
                     }
                 }
@@ -179,6 +183,29 @@ class TestValidationFixes:
             config = config.reload(extra_yaml_path=temp_path)
             assert config.data.gui.inbox.folders["inbox_1"].name == "inbox_1"
             assert config.data.gui.inbox.folders["inbox_2"].name == "a"
+
+    def test_non_unique_path_raises(self):
+        """Inbox paths should be unique."""
+
+        config = get_config()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = {
+                "gui": {
+                    "inbox": {
+                        "folders": {
+                            "inbox_1": {"path": temp_dir},
+                            "inbox_2": {"path": temp_dir},
+                        }
+                    }
+                }
+            }
+            temp_path = Path(temp_dir) / "temp1.yaml"
+            with open(temp_path, "w") as f:
+                yaml.dump(temp, f)
+
+            with pytest.raises(ConfigurationError):
+                config.reload(extra_yaml_path=temp_path)
 
     def test_inbox_folder_does_not_exist(self):
         config = get_config()
@@ -202,3 +229,54 @@ class TestValidationFixes:
 
     def test_slash_removal(self):
         pass
+
+
+class TestInboxSpecific:
+    def test_defaults_restore(self):
+        config = get_config()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = {
+                "plugins": ["musicbrainz"],
+            }
+            temp_path = Path(temp_dir) / "temp1.yaml"
+            with open(temp_path, "w") as f:
+                yaml.dump(temp, f)
+
+            config = config.reload(extra_yaml_path=temp_path)
+
+        config.store_inspecific_settings()
+        assert config.inspecific_data.plugins == ["musicbrainz"]
+
+        config.data.plugins = ["lorem"]
+        config.reset_inbox_specific_overrides()
+        assert config.inspecific_data.plugins == ["musicbrainz"]
+
+    def test_override(self):
+        config = get_config()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = {
+                "gui": {
+                    "inbox": {
+                        "folders": {
+                            "inbox_1": {
+                                "path": temp_dir,
+                                "overrides": {"plugins": ["foobar"]},
+                            },
+                        }
+                    }
+                },
+                "plugins": ["musicbrainz"],
+            }
+            temp_path = Path(temp_dir) / "temp1.yaml"
+            with open(temp_path, "w") as f:
+                yaml.dump(temp, f)
+
+            config = config.reload(extra_yaml_path=temp_path)
+
+        config.store_inspecific_settings()
+        assert config.inspecific_data.plugins == ["musicbrainz"]
+
+        config.apply_inbox_specific_overrides(inbox_path=temp_dir)
+        assert config.data.plugins == ["foobar"]

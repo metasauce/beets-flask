@@ -17,7 +17,7 @@ from eyconf.validation import ConfigurationError, MultiConfigurationError
 from beets_flask.logger import log
 from beets_flask.utility import deprecation_warning
 
-from .schema import BeetsSchema
+from .schema import BeetsSchema, InboxSpecificOverridesSchema
 
 _BEETS_EXAMPLE_PATH = Path(os.path.dirname(__file__)) / "config_b_example.yaml"
 _BF_EXAMPLE_PATH = Path(os.path.dirname(__file__)) / "config_bf_example.yaml"
@@ -26,12 +26,15 @@ _BF_EXAMPLE_PATH = Path(os.path.dirname(__file__)) / "config_bf_example.yaml"
 class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
     """Base config class with extra fields support."""
 
+    inspecific_data: InboxSpecificOverridesSchema
+
     def __init__(self):
         """Initialize the config object with the default values."""
         super().__init__(schema=BeetsSchema, data=BeetsSchema())
         BeetsFlaskConfig.write_examples_as_user_defaults()
         self.reload()
         self.commit_to_beets()
+        self.store_inspecific_settings()
 
     @classmethod
     def get_beets_flask_config_path(cls) -> Path:
@@ -111,6 +114,9 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         beets.config.read()
 
         # Put our defaults that come from schema at lowest priority
+        # TODO: add support for optional schema fields (None)
+        # They should simply become beets defaults, but currently raise confuse errors.
+        # Likely because the None we add now takes precedence over whats there from beets.
         beets.config.add(asdict_with_aliases(BeetsSchema()))
 
         # Inserts user config into confuse
@@ -120,8 +126,8 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         # is normally done by beets. Clear the list to force
         # actual reload.
         plugin_instances.clear()
-        load_plugins()
         log.debug(f"Loading plugins: {get_plugin_names()}")
+        load_plugins()
 
         # Beets config "Singleton" is not a real singleton, there might be copies
         # in different submodules - we need to update all of them.
@@ -154,7 +160,8 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
 
         # make sure to remove trailing slashes from user configured inbox paths
         # we could also fix this in the frontend, but this was easier.
-        missing_folder_errors = []
+        multi_config_errors = []
+        inbox_folder_paths: list[str] = []
         for key in self.data.gui.inbox.folders.keys():
             folder = self.data.gui.inbox.folders[key]
             if folder.path.endswith("/"):
@@ -181,17 +188,29 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
                 )
                 # prevent validation errors on our user examples and default value
             ):
-                missing_folder_errors.append(
+                multi_config_errors.append(
                     ConfigurationError(
                         f"Inbox folder path does not exist: {folder.path}",
                         section="gui.inbox.folders",
                     )
                 )
 
-        if len(missing_folder_errors) > 1:
-            raise MultiConfigurationError(missing_folder_errors)
-        elif len(missing_folder_errors) == 1:
-            raise missing_folder_errors[0]
+            # check that inbox paths are unique, since we use them to identify
+            # inbox-specific settings.
+            if folder.path in inbox_folder_paths:
+                multi_config_errors.append(
+                    ConfigurationError(
+                        f"Inbox folder path is not unique: {folder.path}",
+                        section="gui.inbox.folders",
+                    )
+                )
+            else:
+                inbox_folder_paths.append(folder.path)
+
+        if len(multi_config_errors) > 1:
+            raise MultiConfigurationError(multi_config_errors)
+        elif len(multi_config_errors) == 1:
+            raise multi_config_errors[0]
 
     @classmethod
     def write_examples_as_user_defaults(cls):
@@ -242,6 +261,81 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
                         "Could not create beets_flask_config_example directories, "
                         + "likely because this was not run inside the docker container."
                     )
+                    
+    # ------------------------ Inbox specific settings ----------------------- #
+
+    def store_inspecific_settings(self):
+        """Keep the non-inbox-specific global settings around, for easier restore."""
+        self.inspecific_data = InboxSpecificOverridesSchema()
+        self.inspecific_data.plugins = self.data.plugins
+        self.inspecific_data.aisauce = self.data.aisauce
+
+    def apply_inbox_specific_overrides(self, inbox_path: Path | str) -> None:
+        """
+        Lift inbox-specific to the global config.
+
+        We allow some parts of the beets config to be set per inbox folder.
+        These are normal beets config options, which should be overwritten
+        whenever an action takes place in that inbox.
+
+        Calls `commit_to_beets` if any changes from defaults were noticed.
+
+        Arguments
+        ---------
+        - inbox_path: str | Path
+            We identify inboxes by their absoulte path.
+        """
+
+        inbox_path = Path(inbox_path)
+        if inbox_path not in [
+            Path(f.path) for f in self.data.gui.inbox.folders.values()
+        ]:
+            raise ValueError(f"{inbox_path} is not a valid inbox")
+
+        overrides = [
+            f.overrides
+            for f in self.data.gui.inbox.folders.values()
+            if Path(f.path) == inbox_path
+        ][0]
+
+        # apply supported changes. for now manually, later we can iterate the schema
+        commit_to_beets = False
+        if overrides.plugins != "_use_all":
+            if self.data.plugins != overrides.plugins:
+                commit_to_beets = True
+                self.data.plugins = overrides.plugins
+
+        if self.data.aisauce != overrides.aisauce:
+            commit_to_beets = True
+            self.data.aisauce = overrides.aisauce
+
+        if commit_to_beets:
+            self.commit_to_beets()
+            log.debug("Applied inbox-specific overrides to beets config")
+        else:
+            log.debug("No changes after applying inbox-specific overrides")
+
+    def reset_inbox_specific_overrides(self) -> None:
+        """
+        Reset inbox-specific changes to the global config in an efficient way.
+
+        Avoids reloading the whole config, by only restoring keys that can
+        be tweaked to begin with.
+
+        Calls `commit_to_beets` if any changes from defaults were noticed.
+        """
+        commit_to_beets = False
+
+        if self.data.plugins != self.inspecific_data.plugins:
+            commit_to_beets = True
+        self.data.plugins = cast(list[str], self.inspecific_data.plugins)
+
+        if self.data.aisauce != self.inspecific_data.aisauce:
+            commit_to_beets = True
+        self.data.aisauce = self.inspecific_data.aisauce
+
+        if commit_to_beets:
+            self.commit_to_beets()
 
     # ------------------------------ Utility getters ----------------------------- #
 
