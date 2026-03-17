@@ -1,7 +1,7 @@
 [project]
 name = "beets-flask"
 description = "An opinionated web-interface around the music organizer [beets](https://beets.io/)"
-version = "2.0.0-rc2"
+version = "2.0.0-rc4"
 authors = [
     { name = "F. Paul Spitzner", email = "paul.spitzner@gmail.com" },
     { name = "Sebastian B. Mohr", email = "sebastian@mohrenclan.de" },
@@ -60,7 +60,6 @@ typed = [
     "types-cachetools",
     "types-Deprecated",
     "types-aiofiles",
-    "types-pytz",
     "types-pyyaml",
     "pandas-stubs",
 ]
@@ -117,7 +116,7 @@ fixable = ["ALL"]
 convention = "numpy"
 
 [tool.ruff.lint.isort]
-known-first-party = ["beets_flask"]
+known-first-party = ["beets_flask", "tests"]
 
 [tool.pytest.ini_options]
 # addopts = ["--import-mode=importlib", "--cov=beets_flask"]
