@@ -224,10 +224,10 @@ export interface FileRoutesByFullPath {
   '/debug/sortable_multi': typeof DebugSortable_multiRoute
   '/library/search': typeof LibrarySearchRoute
   '/': typeof FrontpageIndexRoute
-  '/debug': typeof DebugIndexRoute
-  '/inbox': typeof InboxIndexRoute
-  '/sessiondraft': typeof SessiondraftIndexRoute
-  '/terminal': typeof TerminalIndexRoute
+  '/debug/': typeof DebugIndexRoute
+  '/inbox/': typeof InboxIndexRoute
+  '/sessiondraft/': typeof SessiondraftIndexRoute
+  '/terminal/': typeof TerminalIndexRoute
   '/library/browse/artists': typeof LibraryBrowseArtistsRouteRouteWithChildren
   '/debug/design/buttons': typeof DebugDesignButtonsRoute
   '/debug/design/icons': typeof DebugDesignIconsRoute
@@ -235,7 +235,7 @@ export interface FileRoutesByFullPath {
   '/inbox/folder/$path': typeof InboxFolderPathRoute
   '/inbox/task/$taskId': typeof InboxTaskTaskIdRoute
   '/library/browse/albums': typeof LibraryBrowseAlbumsRoute
-  '/library/browse': typeof LibraryBrowseIndexRoute
+  '/library/browse/': typeof LibraryBrowseIndexRoute
   '/library/album/$albumId': typeof LibraryresourcesAlbumAlbumIdRouteRouteWithChildren
   '/library/item/$itemId': typeof LibraryresourcesItemItemIdRouteRouteWithChildren
   '/inbox/folder/$path/$hash': typeof InboxFolderPathHashRoute
@@ -326,10 +326,10 @@ export interface FileRouteTypes {
     | '/debug/sortable_multi'
     | '/library/search'
     | '/'
-    | '/debug'
-    | '/inbox'
-    | '/sessiondraft'
-    | '/terminal'
+    | '/debug/'
+    | '/inbox/'
+    | '/sessiondraft/'
+    | '/terminal/'
     | '/library/browse/artists'
     | '/debug/design/buttons'
     | '/debug/design/icons'
@@ -337,7 +337,7 @@ export interface FileRouteTypes {
     | '/inbox/folder/$path'
     | '/inbox/task/$taskId'
     | '/library/browse/albums'
-    | '/library/browse'
+    | '/library/browse/'
     | '/library/album/$albumId'
     | '/library/item/$itemId'
     | '/inbox/folder/$path/$hash'
@@ -455,28 +455,28 @@ declare module '@tanstack/react-router' {
     '/terminal/': {
       id: '/terminal/'
       path: '/terminal'
-      fullPath: '/terminal'
+      fullPath: '/terminal/'
       preLoaderRoute: typeof TerminalIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sessiondraft/': {
       id: '/sessiondraft/'
       path: '/sessiondraft'
-      fullPath: '/sessiondraft'
+      fullPath: '/sessiondraft/'
       preLoaderRoute: typeof SessiondraftIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inbox/': {
       id: '/inbox/'
       path: '/inbox'
-      fullPath: '/inbox'
+      fullPath: '/inbox/'
       preLoaderRoute: typeof InboxIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/debug/': {
       id: '/debug/'
       path: '/debug'
-      fullPath: '/debug'
+      fullPath: '/debug/'
       preLoaderRoute: typeof DebugIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -539,7 +539,7 @@ declare module '@tanstack/react-router' {
     '/library/browse/': {
       id: '/library/browse/'
       path: '/library/browse'
-      fullPath: '/library/browse'
+      fullPath: '/library/browse/'
       preLoaderRoute: typeof LibraryBrowseIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
