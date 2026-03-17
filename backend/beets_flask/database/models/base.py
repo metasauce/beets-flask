@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Self
 from uuid import uuid4
 
-import pytz
 from sqlalchemy import LargeBinary, select
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -115,6 +114,6 @@ class Base(DeclarativeBase):
         # Seems a bit hacky but is the only way to ensure that
         # datetime objects are timezone-aware after deserialization
         if self.created_at and self.created_at.tzinfo is None:
-            self.created_at = self.created_at.replace(tzinfo=pytz.UTC)
+            self.created_at = self.created_at.replace(tzinfo=UTC)
         if self.updated_at and self.updated_at.tzinfo is None:
-            self.updated_at = self.updated_at.replace(tzinfo=pytz.UTC)
+            self.updated_at = self.updated_at.replace(tzinfo=UTC)
