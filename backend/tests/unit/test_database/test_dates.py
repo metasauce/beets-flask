@@ -1,11 +1,10 @@
 import datetime
 from pathlib import Path
 
-import pytz
+from tests.mixins.database import IsolatedDBMixin
 
 from beets_flask.database.models import SessionStateInDb
 from beets_flask.importer.session import SessionState
-from tests.mixins.database import IsolatedDBMixin
 
 
 class TestDates(IsolatedDBMixin):
@@ -38,8 +37,8 @@ class TestDates(IsolatedDBMixin):
             # Check that the timezone is UTC
             assert state_in_db.created_at.tzinfo is not None
             assert state_in_db.updated_at.tzinfo is not None
-            assert state_in_db.created_at.tzinfo == pytz.UTC
-            assert state_in_db.updated_at.tzinfo == pytz.UTC
+            assert state_in_db.created_at.tzinfo == datetime.UTC
+            assert state_in_db.updated_at.tzinfo == datetime.UTC
 
             # Should be approximately equal to current local time
             now = datetime.datetime.now().astimezone()

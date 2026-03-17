@@ -60,7 +60,6 @@ typed = [
     "types-cachetools",
     "types-Deprecated",
     "types-aiofiles",
-    "types-pytz",
     "types-pyyaml",
     "pandas-stubs",
 ]
@@ -117,7 +116,7 @@ fixable = ["ALL"]
 convention = "numpy"
 
 [tool.ruff.lint.isort]
-known-first-party = ["beets_flask"]
+known-first-party = ["beets_flask", "tests"]
 
 [tool.pytest.ini_options]
 # addopts = ["--import-mode=importlib", "--cov=beets_flask"]
