@@ -1,10 +1,9 @@
 import datetime
 from pathlib import Path
 
-from tests.mixins.database import IsolatedDBMixin
-
 from beets_flask.database.models import SessionStateInDb
 from beets_flask.importer.session import SessionState
+from tests.mixins.database import IsolatedDBMixin
 
 
 class TestDates(IsolatedDBMixin):

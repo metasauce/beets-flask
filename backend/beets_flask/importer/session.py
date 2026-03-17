@@ -255,7 +255,8 @@ class BaseSession(importer.ImportSession, ABC):
         """Get a config value from the overlay or default.
 
         TODO: remove or rework, this is finicky, and we should be able to come up
-        with something better now that we have our own config class.
+        with something better now that we have our own config class. This should
+        allow us to remove the type ignores below too.
 
         Use dots to separate levels.
         """
@@ -275,8 +276,8 @@ class BaseSession(importer.ImportSession, ABC):
         # the same as dict.get(), but rather resolves the value.
         default = get_config().beets_config
         for p in path:
-            default = default[p]
-        default = default.get(type_func) if type_func else default.get()
+            default = default[p]  # type: ignore[assignment]
+        default = default.get(type_func) if type_func else default.get()  # type: ignore
         return default
 
     # -------------------------- State handling helpers -------------------------- #
