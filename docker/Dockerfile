@@ -32,6 +32,7 @@ ENV UV_LINK_MODE=copy
 ENV UV_NO_DEV=1
 ENV UV_NO_EDITABLE=1
 ENV UV_PYTHON_DOWNLOADS=0
+ENV UV_PROJECT_ENVIRONMENT=/venv
 
 # Install backend dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -40,11 +41,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project
 
 # Install backend package
-COPY ./backend/beets_flask/ /repo/backend/beets_flask/
-COPY ./backend/generate_types.py /repo/backend/
-COPY ./backend/launch_*.py /repo/backend/
-COPY ./backend/pyproject.toml /repo/backend
-COPY ./backend/uv.lock /repo/backend
+COPY ./backend/ /repo/backend/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
@@ -89,6 +86,7 @@ ENV EDITOR="vi"
 ENV BEETSDIR="/config/beets"
 ENV BEETSFLASKDIR="/config/beets-flask"
 ENV BEETSFLASKLOG="/logs/beets-flask.log"
+ENV UV_PROJECT_ENVIRONMENT=/venv
 
 # Create user and group
 RUN groupadd -g 1000 beetle && \
@@ -125,6 +123,11 @@ COPY --from=builder_ffmpeg /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=builder_ffmpeg /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
 RUN ffmpeg -version
 
+
+# Copy bf dependencies
+COPY --from=builder_py --chown=beetle:beetle /venv /venv
+
+
 # ------------------------------------------------------------------------------------ #
 #                                      Production                                      #
 # ------------------------------------------------------------------------------------ #
@@ -144,7 +147,7 @@ RUN chmod +x /repo/*.sh
 
 ENTRYPOINT [ \
     "/bin/bash", "-c", \
-    "source ./backend/.venv/bin/activate && \
+    "source /venv/bin/activate && \
     /repo/entrypoint_fix_permissions.sh && \
     /repo/entrypoint_user_scripts.sh && \
     su beetle -c /repo/entrypoint.sh" \
@@ -156,6 +159,7 @@ ENTRYPOINT [ \
 # ------------------------------------------------------------------------------------ #
 
 FROM base AS dev
+
 
 ENV IB_SERVER_CONFIG="dev_docker"
 
@@ -192,10 +196,8 @@ RUN uv run python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyp
 WORKDIR /repo
 ENTRYPOINT [ \
     "/bin/bash", "-c", \
-    "source ./backend/.venv/bin/activate && \
+    "source /venv/bin/activate && \
     ./docker/entrypoints/entrypoint_fix_permissions.sh && \
     ./docker/entrypoints/entrypoint_user_scripts.sh && \
     su beetle -c ./docker/entrypoints/entrypoint_dev.sh" \
     ]
-
-

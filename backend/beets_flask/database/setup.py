@@ -33,8 +33,6 @@ def setup_database(app: Quart | None = None) -> None:
         log.warning("Resetting database due to RESET_DB=True in config")
         _reset_database()
 
-    _create_tables(engine)
-
     if app is not None:
         # Gracefully shutdown the database session, if launched
         # from within a Flask app context.
@@ -93,13 +91,6 @@ def db_session_factory(session: Session | None = None):
             session.close()  # type: ignore
 
 
-def _create_tables(engine) -> None:
-    Base.metadata.create_all(bind=engine)
-
-
 def _reset_database():
-    # Removes all data from the database but keeps schema
-    for t in reversed(Base.metadata.sorted_tables):
-        with db_session_factory() as session:
-            session.execute(t.delete())
-            session.commit()
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
