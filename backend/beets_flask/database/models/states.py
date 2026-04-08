@@ -347,7 +347,10 @@ class TaskStateInDb(Base):
         cascade="all, delete-orphan",
     )
     # Set at the end of the import session
-    chosen_candidate_id: Mapped[str | None] = mapped_column(ForeignKey("candidate.id"))
+    # use_alter=True to break circular FK with candidate.task_id
+    chosen_candidate_id: Mapped[str | None] = mapped_column(
+        ForeignKey("candidate.id", use_alter=True)
+    )
     chosen_candidate: Mapped[CandidateStateInDb | None] = relationship(
         back_populates="task",
         foreign_keys=[chosen_candidate_id],
