@@ -92,7 +92,7 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
-"**/alembic/**/*" = ["D"]
+"**/alembic/**/*" = ["D","I"]
 
 [tool.ruff.lint]
 select = [
@@ -116,8 +116,10 @@ fixable = ["ALL"]
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
+
 [tool.ruff.lint.isort]
 known-first-party = ["beets_flask", "tests"]
+known-third-party = ["alembic", "sqlalchemy"]
 
 [tool.pytest.ini_options]
 # addopts = ["--import-mode=importlib", "--cov=beets_flask"]
