@@ -5,17 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from beets_flask.database.models.states import FolderInDb
-from beets_flask.database.setup import _reset_database, with_db_session
-
-
-def test_with_db_session_decorator(testapp):
-    # Needs the testapp
-
-    @with_db_session
-    def sample_function(session=None):
-        return session is not None
-
-    assert sample_function() is True
+from beets_flask.database.setup import _reset_database
 
 
 def test_reset(

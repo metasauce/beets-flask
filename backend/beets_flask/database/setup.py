@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from functools import wraps
 
 from quart import Quart
 from sqlalchemy import Engine, create_engine
@@ -92,28 +91,6 @@ def db_session_factory(session: Session | None = None):
     finally:
         if is_outermost:
             session.close()  # type: ignore
-
-
-def with_db_session(func):
-    """Decorate a function with a db session as a keyword argument to the function.
-
-    Example
-    ```
-    @with_db_session
-    def my_function(session=None):
-        tag.foo = "bar"
-        session.merge(tag)
-        return tag.to_dict()
-    ```
-    """
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with db_session_factory() as session:
-            kwargs.setdefault("session", session)
-            return func(*args, **kwargs)
-
-    return wrapper
 
 
 def _create_tables(engine) -> None:
