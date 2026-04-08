@@ -24,4 +24,52 @@ BEETSFLASKDIR="/config/beets-flask"
 BEETSFLASKLOG="/logs/beets-flask.log"
 ```
 
+## Database Migrations Guide
 
+We use [Alembic](https://alembic.sqlalchemy.org/) for database migrations.
+
+### Overview
+
+- Migrations are stored in `backend/alembic/versions/`
+- The database tracks its current version in the `alembic_version` table
+- Migration files define `upgrade()` and `downgrade()` functions
+
+### Quick Reference
+
+| Task | Command |
+|------|---------|
+| Create migration | `alembic revision --autogenerate -m "description"` |
+| Apply all pending | `alembic upgrade head` |
+| Roll back one | `alembic downgrade -1` |
+| Check version | `alembic current` |
+| See history | `alembic history` |
+| Validate | `alembic check` |
+
+### Workflow: Creating a migration
+
+We use a local database (`./beets-flask-sqlite.db`) to avoid breaking the docker setup.
+
+1. Ensure you have a local database:
+  ```bash
+  cd backend
+  alembic upgrade head
+  ```
+
+2. Edit the model (e.g., add a column to `states.py`)
+
+3. Generate the migration:
+  ```bash
+  alembic revision --autogenerate -m "add_column_name"
+  ```
+
+4. Review the generated migration file in `alembic/versions/`
+
+5. Apply the migration:
+  ```bash
+  alembic upgrade head
+  ```
+
+6. Validate with 
+  ```bash
+  alembic current  
+  ```
