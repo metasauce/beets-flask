@@ -41,6 +41,7 @@ dependencies = [
     "numpy",
     "typing_extensions",
     "polars>=1.36.1",
+    "alembic>=1.18.4",
 ]
 
 [project.optional-dependencies]
@@ -91,7 +92,7 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
-
+"alembic/**" = ["D"]
 
 [tool.ruff.lint]
 select = [
