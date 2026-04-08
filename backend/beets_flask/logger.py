@@ -41,6 +41,14 @@ LOGGING_CONFIG = {
             "level": os.getenv("LOG_LEVEL_BEETSFLASK", logging.INFO),
             "propagate": False,
         },
+        "alembic.runtime.migration": {
+            "level": logging.INFO,
+            "propagate": True,
+        },
+        "uvicorn": {
+            "level": logging.WARNING,
+            "propagate": True,
+        },
     },
 }
 

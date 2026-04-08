@@ -42,14 +42,18 @@ export FLASK_DEBUG=1
 # running the server from inside the backend dir makes imports and redis easier
 cd /repo/backend
 
-uv sync --locked
-# No need to activate, we have this in PATH
+uv sync --locked --active
+
+# Databse creation & migrations (beets-flask)
+python -c "from beets_flask.database.migration import run_migrations; run_migrations()"
+
+# Database creation & migration (beets)
+python -c "from beets.ui import _open_library; from beets_flask.config.beets_config import get_config; _open_library(get_config().beets_config)"
+
 
 redis-server --daemonize yes
 
-
 # blocking
-python ./launch_db_init.py
 python ./launch_redis_workers.py
 
 # keeps running in the background
