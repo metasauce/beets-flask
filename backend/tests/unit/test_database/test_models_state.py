@@ -8,6 +8,7 @@ from beets_flask.database.models.states import SessionStateInDb
 from beets_flask.importer.session import SessionState
 from beets_flask.importer.stages import Progress
 from tests.conftest import beets_lib_item
+from tests.mixins.database import IsolatedDBMixin
 from tests.unit.test_importer.test_states import get_album_match
 
 log = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ def import_task(beets_lib):
     return task
 
 
-class TestSessionStateInDb:
+class TestSessionStateInDb(IsolatedDBMixin):
     state: SessionState
 
     @pytest.fixture(autouse=True)
