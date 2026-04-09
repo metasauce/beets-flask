@@ -92,5 +92,5 @@ def db_session_factory(session: Session | None = None):
 
 
 def _reset_database():
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.drop_all(bind=engine)  # type: ignore
+    Base.metadata.create_all(bind=engine)  # type: ignore
