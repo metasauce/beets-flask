@@ -75,6 +75,19 @@ services:
     beets-flask:
         image: pspitzner/beets-flask:stable
         restart: unless-stopped
+        security_opt:
+          - no-new-privileges=true
+        cap_drop:
+          - ALL
+        cap_add:
+          - SETUID
+          - SETGID
+        deploy:
+          resources:
+            limits:
+              cpus: '1.0'
+              memory: 1G
+              pids: 100
         ports:
             - "5001:5001"
         environment:
