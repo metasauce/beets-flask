@@ -1,3 +1,11 @@
+"""
+Scaffold for initial alembic setup and all future migrations.
+
+Introduced for migration from 1.2.1 to 2.0.
+We use a python wrapper instead of the cli, because this way we get configs and
+env vars in our usual way.
+"""
+
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, text
