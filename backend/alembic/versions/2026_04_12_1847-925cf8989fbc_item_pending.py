@@ -9,8 +9,15 @@ Historically, task state items were stored as binary (pickle) blobs in the datab
 This approach has proven to be brittle and difficult to maintain. In particular,
 changes and upgrades in beets break deserialization, requiring manual
 intervention to recover or migrate data.
+
+For the unpickling to work, we would rely on beets class definitions – which are likely
+to change over time. Thus, we have a custom unpickler, and mocked beets classes, which
+will give the right structures, even past beets 2.5.1. Beware, this also holds for
+our own classes (like BeetsItemType) which we will need to make copies of once we
+change them.
 """
 
+from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 import io
@@ -28,6 +35,90 @@ revision: str = "925cf8989fbc"
 down_revision: str | Sequence[str] | None = "a986c03d9ba3"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    op.create_table(
+        "task_pending_items",
+        sa.Column("id", sa.String(), nullable=False),
+        sa.Column("task_id", sa.String(), nullable=False),
+        sa.Column("item", BeetsItemType(), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["task_id"],
+            ["task.id"],
+        ),
+    )
+    op.create_index(
+        op.f("ix_task_pending_items_created_at"),
+        "task_pending_items",
+        ["created_at"],
+        unique=False,
+    )
+
+    migrate_data()
+
+    op.drop_column("task", "items")
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    op.add_column("task", sa.Column("items", sa.BLOB(), nullable=False))
+    op.drop_table("task_pending_items")
+
+
+def migrate_data():
+    conn = op.get_bind()
+    meta = sa.MetaData()
+
+    task_pending_items = sa.Table("task_pending_items", meta, autoload_with=conn)
+
+    result = conn.execute(sa.text("SELECT id, items FROM task WHERE items IS NOT NULL"))
+    for row in result:
+        task_id = row[0]
+        items_blob = row[1]
+
+        try:
+            items = load_items(items_blob)
+        except Exception as e:
+            log.error(f"Failed to unpickle task {task_id}: {e}")
+            continue
+
+        rows = []
+        now = datetime.utcnow()
+        for stub in items:
+            rows.append(
+                {
+                    "id": str(uuid4()),
+                    "created_at": now,
+                    "updated_at": now,
+                    "task_id": task_id,
+                    "item": {
+                        "fixed_values": BeetsItemType._encode(
+                            dict(stub._values_fixed.items())
+                        ),
+                        "flex_values": BeetsItemType._encode(
+                            dict(stub._values_flex.items())
+                        ),
+                    },
+                }
+            )
+
+        if rows:
+            conn.execute(
+                task_pending_items.insert(),
+                rows,
+            )
+
+
+def load_items(blob: bytes) -> list[ModelStub]:
+    return ItemsUnpickler(io.BytesIO(blob)).load()
+
+
+# --------------------------- Mocked Beets Classes --------------------------- #
 
 
 class ModelStub:
@@ -122,87 +213,3 @@ class ItemsUnpickler(pickle.Unpickler):
             return dict  # Fallback for unknown classes
         return self.CLASS_MAP[key]
 
-
-def load_items(blob: bytes) -> list[ModelStub]:
-    return ItemsUnpickler(io.BytesIO(blob)).load()
-
-
-def migrate_data():
-    conn = op.get_bind()
-    meta = sa.MetaData()
-
-    task_pending_items = sa.Table("task_pending_items", meta, autoload_with=conn)
-
-    result = conn.execute(sa.text("SELECT id, items FROM task WHERE items IS NOT NULL"))
-    for row in result:
-        task_id = row[0]
-        items_blob = row[1]
-
-        try:
-            items = load_items(items_blob)
-        except Exception as e:
-            log.error(f"Failed to unpickle task {task_id}: {e}")
-            continue
-
-        rows = []
-        now = datetime.utcnow()
-        for stub in items:
-            rows.append(
-                {
-                    "id": str(uuid4()),
-                    "created_at": now,
-                    "updated_at": now,
-                    "task_id": task_id,
-                    "item": {
-                        "fixed_values": BeetsItemType._encode(
-                            dict(stub._values_fixed.items())
-                        ),
-                        "flex_values": BeetsItemType._encode(
-                            dict(stub._values_flex.items())
-                        ),
-                    },
-                }
-            )
-
-        if rows:
-            conn.execute(
-                task_pending_items.insert(),
-                rows,
-            )
-
-
-def upgrade() -> None:
-    """Upgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.create_table(
-        "task_pending_items",
-        sa.Column("id", sa.String(), nullable=False),
-        sa.Column("task_id", sa.String(), nullable=False),
-        sa.Column("item", BeetsItemType(), nullable=False),
-        sa.PrimaryKeyConstraint("id"),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["task_id"],
-            ["task.id"],
-        ),
-    )
-    op.create_index(
-        op.f("ix_task_pending_items_created_at"),
-        "task_pending_items",
-        ["created_at"],
-        unique=False,
-    )
-
-    migrate_data()
-
-    op.drop_column("task", "items")
-    # ### end Alembic commands ###
-
-
-def downgrade() -> None:
-    """Downgrade schema."""
-    # ### commands auto generated by Alembic - please adjust! ###
-    op.add_column("task", sa.Column("items", sa.BLOB(), nullable=False))
-    op.drop_table("task_pending_items")
-    # ### end Alembic commands ###

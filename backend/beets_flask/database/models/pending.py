@@ -16,6 +16,23 @@ if TYPE_CHECKING:
 
 
 class BeetsItemType(TypeDecorator[BeetsItem]):
+    """
+    We do not implement items in full detail yet, but keep them as a serialized json.
+
+    The transformation is relatively short, because items in beets are already
+    in a format for (their) database.
+
+    Notes:
+    - this type is relevant, because we want to save items __before__ beets does, so
+      that we can resume imports.
+    - in beets, the fixed_ and flex_values are computed at runtime and not stored
+      1:1 in beets' internal library:
+        - fixed are their own columns
+        - flex are linked in an extra table
+    - we need them here, but not as pickle (no need for functions/classes, and including
+      functions etc makes migrations a lot harder)
+    """
+
     impl = JSON
 
     @classmethod
@@ -47,6 +64,7 @@ class BeetsItemType(TypeDecorator[BeetsItem]):
         return v
 
     def process_bind_param(self, value: BeetsItem | None, dialect):
+        """Transform from live object into serialized json in database."""
         if value is None or not value:
             return None
 
@@ -58,6 +76,7 @@ class BeetsItemType(TypeDecorator[BeetsItem]):
         }
 
     def process_result_value(self, value, dialect):
+        """Transform from serialized json in database to live object."""
         if value is None:
             return None
 
