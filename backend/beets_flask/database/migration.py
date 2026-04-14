@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 
 from alembic import command
 from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import Engine, create_engine, text
 
 from beets_flask.config.flask_config import get_flask_config
@@ -82,6 +84,10 @@ def upgrade(alembic_config: Config, db_url: str, engine: Engine):
 
     Adds backups and runs a cleanup after migrations.
     """
+    if not _needs_migration(alembic_config, engine):
+        log.info("No pending migrations. Skipping.")
+        return  # No backup, no upgrade
+
     db_path = urlparse(db_url).path
     ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     backup_path = Path(db_path).with_suffix(f".backup_{ts}.db")
@@ -102,3 +108,13 @@ def upgrade(alembic_config: Config, db_url: str, engine: Engine):
     except Exception:
         log.exception("Migration failed! Please report this!")
         raise
+
+
+def _needs_migration(config: Config, engine: Engine) -> bool:
+    """Check if any migrations are pending."""
+    script = ScriptDirectory.from_config(config)
+    with engine.connect() as conn:
+        ctx = MigrationContext.configure(conn)
+        current_rev = ctx.get_current_revision()
+        head_rev = script.get_current_head()
+        return current_rev != head_rev
