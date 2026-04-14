@@ -2,6 +2,7 @@
 
 from unittest.mock import Mock
 
+import pytest
 from sqlalchemy import text
 
 from beets_flask.database.migration import (
@@ -65,6 +66,14 @@ class TestAlembicInitialized:
 
 class TestRunMigrations:
     """Tests for run_migrations function."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        import beets_flask.database.migration as mig
+
+        mig.shutil.copy2 = Mock()
+
+        return mig
 
     def test_runs_upgrade_empty_db(self, caplog):
         import beets_flask.database.migration as mig
