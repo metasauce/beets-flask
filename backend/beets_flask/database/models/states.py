@@ -13,13 +13,9 @@ Why not just have State and StateInDb in the same class?
 
 from __future__ import annotations
 
-import io
 import pickle
 from pathlib import Path
-from typing import Any
 
-from beets.autotag import AlbumMatch
-from beets.autotag.distance import Distance
 from beets.importer import Action, ImportTask
 from sqlalchemy import (
     ForeignKey,
@@ -33,7 +29,10 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from beets_flask.database.mapper.base import Context
+from beets_flask.database.mapper.match import MatchMapper
 from beets_flask.database.models.base import Base
+from beets_flask.database.models.match import Match
 from beets_flask.disk import Archive, Folder
 from beets_flask.importer.progress import Progress
 from beets_flask.importer.states import (
@@ -44,7 +43,7 @@ from beets_flask.importer.states import (
     SessionState,
     TaskState,
 )
-from beets_flask.importer.types import BeetsAlbumMatch, BeetsItem, BeetsTrackMatch
+from beets_flask.importer.types import BeetsItem
 from beets_flask.logger import log
 from beets_flask.server.exceptions import SerializedException
 
@@ -490,8 +489,8 @@ class CandidateStateInDb(Base):
     )
 
     # Should deserialize to AlbumMatch|TrackMatch
-    # ~4kb per match
-    match: Mapped[bytes]
+    match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"))
+    match: Mapped[Match] = relationship()
 
     # Duplicate ids (if any) (beets_id)
     duplicate_ids: Mapped[str]
@@ -501,25 +500,14 @@ class CandidateStateInDb(Base):
 
     def __init__(
         self,
-        match: BeetsAlbumMatch | BeetsTrackMatch,
+        match: Match,
         mapping: dict[int, int],
         duplicate_ids: list[str] = [],
         id: str | None = None,
     ):
         super().__init__(id)
 
-        # Remove db from all items as it can't be pickled
-        # FIXME: this should go into beets __getstate__ method
-        # see https://github.com/beetbox/beets/pull/5641
-        if isinstance(match, BeetsAlbumMatch):
-            for item in match.mapping.keys():
-                item._db = None
-                item._Item__album = None
-            for item in match.extra_items:
-                item._db = None
-                item._Item__album = None
-
-        self.match = pickle.dumps(match)
+        self.match = match
         self.duplicate_ids = ";".join(map(str, duplicate_ids))
         self.mapping = mapping
 
@@ -528,7 +516,7 @@ class CandidateStateInDb(Base):
         """Create the DB representation of a live CandidateState."""
         return cls(
             id=state.id,
-            match=state.match,
+            match=MatchMapper().from_beets(state.match, Context()),
             duplicate_ids=state.duplicate_ids,
             mapping=state._mapping,
         )
@@ -538,7 +526,7 @@ class CandidateStateInDb(Base):
         if task_state is None:
             task_state = self.task.to_live_state()
         live_state = CandidateState(
-            CustomUnpickler(io.BytesIO(self.match)).load(),
+            MatchMapper().to_beets(self.match, Context()),
             task_state,
             mapping=self.mapping,
         )
@@ -553,45 +541,6 @@ class CandidateStateInDb(Base):
 
     def to_dict(self) -> SerializedCandidateState:
         return self.to_live_state(self.task.to_live_state()).serialize()
-
-
-# Hotfix for match unpickler to resolve beets distance moved
-# This is needed because various beets updates changed class implementations
-# and we want to rebuild the newer versions of some beets classes from old pickles.
-# TODO: We should fix this in general and not pickle beets objects
-class CustomUnpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        """Override the find_class method to redirect Distance class references."""
-        # Redirect Distance class from beets.autotag.hooks to beets.distance (2.4.0)
-        if module == "beets.autotag.hooks" and name == "Distance":
-            return Distance
-
-        # For all other classes, use the default lookup mechanism
-        return super().find_class(module, name)
-
-    def load(self) -> Any:
-        object = super().load()
-        if isinstance(object, Distance):
-            self.patch_distance(object)
-
-        if isinstance(object, AlbumMatch):
-            self.patch_distance(object.distance)
-
-        return object
-
-    def patch_distance(self, distance: Distance) -> Distance:
-        # Rewrite "source" penalty to "data_source" penalty (2.5.0)
-        if "source" in distance._penalties:
-            log.debug(
-                "Converting old distance.source to distance.data_source (changed in beets 2.5.0)"
-            )
-            distance._penalties["data_source"] = distance._penalties["source"]
-            del distance._penalties["source"]
-
-            # Potential infinite recursion, ah well
-            for track, d in distance.tracks.items():
-                self.patch_distance(d)
-        return distance
 
 
 __all__ = ["SessionStateInDb", "TaskStateInDb", "CandidateStateInDb"]

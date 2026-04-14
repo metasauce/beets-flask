@@ -7,7 +7,6 @@ from uuid import uuid4
 
 from sqlalchemy import LargeBinary, select
 from sqlalchemy.orm import (
-    DeclarativeBase,
     Mapped,
     Session,
     mapped_column,
@@ -18,20 +17,21 @@ from sqlalchemy.sql import func
 
 from beets_flask.logger import log
 
-from .types import DictType, IntDictType, StrDictType
+from .types import DictType, FloatListType, IntDictType, StrDictType
+
+mapper_registry = registry(
+    type_annotation_map={
+        bytes: LargeBinary,
+        dict[int, int]: IntDictType,
+        dict[str, str]: StrDictType,
+        dict[str, Any]: DictType,
+        list[float]: FloatListType,
+    }
+)
 
 
-class Base(DeclarativeBase):
+class Base(mapper_registry.generate_base()):
     __abstract__ = True
-
-    registry = registry(
-        type_annotation_map={
-            bytes: LargeBinary,
-            dict[int, int]: IntDictType,
-            dict[str, str]: StrDictType,
-            dict[str, Any]: DictType,
-        }
-    )
 
     id: Mapped[str] = mapped_column(primary_key=True)
 
