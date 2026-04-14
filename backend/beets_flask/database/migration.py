@@ -1,10 +1,14 @@
 """
 Scaffold for initial alembic setup and all future migrations.
 
-Introduced for migration from 1.2.1 to 2.0.
-We use a python wrapper instead of the cli, because this way we get configs and
-env vars in our usual way.
+Introduced for migration from beets-flask v1.2.1 to v2.0. We use a python wrapper here
+instead of the alembic cli, as this way we get configs and env vars in our usual way.
 """
+
+import shutil
+from datetime import UTC, datetime
+from pathlib import Path
+from urllib.parse import urlparse
 
 from alembic import command
 from alembic.config import Config
@@ -18,40 +22,33 @@ def run_migrations() -> None:
     """Run all pending database migrations."""
 
     alembic_config = Config("alembic.ini")
-    engine = create_engine(get_flask_config()["DATABASE_URI"])
+    db_url = get_flask_config()["DATABASE_URI"]
+    engine = create_engine(db_url)
 
     if not _db_has_tables(engine):
         # Completely empty database - run full migrations to create tables
         log.info("Database empty, running initial migration...")
-        command.upgrade(alembic_config, "head")
+        upgrade(alembic_config, db_url, engine)
     elif not _alembic_initialized(engine):
         # Has tables but no alembic tracking - stamp then upgrade
         log.info("Database has no alembic tracking yet")
         stamp_initial(alembic_config)
-        command.upgrade(alembic_config, "head")
+        upgrade(alembic_config, db_url, engine)
     else:
         # Already tracked - just run pending migrations
         log.info("Running database migrations...")
-        command.upgrade(alembic_config, "head")
+        upgrade(alembic_config, db_url, engine)
 
     log.info("Database migrations complete.")
 
 
 def stamp_initial(config: Config) -> str | None:
-    """Stamp the database with the base migration.
+    """Stamp the database with the initial migration.
 
     Use this for existing databases that should be considered up-to-date
-    at the base migration, without running any schema changes.
+    at the initial migration, without running any schema changes.
     """
-    from alembic.script import ScriptDirectory
-
-    script = ScriptDirectory.from_config(config)
-    base_rev = script.get_base()
-
-    if base_rev is None:
-        log.warning("No migrations found, skipping stamp")
-        return None
-
+    base_rev = "a986c03d9ba3"  # a986c03d9ba3 == initial
     log.info(f"Stamping database with base migration: {base_rev}...")
     command.stamp(config, base_rev)
     log.info(f"Database stamped with {base_rev}.")
@@ -78,3 +75,30 @@ def _db_has_tables(engine: Engine) -> bool:
         )
         count = result.scalar() or 0
         return count > 0
+
+
+def upgrade(alembic_config: Config, db_url: str, engine: Engine):
+    """Light wrapper around the alembic upgrade command.
+
+    Adds backups and runs a cleanup after migrations.
+    """
+    db_path = urlparse(db_url).path
+    ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    backup_path = Path(db_path).with_suffix(f".backup_{ts}.db")
+    shutil.copy2(db_path, backup_path)
+    log.info(f"SQLite backup created at {backup_path}")
+
+    try:
+        command.upgrade(alembic_config, "head")
+
+        with engine.begin() as conn:
+            conn.exec_driver_sql("PRAGMA wal_checkpoint(FULL);")
+            conn.exec_driver_sql("ANALYZE;")
+            conn.exec_driver_sql("REINDEX;")
+            conn.exec_driver_sql("VACUUM;")
+            result = conn.exec_driver_sql("PRAGMA integrity_check;").scalar()
+            if result != "ok":
+                raise RuntimeError(f"Integrity check failed: {result}")
+    except Exception:
+        log.exception("Migration failed! Please report this!")
+        raise
