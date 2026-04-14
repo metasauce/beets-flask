@@ -12,6 +12,7 @@ from ..models.match import (
     AlbumMatch,
     AlbumMatchTrackMapping,
     Distance,
+    Match,
     Penalty,
     TrackInfo,
     TrackMatch,
@@ -37,7 +38,7 @@ class AlbumInfoMapper(BeetsMapper[BeetsAlbumInfo, AlbumInfo]):
         self.track_mapper = TrackInfoMapper()
 
     def _from_beets(self, obj: BeetsAlbumInfo, ctx: Context) -> AlbumInfo:
-        data = dict(obj.data)
+        data = {k: v for k, v in obj.items()}
         data.pop("tracks", None)
         return AlbumInfo(
             tracks=[self.track_mapper.from_beets(t, ctx) for t in obj.tracks],
@@ -178,16 +179,14 @@ class AlbumMatchMapper(BeetsMapper[BeetsAlbumMatch, AlbumMatch]):
         )
 
 
-class MatchMapper(
-    BeetsMapper[BeetsAlbumMatch | BeetsTrackMatch, AlbumMatch | TrackMatch]
-):
+class MatchMapper(BeetsMapper[BeetsAlbumMatch | BeetsTrackMatch, Match]):
     def __init__(self):
         self.album_mapper = AlbumMatchMapper()
         self.track_mapper = TrackMatchMapper()
 
     def _from_beets(
         self, obj: BeetsAlbumMatch | BeetsTrackMatch, ctx: Context
-    ) -> AlbumMatch | TrackMatch:
+    ) -> Match:
         if isinstance(obj, BeetsAlbumMatch):
             return self.album_mapper.from_beets(obj, ctx)
 
@@ -197,7 +196,7 @@ class MatchMapper(
         raise TypeError(f"Unsupported beets obj type: {type(obj)}")
 
     def _to_beets(
-        self, model: AlbumMatch | TrackMatch, ctx: Context
+        self, model: Match, ctx: Context
     ) -> BeetsAlbumMatch | BeetsTrackMatch:
         if isinstance(model, AlbumMatch):
             return self.album_mapper.to_beets(model, ctx)

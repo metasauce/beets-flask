@@ -88,3 +88,43 @@ class Item(Base):
             return [cls._decode(x) for x in v]
 
         return v
+
+    def process_bind_param(self, value: BeetsItem | None, dialect):
+        """Transform from live object into serialized json in database."""
+        if value is None or not value:
+            return None
+
+        return {
+            "fixed_values": {
+                k: self._encode(v) for k, v in value._values_fixed.items() if v
+            },
+            "flex_values": {
+                k: self._encode(v) for k, v in value._values_flex.items() if v
+            },
+        }
+
+    def process_result_value(self, value, dialect):
+        """Transform from serialized json in database to live object."""
+        if value is None:
+            return None
+
+        return BeetsItem._awaken(
+            fixed_values={
+                k: self._decode(v) for k, v in value.get("fixed_values", {}).items()
+            },
+            flex_values={
+                k: self._decode(v) for k, v in value.get("flex_values", {}).items()
+            },
+        )
+
+
+class TaskPendingItem(Base):
+    __tablename__ = "task_pending_items"
+
+    task_id: Mapped[str] = mapped_column(ForeignKey("task.id"))
+    task: Mapped[TaskStateInDb] = relationship(back_populates="pending_items")
+    item: Mapped[BeetsItem] = mapped_column(BeetsItemType())
+
+    def __init__(self, item: BeetsItem, id: str | None = None):
+        super().__init__(id)
+        self.item = item

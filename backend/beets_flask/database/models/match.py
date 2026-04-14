@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
 
 from beets_flask.database.models.pending import BeetsItemType
 from beets_flask.importer.types import BeetsItem
@@ -79,15 +80,12 @@ class Penalty(Base):
 # ----------------------------------- Info ----------------------------------- #
 
 
-class DataMixin:
-    data: Mapped[dict[str, Any]] = mapped_column(default=dict)
-
-
-class TrackInfo(DataMixin, Base):
+class TrackInfo(Base):
     __tablename__ = "track_info"
 
     album_id: Mapped[str | None] = mapped_column(ForeignKey("album_info.id"))
     album: Mapped[AlbumInfo] = relationship(back_populates="tracks")
+    data: Mapped[dict[str, Any]] = mapped_column(JSON(), default=dict)
 
     def __init__(
         self,
@@ -99,13 +97,14 @@ class TrackInfo(DataMixin, Base):
         self.data = data or {}
 
 
-class AlbumInfo(DataMixin, Base):
+class AlbumInfo(Base):
     __tablename__ = "album_info"
 
     tracks: Mapped[list[TrackInfo]] = relationship(
         back_populates="album",
         cascade="all, delete-orphan",
     )
+    data: Mapped[dict[str, Any]] = mapped_column(JSON(), default=dict)
 
     def __init__(
         self,
