@@ -16,21 +16,25 @@ if TYPE_CHECKING:
 
 
 class BeetsItemType(TypeDecorator[BeetsItem]):
-    """
-    We do not implement items in full detail yet, but keep them as a serialized json.
+    """Serializer and Deserializer for Beets Item class.
 
-    The transformation is relatively short, because items in beets are already
-    in a format for (their) database.
+    This component serializes Beets items by storing their fixed and flex fields
+    as JSON. Full object queryability is not implemented yet; instead, items are
+    preserved in a lightweight serialized form.
 
-    Notes:
-    - this type is relevant, because we want to save items __before__ beets does, so
-      that we can resume imports.
-    - in beets, the fixed_ and flex_values are computed at runtime and not stored
-      1:1 in beets' internal library:
-        - fixed are their own columns
-        - flex are linked in an extra table
-    - we need them here, but not as pickle (no need for functions/classes, and including
-      functions etc makes migrations a lot harder)
+    The transformation is intentionally minimal because Beets items are already
+    structured for database persistence.
+
+
+    Notes
+    -----
+    - Items are persisted here before Beets writes them to the beets db, we need this
+      to allow import processes to be resumed safely.
+    - In Beets, fixed and flex values are stored differently:
+        - fixed fields are stored as standard columns
+        - flex fields are stored in a separate linked table
+    - Pickling is avoided to ensure portability and migration stability (no
+      functions or runtime state are serialized).
     """
 
     impl = JSON
