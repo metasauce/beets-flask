@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from functools import wraps
 
 from quart import Quart
 from sqlalchemy import Engine, create_engine
@@ -33,8 +32,6 @@ def setup_database(app: Quart | None = None) -> None:
     if get_flask_config()["RESET_DB_ON_START"]:
         log.warning("Resetting database due to RESET_DB=True in config")
         _reset_database()
-
-    _create_tables(engine)
 
     if app is not None:
         # Gracefully shutdown the database session, if launched
@@ -94,35 +91,6 @@ def db_session_factory(session: Session | None = None):
             session.close()  # type: ignore
 
 
-def with_db_session(func):
-    """Decorate a function with a db session as a keyword argument to the function.
-
-    Example
-    ```
-    @with_db_session
-    def my_function(session=None):
-        tag.foo = "bar"
-        session.merge(tag)
-        return tag.to_dict()
-    ```
-    """
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with db_session_factory() as session:
-            kwargs.setdefault("session", session)
-            return func(*args, **kwargs)
-
-    return wrapper
-
-
-def _create_tables(engine) -> None:
-    Base.metadata.create_all(bind=engine)
-
-
 def _reset_database():
-    # Removes all data from the database but keeps schema
-    for t in reversed(Base.metadata.sorted_tables):
-        with db_session_factory() as session:
-            session.execute(t.delete())
-            session.commit()
+    Base.metadata.drop_all(bind=engine)  # type: ignore
+    Base.metadata.create_all(bind=engine)  # type: ignore

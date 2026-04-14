@@ -41,6 +41,7 @@ dependencies = [
     "numpy",
     "typing_extensions",
     "polars>=1.36.1",
+    "alembic>=1.18.4",
 ]
 
 [project.optional-dependencies]
@@ -91,7 +92,7 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
-
+"**/alembic/**/*" = ["D","I"]
 
 [tool.ruff.lint]
 select = [
@@ -115,12 +116,14 @@ fixable = ["ALL"]
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
+
 [tool.ruff.lint.isort]
 known-first-party = ["beets_flask", "tests"]
+known-third-party = ["alembic", "sqlalchemy"]
 
 [tool.pytest.ini_options]
 # addopts = ["--import-mode=importlib", "--cov=beets_flask"]
-addopts = ["--import-mode=importlib"]
+addopts = ["--import-mode=importlib", "--cov=beets_flask", "--cov-report=html"]
 filterwarnings = [
     "error",
     "ignore::sqlalchemy.exc.SAWarning",
@@ -130,6 +133,7 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 log_format = "%(relativeCreated)-8d [%(levelname)-5s] %(name)s %(filename)-8s:%(lineno)d %(message)s"
 asyncio_default_fixture_loop_scope = "function"
+
 
 [tool.coverage.report]
 omit = ["*/tests/*"]
