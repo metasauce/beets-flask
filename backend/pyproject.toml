@@ -44,7 +44,15 @@ dependencies = [
     "alembic>=1.18.4",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
+dev = [
+    { include-group = "test" },
+    { include-group = "docs" },
+    { include-group = "typed" },
+    "ruff>=0.6.5",
+    "pre-commit>=3.8.0",
+]
+
 # Can be install with e.g. `pip install -e .[dev]`
 test = [
     "pytest>=8.2.2",
@@ -53,7 +61,15 @@ test = [
     "pytest-cov>=5.0.0",
     "fakeredis",
 ]
-dev = ["ruff>=0.6.5", "pre-commit>=3.8.0", "beets_flask[typed]"]
+docs = [
+    "sphinx>=8.0.2",
+    "furo>=2024.8.6",
+    "sphinx-copybutton>=0.5.2",
+    "sphinx-inline-tabs>=2023.4.21",
+    "sphinxcontrib-typer[html]>=0.5.0",
+    "myst-parser>=4.0.0",
+    "myst-nb>=1.1.2",
+]
 typed = [
     "types-cachetools",
     "types-requests",
@@ -63,16 +79,6 @@ typed = [
     "types-aiofiles",
     "types-pyyaml",
     "pandas-stubs",
-]
-all = ["beets_flask[dev,test,typed]"]
-docs = [
-    "sphinx>=8.0.2",
-    "furo>=2024.8.6",
-    "sphinx-copybutton>=0.5.2",
-    "sphinx-inline-tabs>=2023.4.21",
-    "sphinxcontrib-typer[html]>=0.5.0",
-    "myst-parser>=4.0.0",
-    "myst-nb>=1.1.2",
 ]
 
 [build-system]
@@ -115,7 +121,6 @@ fixable = ["ALL"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
-
 
 [tool.ruff.lint.isort]
 known-first-party = ["beets_flask", "tests"]
