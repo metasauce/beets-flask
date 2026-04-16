@@ -209,7 +209,12 @@ class ItemsUnpickler(pickle.Unpickler):
         """Override the find_class method to redirect Distance class references."""
         key = (module, name)
         if key not in self.CLASS_MAP:
-            print(f"WARNING: Unknown class not in migration map: {module}.{name}")
-            return dict  # Fallback for unknown classes
+            log.warning(
+                "Unknown class not in migration map during item unpickling: %s.%s",
+                module,
+                name,
+            )
+            raise pickle.UnpicklingError(
+                f"Unknown class not in migration map: {module}.{name}"
+            )
         return self.CLASS_MAP[key]
-

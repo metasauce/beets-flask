@@ -365,7 +365,8 @@ class TaskStateInDb(Base):
     # old_paths contain original file paths, but are only set when files are moved.
     # (which breaks some deep links that before were identical to paths, but no more!)
     pending_items: Mapped[list[TaskPendingItem]] = relationship(
-        cascade="all, delete-orphan"
+        back_populates="task",
+        cascade="all, delete-orphan",
     )
     choice_flag: Mapped[Action | None]
 
