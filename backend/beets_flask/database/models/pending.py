@@ -38,6 +38,7 @@ class BeetsItemType(TypeDecorator[BeetsItem]):
     """
 
     impl = JSON
+    cache_ok = True
 
     @classmethod
     def _encode(cls, v):
@@ -97,7 +98,7 @@ class BeetsItemType(TypeDecorator[BeetsItem]):
 class TaskPendingItem(Base):
     __tablename__ = "task_pending_items"
 
-    task_id: Mapped[int] = mapped_column(ForeignKey("task.id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey("task.id"))
     task: Mapped[TaskStateInDb] = relationship(back_populates="pending_items")
     item: Mapped[BeetsItem] = mapped_column(BeetsItemType())
 
