@@ -14,6 +14,7 @@ export interface FolderSelectionContext {
     toggleSelect(folder: Folder | Archive): void;
     isSelected(folder: Folder | Archive): boolean;
     deselectAll(): void;
+    selectAll(folders: Array<Folder | Archive>): void;
 }
 
 const FoldersContext = createContext<FolderSelectionContext | null>(null);
@@ -68,6 +69,13 @@ export function FolderSelectionProvider({
 
     const deselectAll = () => setSelected({ hashes: [], paths: [] });
 
+    const selectAll = (folders: Array<Folder | Archive>) => {
+        setSelected({
+            hashes: folders.map((f) => f.hash),
+            paths: folders.map((f) => f.full_path),
+        });
+    };
+
     const nSelected = selected.hashes.length;
 
     return (
@@ -78,6 +86,7 @@ export function FolderSelectionProvider({
                 isSelected,
                 selected,
                 deselectAll,
+                selectAll,
             }}
         >
             {children}

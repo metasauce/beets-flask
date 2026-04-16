@@ -261,11 +261,18 @@ function InboxCardContent() {
         gridTemplateColumns,
     } = useInboxCardContext();
 
+    const selectableFolders = inbox.children.filter(
+        (child) => child.type === 'directory' || child.type === 'archive'
+    ) as Array<Folder | Archive>;
+
     return (
         <CardContent>
             <GridWrapper config={gridTemplateColumns}>
                 {/* Only show inner folders */}
-                <InboxGridHeader inboxFolderConfig={folderConfig} />
+                <InboxGridHeader
+                    inboxFolderConfig={folderConfig}
+                    selectableFolders={selectableFolders}
+                />
                 {inbox.children.map((child) => {
                     if (child.type === 'directory') {
                         return (

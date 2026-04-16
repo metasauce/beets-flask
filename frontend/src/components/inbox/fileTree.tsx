@@ -552,13 +552,14 @@ function Chips({ folder }: { folder: Folder | Archive }) {
 
 export function InboxGridHeader({
     inboxFolderConfig,
+    selectableFolders,
 }: {
     inboxFolderConfig: ReturnType<typeof useInboxFolderConfig>;
+    selectableFolders: Array<Folder | Archive>;
 }) {
     const theme = useTheme();
     const [open, setOpen] = useState(false);
-    const [checked, setChecked] = useState(false);
-    const { nSelected, deselectAll } = useFolderSelectionContext();
+    const { nSelected, deselectAll, selectAll } = useFolderSelectionContext();
     const {
         gridTemplateColumns,
         setGridTemplateColumns,
@@ -566,22 +567,28 @@ export function InboxGridHeader({
         setActionButtons,
     } = useInboxFolderFrontendConfig(inboxFolderConfig.path);
 
+    const total = selectableFolders.length;
+    const allSelected = total > 0 && nSelected === total;
+    const someSelected = nSelected > 0 && nSelected < total;
+
     return (
         <GridRow>
             <Checkbox
                 color="secondary"
-                indeterminate={nSelected > 0}
+                indeterminate={someSelected}
                 className="selector"
                 sx={{
                     margin: 0,
                     padding: 0,
                 }}
-                checked={checked}
+                checked={allSelected}
                 onChange={() => {
-                    deselectAll();
-                    setChecked(false);
+                    if (allSelected || someSelected) {
+                        deselectAll();
+                    } else {
+                        selectAll(selectableFolders);
+                    }
                 }}
-                disabled={nSelected === 0}
             />
             <Box
                 className="tree"
