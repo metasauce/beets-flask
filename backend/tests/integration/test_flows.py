@@ -310,7 +310,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
                         id_99_red_balloons,
                     ],  # Nena 99 Red Balloons
                     "search_artist": None,
-                    "search_album": None,
+                    "search_name": None,
                 }
             },
         )
@@ -352,7 +352,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
                         "non_existing_id",
                     ],  # Nena 99 Red Balloons
                     "search_artist": None,
-                    "search_album": None,
+                    "search_name": None,
                 }
             },
         )
@@ -392,7 +392,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
                         id_99_red_balloons,
                     ],  # Nena 99 Red Balloons
                     "search_artist": None,
-                    "search_album": None,
+                    "search_name": None,
                 }
             },
         )
