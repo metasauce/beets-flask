@@ -5,6 +5,7 @@ Beets-Flask provides a quart application with REST API for the beets music libra
 ```{toctree}
 :hidden:
 
+./classes
 ./database
 ./state_serialize
 ```
