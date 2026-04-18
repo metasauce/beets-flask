@@ -41,7 +41,6 @@ from tests.mixins.plugins import PluginEventsMixin
 from tests.unit.test_importer.conftest import (
     VALID_PATHS,
     album_path_absolute,
-    use_mock_tag_album,
 )
 
 
@@ -100,7 +99,6 @@ class TestPreview(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryMixi
     )
     def path(self, request) -> Path:
         path = album_path_absolute(request.param)
-        use_mock_tag_album(str(path))
         return path
 
     async def test_preview(
@@ -165,7 +163,6 @@ class TestPreviewMultipleTasks(
     @pytest.fixture()
     def path(self) -> Path:
         path = album_path_absolute("multi_flat")
-        use_mock_tag_album(str(path))
         return path
 
     @pytest.mark.parametrize(
@@ -248,7 +245,6 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
     @pytest.fixture()
     def path(self) -> Path:
         path = album_path_absolute(VALID_PATHS[0])
-        use_mock_tag_album(str(path))
         return path
 
     def check_mapping_consistency(self, db_session: Session):
@@ -712,7 +708,6 @@ class TestImportAuto(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
     @pytest.fixture()
     def path(self) -> Path:
         path = album_path_absolute(VALID_PATHS[0])
-        use_mock_tag_album(str(path))
         return path
 
     async def test_import_auto_accept(self, db_session: Session, path: Path):
@@ -764,7 +759,6 @@ class TestImportAutoFails(
     @pytest.fixture()
     def path(self) -> Path:
         path = album_path_absolute(VALID_PATHS[0])
-        use_mock_tag_album(str(path))
         return path
 
     async def test_import_auto_fails(self, db_session: Session, path: Path):
@@ -824,7 +818,6 @@ class TestChooseCandidatesSingleTask(
     @pytest.fixture()
     def path_single_task(self) -> Path:
         path = album_path_absolute(VALID_PATHS[0])
-        use_mock_tag_album(str(path))
         return path
 
     async def test_choose_candidates(
@@ -850,6 +843,7 @@ class TestChooseCandidatesSingleTask(
         assert s_state_indb.folder.full_path == str(path_single_task)
         assert len(s_state_indb.tasks) == 1
 
+        # Should have to candidates (one from mb and one from spotify)
         choosen_candidate = s_state_indb.tasks[0].candidates[-2]
 
         exc = await run_import_candidate(
@@ -886,7 +880,6 @@ class TestMultipleTasks(
     @pytest.fixture()
     def path_multiple_tasks(self) -> Path:
         path = album_path_absolute("multi")
-        use_mock_tag_album(str(path))
         return path
 
     async def test_choose_candidates_multiple_tasks(
@@ -922,9 +915,7 @@ class TestMultipleTasks(
         candidates: TaskIdMappingArg[CandidateChoice] = {}
         assert candidates is not None
         for task in s_state_indb.tasks:
-            print(task.paths)
-            print([c.metadata for c in task.candidates])
-            assert len(task.candidates) > 2, "Should have candidates"
+            assert len(task.candidates) >= 2, "Should have candidates"
             candidates[task.id] = task.candidates[-2].id
 
         # Check that we have the same number of candidates as tasks
@@ -983,7 +974,7 @@ class TestMultipleTasks(
         assert duplicate_actions is not None
 
         for task in s_state_indb.tasks:
-            assert len(task.candidates) > 2, "Should have candidates"
+            assert len(task.candidates) >= 2, "Should have candidates"
             candidates[task.id] = task.candidates[-2].id
             duplicate_actions[task.id] = duplicate_action
 
@@ -1013,7 +1004,6 @@ class TestPluginEvents(
     @pytest.fixture()
     def path(self) -> Path:
         path = album_path_absolute(VALID_PATHS[0])
-        use_mock_tag_album(str(path))
         return path
 
     async def test_preview_events(self, db_session: Session, path: Path):
@@ -1114,7 +1104,6 @@ class TestImportBootleg(
     @pytest.fixture()
     def path(self) -> Path:
         path = album_path_absolute(VALID_PATHS[0])
-        use_mock_tag_album(str(path))
         return path
 
     async def test_import_bootleg(self, db_session: Session, path: Path):

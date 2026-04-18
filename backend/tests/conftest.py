@@ -1,12 +1,17 @@
+import hashlib
 import logging
 import os
+import pickle
 import shutil
+import tempfile
 from collections.abc import Callable, Generator
 from contextlib import _GeneratorContextManager
 from pathlib import Path
 
 import pytest
 import yaml
+from beets import autotag
+from beets.autotag import tag_album as _tag_album
 from quart import Quart
 from quart.typing import TestClientProtocol
 from sqlalchemy.orm import Session
@@ -46,7 +51,7 @@ def setup_and_teardown(tmpdir_factory):
     # we have one test that does replacements on this file
     # and assumes the default 4 workers
     with open(tmp_dir / "beets/config.yaml", "w") as f:
-        yaml.dump({"plugins": ["musicbrainz"]}, f)
+        yaml.dump({"plugins": ["musicbrainz", "spotify"]}, f)
 
     yield
 
@@ -205,3 +210,60 @@ def local_redis(monkeypatch):
     yield
     log.debug("Unmocking beets_flask.redis")
     monkeypatch.undo()
+
+
+lookup_cache_dir: Path
+
+
+@pytest.fixture(scope="module", autouse=True)
+def mock_tag_album():
+    """Fixture that monkeypatches beets tag_album to use cached lookups."""
+    # Create temp lookup cache directory once per module
+    global lookup_cache_dir
+
+    lookup_cache_dir = Path(tempfile.mkdtemp(prefix="beets_lookup_cache_"))
+
+    original_tag_album = autotag.tag_album
+    autotag.tag_album = tag_album
+    yield lookup_cache_dir
+    autotag.tag_album = original_tag_album
+
+
+def tag_album(
+    items,
+    search_artist: str | None = None,
+    search_name: str | None = None,
+    search_ids: list[str] = [],
+):
+    global lookup_cache_dir
+    # Compute items hash based on the items
+    m = hashlib.md5()
+    for item in items:
+        m.update(item.path)
+    if search_artist:
+        m.update(search_artist.encode("utf-8"))
+    if search_name:
+        m.update(search_name.encode("utf-8"))
+    for search_id in search_ids:
+        m.update(search_id.encode("utf-8"))
+    items_hash = m.hexdigest()[:8]
+
+    cache_file = lookup_cache_dir / f"lookup_{items_hash}.pickle"
+    if cache_file.exists():
+        log.debug(f"Using cached lookup from temp dir {cache_file}")
+        with open(cache_file, "rb") as f:
+            return pickle.load(f)
+    else:
+        # TODO: This pickle contains absolute paths to the files
+        # while undesired (no use in having them in the git repo) its for now the
+        # easiest way... and we hope music brainz does not change its data too often!
+        res = _tag_album(items, search_artist, search_name, search_ids)
+
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(cache_file, "wb") as f:
+            pickle.dump(res, f)
+
+        return res
+
+
+autotag.tag_album = tag_album
