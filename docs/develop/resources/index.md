@@ -11,6 +11,5 @@ docker.md
 documentation.md
 frontend.md
 backend.md
-database.md
 macos.md
 ```
