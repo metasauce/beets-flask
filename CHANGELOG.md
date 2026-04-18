@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - We now use `uv` (Universal Virtualenv) to manage python dependencies and run scripts in CI/CD. This should improve dependency resolution and installation times.
 - We now ship a static ffmpeg binary instead of installing ffmpeg via apt. This should reduce image size and improve compatibility across different host systems.
 - Added a database migration setup using [Alembic](https://alembic.sqlalchemy.org/) for future database migrations.
+- Upgraded `beets` from `v2.5.1` to `v2.6.1`
 
 ## [1.2.0] - 25-12-17
 
