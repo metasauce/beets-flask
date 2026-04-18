@@ -21,7 +21,6 @@ from typing import Any
 from beets.autotag import AlbumMatch
 from beets.autotag.distance import Distance
 from beets.importer import Action, ImportTask
-from beets.library.models import Item as LibraryItem
 from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
@@ -45,9 +44,11 @@ from beets_flask.importer.states import (
     SessionState,
     TaskState,
 )
-from beets_flask.importer.types import BeetsAlbumMatch, BeetsTrackMatch
+from beets_flask.importer.types import BeetsAlbumMatch, BeetsItem, BeetsTrackMatch
 from beets_flask.logger import log
 from beets_flask.server.exceptions import SerializedException
+
+from .pending import TaskPendingItem
 
 
 class FolderInDb(Base):
@@ -363,7 +364,10 @@ class TaskStateInDb(Base):
     old_paths: Mapped[bytes | None]
     # old_paths contain original file paths, but are only set when files are moved.
     # (which breaks some deep links that before were identical to paths, but no more!)
-    items: Mapped[bytes]
+    pending_items: Mapped[list[TaskPendingItem]] = relationship(
+        back_populates="task",
+        cascade="all, delete-orphan",
+    )
     choice_flag: Mapped[Action | None]
 
     # To allow for continue we need to store the current artist and album
@@ -374,13 +378,21 @@ class TaskStateInDb(Base):
 
     progress: Mapped[Progress]
 
+    @property
+    def items(self) -> list[BeetsItem]:
+        return [row.item for row in self.pending_items]
+
+    @items.setter
+    def items(self, value: list[BeetsItem]):
+        self.pending_items = [TaskPendingItem(item=v) for v in value]
+
     def __init__(
         self,
         id: str | None = None,
         toppath: bytes | None = None,
         paths: list[bytes] = [],
         old_paths: list[bytes] | None = None,
-        items: list[LibraryItem] = [],
+        items: list[BeetsItem] = [],
         candidates: list[CandidateStateInDb] = [],
         chosen_candidate_id: str | None = None,
         progress: Progress = Progress.NOT_STARTED,
@@ -393,12 +405,7 @@ class TaskStateInDb(Base):
         self.paths = pickle.dumps(paths)
         self.old_paths = pickle.dumps(old_paths) if old_paths else None
 
-        for item in items:
-            # Remove db from all items as it can't be pickled
-            item._db = None
-            item._Item__album = None
-
-        self.items = pickle.dumps(items)
+        self.items = items
         self.candidates = candidates
         self.chosen_candidate_id = chosen_candidate_id
         self.progress = progress
@@ -418,7 +425,7 @@ class TaskStateInDb(Base):
             id=state.id,
             toppath=str(state.toppath).encode("utf-8") if state.toppath else None,
             paths=state.task.paths,
-            items=state.task.items,
+            items=state.items,
             candidates=[
                 CandidateStateInDb.from_live_state(c) for c in state.candidate_states
             ],
@@ -438,7 +445,7 @@ class TaskStateInDb(Base):
         beets_task = ImportTask(
             toppath=self.toppath,
             paths=pickle.loads(self.paths),
-            items=pickle.loads(self.items),
+            items=self.items,
         )
         beets_task.choice_flag = self.choice_flag
         beets_task.cur_artist = self.cur_artist
