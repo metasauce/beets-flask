@@ -25,7 +25,7 @@ export interface SerializedProgressState {
 export interface Search {
     search_ids: Array<string>;
     search_artist: null | string;
-    search_album: null | string;
+    search_name: null | string;
 }
 
 export interface LibraryStats {

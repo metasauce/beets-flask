@@ -209,7 +209,7 @@ def enqueue_preview(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs) ->
 def enqueue_preview_add_candidates(
     hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
 ) -> Job:
-    # May contain search_ids, search_artist, search_album
+    # May contain search_ids, search_artist, search_name
     # As always to allow task mapping
 
     search: TaskIdMappingArg[Search | Literal["skip"]] = kwargs.pop("search", None)
