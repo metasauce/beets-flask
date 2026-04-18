@@ -10,7 +10,6 @@ from beets_flask.importer.states import SessionState
 from .conftest import (
     VALID_PATHS,
     album_path_absolute,
-    use_mock_tag_album,
 )
 
 log = logging.getLogger(__name__)
@@ -26,7 +25,6 @@ def test_generate_lookup():
     """
     for path in VALID_PATHS:
         p = Path(__file__).parent.parent.parent / "data" / "audio" / path
-        use_mock_tag_album(str(p))
 
         state = SessionState(p)
         session = PreviewSession(state)
@@ -48,7 +46,6 @@ class TestPreviewSessions:
     def get_state(self, path: str):
         p = album_path_absolute(path)
         self.session = PreviewSession(SessionState(p))
-        use_mock_tag_album(str(p))
         return self.session.run_sync()
 
     @pytest.mark.parametrize("path", VALID_PATHS)
