@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Literal, NotRequired, TypedDict, cast
 from uuid import uuid4 as uuid
 
-import beets.ui.commands as uicommands
 from beets import importer
 from beets.ui import _open_library
+from beets.ui.commands.import_.display import show_change
 from beets.util import bytestring_path, get_most_common_tags
 from deprecated import deprecated
 
@@ -484,7 +484,7 @@ class CandidateState(BaseState):
     def diff_preview(self) -> str:
         """Diff preview of the match to the current meta data."""
         out, err, _ = capture_stdout_stderr(
-            uicommands.show_change,
+            show_change,
             self.task_state.task.cur_artist,
             self.task_state.task.cur_album,
             self.match,
