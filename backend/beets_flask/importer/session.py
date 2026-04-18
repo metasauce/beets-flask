@@ -572,36 +572,12 @@ class AddCandidatesSession(PreviewSession):
 
         log.debug(f"Using {search=} for {task_state.id=}, {task_state.paths=}")
 
-        try:
-            _, _, prop = autotag.tag_album(
-                task.items,
+        _, _, prop = autotag.tag_album(
+            task.items,
             search_ids=search["search_ids"],
             search_name=search["search_name"],
             search_artist=search["search_artist"],
         )
-        except Exception as e:
-            # TODO: With beets 2.6.0 this should be revisited
-            # since beets should than be able to handle these exceptions
-            # gracefully upstream.
-            # https://github.com/beetbox/beets/pull/5965
-            from beetsplug.musicbrainz import MusicBrainzAPIError
-            from beetsplug.spotify import APIError as SpotifyAPIError
-
-            if isinstance(e, MusicBrainzAPIError):
-                raise NoCandidatesFoundException(
-                    f"Failed to contact Musicbrainz API: {e.get_message()}",
-                    persist_in_db=False,
-                )
-            elif isinstance(e, SpotifyAPIError):
-                raise NoCandidatesFoundException(
-                    f"Failed to contact Spotify API: {e}",
-                    persist_in_db=False,
-                )
-            else:
-                raise NoCandidatesFoundException(
-                    f"Failed to contact online APIs.",
-                    persist_in_db=False,
-                )
 
         task_state.add_candidates(prop.candidates)
 
