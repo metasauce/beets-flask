@@ -7,28 +7,19 @@ version: 2
 
 # Set the OS, Python version and other tools you might need
 build:
-    os: ubuntu-22.04
-    tools:
-        python: "3.11"
-        # You can also specify other tool versions:
-        # nodejs: "19"
-        # rust: "1.64"
-        # golang: "1.19"
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+  jobs:
+    create_environment:
+      - asdf plugin add uv
+      - asdf install uv latest
+      - asdf global uv latest
+      - cd backend
+      - UV_PROJECT_ENVIRONMENT=$READTHEDOCS_VIRTUALENV_PATH uv sync --all-extras --group docs
+    install:
+      - "true"
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
-    configuration: ./docs/conf.py
-# Optionally build your docs in additional formats such as PDF and ePub
-# formats:
-#    - pdf
-#    - epub
-
-# Optional but recommended, declare the Python requirements required
-# to build your documentation
-# See https://docs.readthedocs.io/en/stable/guides/reproducible-builds.html
-python:
-    install:
-        - method: pip
-          path: ./backend
-          extra_requirements:
-              - docs
+  configuration: docs/conf.py
