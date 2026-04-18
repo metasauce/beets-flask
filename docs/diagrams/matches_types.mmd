@@ -1,0 +1,52 @@
+erDiagram
+  album_info {
+    JSON data
+    VARCHAR id PK
+  }
+
+  album_match_track_mappings {
+    VARCHAR album_match_id FK
+    VARCHAR track_info_id FK "nullable"
+    JSON item "nullable"
+    VARCHAR id PK
+  }
+
+  distances {
+    VARCHAR track_info_id FK "nullable"
+    VARCHAR parent_distance_id FK "nullable"
+    FLOAT raw_distance
+    FLOAT max_distance
+    VARCHAR id PK
+  }
+
+  matches_album {
+    VARCHAR id PK,FK
+    VARCHAR info_id FK
+  }
+
+  matches_track {
+    VARCHAR id PK,FK
+    VARCHAR info_id FK
+  }
+
+  penalties {
+    VARCHAR key "indexed"
+    BLOB value
+    VARCHAR distance_id FK
+    VARCHAR id PK
+  }
+
+  track_info {
+    VARCHAR album_id FK "nullable"
+    JSON data
+    VARCHAR id PK
+  }
+
+  matches_album ||--o{ album_match_track_mappings : album_match_id
+  track_info ||--o{ album_match_track_mappings : track_info_id
+  track_info ||--o{ distances : track_info_id
+  distances ||--o{ distances : parent_distance_id
+  album_info ||--o{ matches_album : info_id
+  track_info ||--o{ matches_track : info_id
+  distances ||--o{ penalties : distance_id
+  album_info ||--o{ track_info : album_id
