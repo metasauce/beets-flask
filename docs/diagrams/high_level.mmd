@@ -1,0 +1,54 @@
+erDiagram
+  candidate {
+    VARCHAR task_id FK
+    VARCHAR match_id FK
+    VARCHAR duplicate_ids
+    TEXT mapping
+    VARCHAR id PK
+  }
+
+  folder {
+    VARCHAR full_path PK "indexed"
+    BOOLEAN is_album "nullable"
+    VARCHAR id PK
+  }
+
+  matches {
+    VARCHAR id PK
+    VARCHAR type
+    VARCHAR distance_id FK
+  }
+
+  session {
+    VARCHAR folder_hash FK
+    INTEGER folder_revision
+    ENUM progress
+    BLOB exc "nullable"
+    VARCHAR id PK
+  }
+
+  task {
+    VARCHAR session_id FK
+    VARCHAR chosen_candidate_id FK "nullable"
+    BLOB toppath "nullable"
+    BLOB paths
+    BLOB old_paths "nullable"
+    ENUM choice_flag "nullable"
+    VARCHAR cur_artist "nullable"
+    VARCHAR cur_album "nullable"
+    ENUM progress
+    VARCHAR id PK
+  }
+
+  task_pending_items {
+    VARCHAR task_id FK
+    JSON item
+    VARCHAR id PK
+  }
+
+  task ||--o{ candidate : task_id
+  matches ||--o{ candidate : match_id
+  folder ||--o{ session : folder_hash
+  session ||--o{ task : session_id
+  candidate ||--o{ task : chosen_candidate_id
+  task ||--o{ task_pending_items : task_id

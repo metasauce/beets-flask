@@ -121,6 +121,12 @@ class AlbumInfo(Base):
 
 
 class Match(Base):
+    """
+    Matches are polymorphic — can be album or track matches.
+
+    This requires us to keep two extra tables.
+    """
+
     __tablename__ = "matches"
 
     # Needed for polymorphic

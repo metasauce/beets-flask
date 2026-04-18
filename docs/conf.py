@@ -30,6 +30,7 @@ extensions = [
     "sphinx_inline_tabs",
     "sphinxcontrib.typer",
     "sphinx.ext.napoleon",
+    "sphinxcontrib.mermaid",
     # "myst_parser",
     "myst_nb",
 ]
