@@ -2,6 +2,36 @@
 
 To keep an overview which types come from beets native, we prefix them to `BeetsSomeType` (see `beets_flask/importer/types.py`)
 
+## Notation
+
+### Items
+
+In Beets, an `Item` is a single track. The `Item` can be stored 
+in the beets database. It represents a tracks metadata on disk.
+
+### Candidates (TrackInfo & AlbumInfo)
+
+Retrieved from external sources (e.g. spotify, tidal...). In particular `TrackInfo` is a single tracks metadata from an external source while `AlbumInfo` is information shared but also additional. `AlbumInfo` may contain a list of `TrackInfo`s.
+
+### Matches (TrackMatch & AlbumMatch)
+
+Matches are the association between `candidates` and `items`. Historically in beets this was just a list of indice mappings but changed to direct references to objects.
+
+For the tracks of a candidate we may find the following relationships after trying
+to assign items and tracks.
+
+```
+items ∩ tracks = pairs
+items' ∩ tracks = extra_items
+items ∩ tracks' = extra_tracks
+```
+
+Matches are ranked through predefined penalties and using linear assignment problem. This yields a percentage score.
+
+### Task(s)
+
+A `Task` is a specific import operation. Tasks need to be started on a folder i.e. `items` and looks up `candidates` online. The goal of task is to assign `items` to `candidates` by finding `matches`. A user can than pick a match. 
+
 ## Sessions and Queues
 
 In Beets and BeetsFlask, folder imports are abstracted into sessions.
