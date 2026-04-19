@@ -690,5 +690,4 @@ __all__ = [
     "user_query",
     "plugin_stage",
     "manipulate_files",
-    "mark_tasks_completed",
 ]

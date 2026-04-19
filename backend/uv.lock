@@ -175,7 +175,7 @@ wheels = [
 
 [[package]]
 name = "beets"
-version = "2.6.1"
+version = "2.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -193,9 +193,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unidecode" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9a/f3/f429c70cdf8de80367be64515fe432b1cf44c60a9774cc75ae0aff36e48b/beets-2.6.1.tar.gz", hash = "sha256:1376b992ee18ee1b5de08d3586625e78d4338edb6b47e24f8e74932d8551f672", size = 2175882, upload-time = "2026-02-02T02:30:36.544Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/9d/4f72fc5f772ca958f48263ca688bc60752bc7d752a248d6191c62e3bafb1/beets-2.7.1.tar.gz", hash = "sha256:95f20c4087be2f4b2ab400be07cbea380bec2720e2a83180b025a972ee94bd22", size = 2189644, upload-time = "2026-03-08T08:31:30.568Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/a8/fbdd2eeaea7add3103d52e8c84490ed7db383db5d5227aa8583e2abe284e/beets-2.6.1-py3-none-any.whl", hash = "sha256:d3654fc7fef2c26d35113d40346d873c073ca981e0db1f21e4575ca1860ede02", size = 604352, upload-time = "2026-02-02T02:30:34.303Z" },
+    { url = "https://files.pythonhosted.org/packages/30/3b/1ad6e0c1f3e3d3e6113634ec97f372b00f1caad5ead91b9744358964b4e2/beets-2.7.1-py3-none-any.whl", hash = "sha256:bbe5a6b29aa55f520e635ef9d4222d8f3d53431bd0d78c68ee5c8bb0f80426f1", size = 610663, upload-time = "2026-03-08T08:31:28.363Z" },
 ]
 
 [[package]]
@@ -290,7 +290,7 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "alembic", specifier = ">=1.18.4" },
-    { name = "beets", specifier = "==2.6.1" },
+    { name = "beets", specifier = "==2.7.1" },
     { name = "cachetools", specifier = ">=5.3.3" },
     { name = "confuse", specifier = ">=2.0.1" },
     { name = "deprecated", specifier = ">=1.2.18" },
