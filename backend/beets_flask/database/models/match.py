@@ -6,10 +6,8 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
-from beets_flask.database.models.pending import BeetsItemType
-from beets_flask.importer.types import BeetsItem
-
 from .base import Base
+from .pending import Item
 
 # --------------------------------- Distance --------------------------------- #
 
@@ -206,15 +204,16 @@ class AlbumMatchTrackMapping(Base):
 
     album_match_id: Mapped[str] = mapped_column(ForeignKey("matches_album.id"))
     track_info_id: Mapped[str | None] = mapped_column(ForeignKey("track_info.id"))
-    item: Mapped[BeetsItem | None] = mapped_column(BeetsItemType())
+    item_id: Mapped[str | None] = mapped_column(ForeignKey("items.id"))
 
     # ID of the beets library Item (not our model, just the raw ID)
-    track_info: Mapped[TrackInfo | None] = relationship()
     album_match: Mapped[AlbumMatch] = relationship(back_populates="track_mappings")
+    track_info: Mapped[TrackInfo | None] = relationship()
+    item: Mapped[Item | None] = relationship()
 
     def __init__(
         self,
-        item: BeetsItem | None = None,
+        item: Item | None = None,
         track_info: TrackInfo | None = None,
         id: str | None = None,
     ):
