@@ -14,12 +14,12 @@ if TYPE_CHECKING:
     from .states import TaskStateInDb
 
 
-class TaskPendingItem(Base):
-    __tablename__ = "task_pending_items"
+class TasksItems(Base):
+    __tablename__ = "tasks_items"
 
     task_id: Mapped[str] = mapped_column(ForeignKey("task.id"))
     task: Mapped[TaskStateInDb] = relationship(back_populates="pending_items")
-    item_id: Mapped[str] = mapped_column(ForeignKey("item.id"))
+    item_id: Mapped[str] = mapped_column(ForeignKey("items.id"))
     item: Mapped[Item] = relationship()
 
     def __init__(self, item: Item, id: str | None = None):
@@ -28,9 +28,12 @@ class TaskPendingItem(Base):
 
 
 class Item(Base):
-    __tablename__ = "item"
+    __tablename__ = "items"
 
+    # items table in beets db
     fixed_values: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+    # item_attributes table  in beets db
     flex_values: Mapped[dict[str, Any]] = mapped_column(JSON)
 
     def __init__(

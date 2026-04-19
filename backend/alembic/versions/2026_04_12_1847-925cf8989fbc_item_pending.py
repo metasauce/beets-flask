@@ -42,7 +42,7 @@ def upgrade() -> None:
     """Upgrade schema."""
 
     op.create_table(
-        "item",
+        "items",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
@@ -51,14 +51,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        op.f("ix_item_created_at"),
-        "item",
+        op.f("ix_items_created_at"),
+        "items",
         ["created_at"],
         unique=False,
     )
 
     op.create_table(
-        "task_pending_items",
+        "tasks_items",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("task_id", sa.String(), nullable=False),
         sa.Column("item_id", sa.String(), nullable=False),
@@ -71,12 +71,12 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["item_id"],
-            ["item.id"],
+            ["items.id"],
         ),
     )
     op.create_index(
-        op.f("ix_task_pending_items_created_at"),
-        "task_pending_items",
+        op.f("ix_tasks_items_created_at"),
+        "tasks_items",
         ["created_at"],
         unique=False,
     )
@@ -89,8 +89,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     op.add_column("task", sa.Column("items", sa.BLOB(), nullable=False))
-    op.drop_table("task_pending_items")
-    op.drop_table("item")
+    op.drop_table("tasks_items")
+    op.drop_table("items")
 
 
 T = TypeVar("T", bound=dict)
@@ -116,8 +116,8 @@ def migrate_data():
     conn = op.get_bind()
     meta = sa.MetaData()
 
-    task_pending_items_table = sa.Table("task_pending_items", meta, autoload_with=conn)
-    items_table = sa.Table("item", meta, autoload_with=conn)
+    tasks_items_table = sa.Table("tasks_items", meta, autoload_with=conn)
+    items_table = sa.Table("items", meta, autoload_with=conn)
     result = conn.execute(sa.text("SELECT id, items FROM task WHERE items IS NOT NULL"))
     for row in result:
         task_id = row[0]
@@ -130,7 +130,7 @@ def migrate_data():
             continue
 
         item_rows = []
-        task_pending_items_rows = []
+        tasks_items_rows = []
         now = datetime.utcnow()
         for stub in items:
             item_id = str(uuid4())
@@ -143,7 +143,7 @@ def migrate_data():
                     "flex_values": _encode(dict(stub._values_flex.items())),
                 }
             )
-            task_pending_items_rows.append(
+            tasks_items_rows.append(
                 {
                     "id": str(uuid4()),
                     "created_at": now,
@@ -153,14 +153,14 @@ def migrate_data():
                 }
             )
 
-        if item_rows and task_pending_items_rows:
+        if item_rows and tasks_items_rows:
             conn.execute(
                 items_table.insert(),
                 item_rows,
             )
             conn.execute(
-                task_pending_items_table.insert(),
-                task_pending_items_rows,
+                tasks_items_table.insert(),
+                tasks_items_rows,
             )
 
 
