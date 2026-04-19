@@ -18,15 +18,16 @@ change them.
 """
 
 from __future__ import annotations
+import base64
 from collections.abc import Sequence
 from datetime import datetime
 import io
 import pickle
+from typing import TypeVar
 from uuid import uuid4
 
 import sqlalchemy as sa
 from beets_flask import log
-from beets_flask.database.models.pending import BeetsItemType
 from alembic import op
 
 
@@ -39,17 +40,38 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
+
+    op.create_table(
+        "item",
+        sa.Column("id", sa.String(), nullable=False),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.Column("flex_values", sa.JSON(), nullable=False),
+        sa.Column("fixed_values", sa.JSON(), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        op.f("ix_item_created_at"),
+        "item",
+        ["created_at"],
+        unique=False,
+    )
+
     op.create_table(
         "task_pending_items",
         sa.Column("id", sa.String(), nullable=False),
         sa.Column("task_id", sa.String(), nullable=False),
-        sa.Column("item", BeetsItemType(), nullable=False),
+        sa.Column("item_id", sa.String(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["task_id"],
             ["task.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["item_id"],
+            ["item.id"],
         ),
     )
     op.create_index(
@@ -68,14 +90,34 @@ def downgrade() -> None:
     """Downgrade schema."""
     op.add_column("task", sa.Column("items", sa.BLOB(), nullable=False))
     op.drop_table("task_pending_items")
+    op.drop_table("item")
+
+
+T = TypeVar("T", bound=dict)
+
+
+def _encode(v):
+    if isinstance(v, bytes):
+        return {
+            "__type__": "bytes",
+            "data": base64.b64encode(v).decode("ascii"),
+        }
+
+    if isinstance(v, dict):
+        return {str(k): _encode(val) for k, val in v.items()}
+
+    if isinstance(v, list):
+        return [_encode(x) for x in v]
+
+    return v
 
 
 def migrate_data():
     conn = op.get_bind()
     meta = sa.MetaData()
 
-    task_pending_items = sa.Table("task_pending_items", meta, autoload_with=conn)
-
+    task_pending_items_table = sa.Table("task_pending_items", meta, autoload_with=conn)
+    items_table = sa.Table("item", meta, autoload_with=conn)
     result = conn.execute(sa.text("SELECT id, items FROM task WHERE items IS NOT NULL"))
     for row in result:
         task_id = row[0]
@@ -87,30 +129,38 @@ def migrate_data():
             log.error(f"Failed to unpickle task {task_id}: {e}")
             continue
 
-        rows = []
+        item_rows = []
+        task_pending_items_rows = []
         now = datetime.utcnow()
         for stub in items:
-            rows.append(
+            item_id = str(uuid4())
+            item_rows.append(
+                {
+                    "id": item_id,
+                    "created_at": now,
+                    "updated_at": now,
+                    "fixed_values": _encode(dict(stub._values_fixed.items())),
+                    "flex_values": _encode(dict(stub._values_flex.items())),
+                }
+            )
+            task_pending_items_rows.append(
                 {
                     "id": str(uuid4()),
                     "created_at": now,
                     "updated_at": now,
                     "task_id": task_id,
-                    "item": {
-                        "fixed_values": BeetsItemType._encode(
-                            dict(stub._values_fixed.items())
-                        ),
-                        "flex_values": BeetsItemType._encode(
-                            dict(stub._values_flex.items())
-                        ),
-                    },
+                    "item_id": item_id,
                 }
             )
 
-        if rows:
+        if item_rows and task_pending_items_rows:
             conn.execute(
-                task_pending_items.insert(),
-                rows,
+                items_table.insert(),
+                item_rows,
+            )
+            conn.execute(
+                task_pending_items_table.insert(),
+                task_pending_items_rows,
             )
 
 
