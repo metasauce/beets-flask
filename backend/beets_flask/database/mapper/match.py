@@ -1,3 +1,15 @@
+"""Converts beets objects to beetsflask database objects.
+
+Historically beets objects have quite some cross references which tend to
+be difficult to map to a structured database. To avoid drilling and handle
+deduplication we use mapper classes with a shared context.
+"""
+
+from __future__ import annotations
+
+import base64
+
+from beets_flask.database.models.pending import Item
 from beets_flask.importer.types import (
     BeetsAlbumInfo,
     BeetsAlbumMatch,
@@ -18,6 +30,35 @@ from ..models.match import (
     TrackMatch,
 )
 from .base import BeetsMapper, Context
+
+
+class MatchMapper(BeetsMapper[BeetsAlbumMatch | BeetsTrackMatch, Match]):
+    def __init__(self):
+        self.album_mapper = AlbumMatchMapper()
+        self.track_mapper = TrackMatchMapper()
+
+    def _from_beets(
+        self, obj: BeetsAlbumMatch | BeetsTrackMatch, ctx: Context
+    ) -> Match:
+        if isinstance(obj, BeetsAlbumMatch):
+            return self.album_mapper.from_beets(obj, ctx)
+
+        if isinstance(obj, BeetsTrackMatch):
+            return self.track_mapper.from_beets(obj, ctx)
+
+        raise TypeError(f"Unsupported beets obj type: {type(obj)}")
+
+    def _to_beets(
+        self, model: Match, ctx: Context
+    ) -> BeetsAlbumMatch | BeetsTrackMatch:
+        if isinstance(model, AlbumMatch):
+            return self.album_mapper.to_beets(model, ctx)
+
+        if isinstance(model, TrackMatch):
+            return self.track_mapper.to_beets(model, ctx)
+
+        raise TypeError(f"Unsupported model type: {type(model)}")
+
 
 # ----------------------------------- Info ----------------------------------- #
 
@@ -116,6 +157,7 @@ class AlbumMatchMapper(BeetsMapper[BeetsAlbumMatch, AlbumMatch]):
         self.album_info_mapper = AlbumInfoMapper()
         self.distance_mapper = DistanceMapper()
         self.track_info_mapper = TrackInfoMapper()
+        self.item_mapper = ItemMapper()
 
     def _from_beets(self, obj: BeetsAlbumMatch, ctx: Context) -> AlbumMatch:
         model = AlbumMatch(
@@ -137,16 +179,16 @@ class AlbumMatchMapper(BeetsMapper[BeetsAlbumMatch, AlbumMatch]):
             model.track_mappings.append(
                 AlbumMatchTrackMapping(
                     track_info=None,
-                    item=extra_item,
+                    item=self.item_mapper.from_beets(extra_item, ctx),
                 )
             )
 
-        # mappings
+        # pairs
         for item, track in obj.mapping.items():
             model.track_mappings.append(
                 AlbumMatchTrackMapping(
                     track_info=self.track_info_mapper.from_beets(track, ctx),
-                    item=item,
+                    item=self.item_mapper.from_beets(item, ctx),
                 )
             )
 
@@ -158,9 +200,11 @@ class AlbumMatchMapper(BeetsMapper[BeetsAlbumMatch, AlbumMatch]):
         extra_tracks: list[BeetsTrackInfo] = []
 
         for tm in model.track_mappings:
-            # mapping case
+            # pairs
             if tm.track_info is not None and tm.item is not None:
-                mapping[tm.item] = self.track_info_mapper.to_beets(tm.track_info, ctx)
+                item = self.item_mapper.to_beets(tm.item, ctx)
+                track_info = self.track_info_mapper.to_beets(tm.track_info, ctx)
+                mapping[item] = track_info
 
             # extra track
             elif tm.track_info is not None:
@@ -168,7 +212,7 @@ class AlbumMatchMapper(BeetsMapper[BeetsAlbumMatch, AlbumMatch]):
 
             # extra item
             elif tm.item is not None:
-                extra_items.append(tm.item)
+                extra_items.append(self.item_mapper.to_beets(tm.item, ctx))
 
         return BeetsAlbumMatch(
             distance=self.distance_mapper.to_beets(model.distance, ctx),
@@ -179,29 +223,43 @@ class AlbumMatchMapper(BeetsMapper[BeetsAlbumMatch, AlbumMatch]):
         )
 
 
-class MatchMapper(BeetsMapper[BeetsAlbumMatch | BeetsTrackMatch, Match]):
-    def __init__(self):
-        self.album_mapper = AlbumMatchMapper()
-        self.track_mapper = TrackMatchMapper()
+class ItemMapper(BeetsMapper[BeetsItem, Item]):
+    def _to_beets(self, model: Item, ctx) -> BeetsItem:
+        return BeetsItem._awaken(
+            fixed_values={k: self._decode(v) for k, v in model.fixed_values.items()},
+            flex_values={k: self._decode(v) for k, v in model.flex_values.items()},
+        )
 
-    def _from_beets(
-        self, obj: BeetsAlbumMatch | BeetsTrackMatch, ctx: Context
-    ) -> Match:
-        if isinstance(obj, BeetsAlbumMatch):
-            return self.album_mapper.from_beets(obj, ctx)
+    def _from_beets(self, obj: BeetsItem, ctx) -> Item:
+        return Item(
+            fixed_values={k: self._encode(v) for k, v in obj._values_fixed.items()},
+            flex_values={k: self._encode(v) for k, v in obj._values_flex.items()},
+        )
 
-        if isinstance(obj, BeetsTrackMatch):
-            return self.track_mapper.from_beets(obj, ctx)
+    @classmethod
+    def _encode(cls, v):
+        if isinstance(v, bytes):
+            return {
+                "__type__": "bytes",
+                "data": base64.b64encode(v).decode("ascii"),
+            }
 
-        raise TypeError(f"Unsupported beets obj type: {type(obj)}")
+        if isinstance(v, dict):
+            return {str(k): cls._encode(val) for k, val in v.items()}
 
-    def _to_beets(
-        self, model: Match, ctx: Context
-    ) -> BeetsAlbumMatch | BeetsTrackMatch:
-        if isinstance(model, AlbumMatch):
-            return self.album_mapper.to_beets(model, ctx)
+        if isinstance(v, list):
+            return [cls._encode(x) for x in v]
 
-        if isinstance(model, TrackMatch):
-            return self.track_mapper.to_beets(model, ctx)
+        return v
 
-        raise TypeError(f"Unsupported model type: {type(model)}")
+    @classmethod
+    def _decode(cls, v):
+        if isinstance(v, dict):
+            if v.get("__type__") == "bytes":
+                return base64.b64decode(v["data"])
+            return {k: cls._decode(val) for k, val in v.items()}
+
+        if isinstance(v, list):
+            return [cls._decode(x) for x in v]
+
+        return v

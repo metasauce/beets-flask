@@ -30,7 +30,7 @@ from sqlalchemy.orm import (
 )
 
 from beets_flask.database.mapper.base import Context
-from beets_flask.database.mapper.match import MatchMapper
+from beets_flask.database.mapper.match import ItemMapper, MatchMapper
 from beets_flask.database.models.base import Base
 from beets_flask.database.models.match import Match
 from beets_flask.disk import Archive, Folder
@@ -47,7 +47,7 @@ from beets_flask.importer.types import BeetsItem
 from beets_flask.logger import log
 from beets_flask.server.exceptions import SerializedException
 
-from .pending import Item, TasksItems
+from .pending import TaskItem
 
 
 class FolderInDb(Base):
@@ -363,7 +363,7 @@ class TaskStateInDb(Base):
     old_paths: Mapped[bytes | None]
     # old_paths contain original file paths, but are only set when files are moved.
     # (which breaks some deep links that before were identical to paths, but no more!)
-    pending_items: Mapped[list[TasksItems]] = relationship(
+    pending_items: Mapped[list[TaskItem]] = relationship(
         back_populates="task",
         cascade="all, delete-orphan",
     )
@@ -379,11 +379,9 @@ class TaskStateInDb(Base):
 
     @property
     def items(self) -> list[BeetsItem]:
-        return [row.item.to_beets() for row in self.pending_items]
-
-    @items.setter
-    def items(self, value: list[BeetsItem]):
-        self.pending_items = [TasksItems(item=Item.from_beets(v)) for v in value]
+        ctx = Context()
+        mapper = ItemMapper()
+        return [mapper.to_beets(row.item, ctx) for row in self.pending_items]
 
     def __init__(
         self,
@@ -391,7 +389,7 @@ class TaskStateInDb(Base):
         toppath: bytes | None = None,
         paths: list[bytes] = [],
         old_paths: list[bytes] | None = None,
-        items: list[BeetsItem] = [],
+        pending_items: list[TaskItem] = [],
         candidates: list[CandidateStateInDb] = [],
         chosen_candidate_id: str | None = None,
         progress: Progress = Progress.NOT_STARTED,
@@ -404,7 +402,7 @@ class TaskStateInDb(Base):
         self.paths = pickle.dumps(paths)
         self.old_paths = pickle.dumps(old_paths) if old_paths else None
 
-        self.items = items
+        self.pending_items = pending_items
         self.candidates = candidates
         self.chosen_candidate_id = chosen_candidate_id
         self.progress = progress
@@ -420,11 +418,16 @@ class TaskStateInDb(Base):
         else:
             old_paths = None
 
+        ctx = Context()
+        mapper = ItemMapper()
+
         task = cls(
             id=state.id,
             toppath=str(state.toppath).encode("utf-8") if state.toppath else None,
             paths=state.task.paths,
-            items=state.items,
+            pending_items=[
+                TaskItem(item=mapper.from_beets(item, ctx)) for item in state.items
+            ],
             candidates=[
                 CandidateStateInDb.from_live_state(c) for c in state.candidate_states
             ],

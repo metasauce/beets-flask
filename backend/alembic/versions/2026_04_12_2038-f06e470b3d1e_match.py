@@ -115,7 +115,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("track_info_id", sa.String(), sa.ForeignKey("track_info.id")),
-        sa.Column("item", sa.JSON()),
+        sa.Column("item_id", sa.String(), sa.ForeignKey("items.id")),
         sa.Column("id", sa.String(), primary_key=True, nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
