@@ -1,6 +1,6 @@
 flowchart LR
 
-    beets.importer.ImportSession
+    BeetsImportSession
     BaseSession
     subgraph Preview Queue
         PreviewSession["`
@@ -33,7 +33,7 @@ flowchart LR
         `"]
     end
 
-    beets.importer.ImportSession --> BaseSession
+    BeetsImportSession --> BaseSession
     BaseSession --> PreviewSession
     BaseSession --> ImportSession
     BaseSession --> UndoSession
