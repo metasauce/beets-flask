@@ -48,7 +48,7 @@ from beets_flask.importer.types import BeetsAlbumMatch, BeetsItem, BeetsTrackMat
 from beets_flask.logger import log
 from beets_flask.server.exceptions import SerializedException
 
-from .pending import TaskPendingItem
+from .pending import Item, TaskPendingItem
 
 
 class FolderInDb(Base):
@@ -380,11 +380,11 @@ class TaskStateInDb(Base):
 
     @property
     def items(self) -> list[BeetsItem]:
-        return [row.item for row in self.pending_items]
+        return [row.item.to_beets() for row in self.pending_items]
 
     @items.setter
     def items(self, value: list[BeetsItem]):
-        self.pending_items = [TaskPendingItem(item=v) for v in value]
+        self.pending_items = [TaskPendingItem(item=Item.from_beets(v)) for v in value]
 
     def __init__(
         self,
