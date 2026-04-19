@@ -1,0 +1,37 @@
+
+
+flowchart LR
+
+    Folder --> Session --> ImportTask --> BeetsItem --> TaskPendingItem
+    ImportTask --> AlbumMatch --> AlbumInfo
+
+    AlbumMatch <--> AlbumMatchTrackMapping
+    AlbumMatchTrackMapping --> BeetsItem
+    AlbumMatchTrackMapping --> TrackInfo
+
+
+    Folder
+    Session
+    ImportTask
+
+    subgraph Album
+        AlbumMatch
+        AlbumInfo
+        AlbumMatchTrackMapping
+    end
+
+    subgraph Track
+        BeetsItem
+        TaskPendingItem
+        TrackInfo
+    end
+
+
+    BeetsItem["`BeetsItem
+        _(Snapshot
+        of track on disk)_
+    `"]
+
+    AlbumMatch["`AlbumMatch
+        _(Candidate)_
+    `"]

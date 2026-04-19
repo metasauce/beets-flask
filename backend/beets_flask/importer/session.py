@@ -36,7 +36,8 @@ from pathlib import Path
 from typing import Any, Literal, TypedDict, TypeGuard, TypeVar
 
 import nest_asyncio
-from beets import autotag, importer, plugins
+from beets import autotag, plugins
+from beets.importer import ImportAbortError
 from beets.ui import UserError, _open_library
 from beets.util import bytestring_path
 from deprecated import deprecated
@@ -46,6 +47,9 @@ from beets_flask.disk import is_archive_file
 from beets_flask.importer.progress import Progress, ProgressState
 from beets_flask.importer.types import (
     BeetsAlbum,
+    BeetsImportAction,
+    BeetsImportSession,
+    BeetsImportTask,
     BeetsLibrary,
     DuplicateAction,
 )
@@ -168,7 +172,7 @@ def _is_search(d: Any) -> TypeGuard[Search]:
 # ---------------------------------------------------------------------------- #
 
 
-class BaseSession(importer.ImportSession, ABC):
+class BaseSession(BeetsImportSession, ABC):
     """Base class for our GUI-based ImportSessions.
 
     Operates on single Albums / files.
@@ -191,7 +195,7 @@ class BaseSession(importer.ImportSession, ABC):
     # are contained in the associated SessionState -> TaskState -> CandidateStates
     state: SessionState
 
-    pipeline: AsyncPipeline[importer.ImportTask, Any] | None = None
+    pipeline: AsyncPipeline[BeetsImportTask, Any] | None = None
     config_overlay: dict
 
     lib: BeetsLibrary
@@ -283,7 +287,7 @@ class BaseSession(importer.ImportSession, ABC):
     # -------------------------- State handling helpers -------------------------- #
 
     def set_task_progress(
-        self, task: importer.ImportTask, progress: ProgressState | Progress | str
+        self, task: BeetsImportTask, progress: ProgressState | Progress | str
     ):
         """Set the progress for a task belonging to the session.
 
@@ -296,7 +300,7 @@ class BaseSession(importer.ImportSession, ABC):
 
         task_state.set_progress(progress)
 
-    def get_task_progress(self, task: importer.ImportTask) -> ProgressState | None:
+    def get_task_progress(self, task: BeetsImportTask) -> ProgressState | None:
         """Get the progress of the task, via this sessions state."""
         task_state = self.state.get_task_state_for_task(task)
         return task_state.progress if task_state else None
@@ -312,7 +316,7 @@ class BaseSession(importer.ImportSession, ABC):
         """
         raise NotImplementedError("Implement in subclass")
 
-    def resolve_duplicate(self, task: importer.ImportTask, found_duplicates):
+    def resolve_duplicate(self, task: BeetsImportTask, found_duplicates):
         """Overload default resolve duplicate and skip it.
 
         This basically skips this stage.
@@ -321,15 +325,15 @@ class BaseSession(importer.ImportSession, ABC):
             "Skipping duplicate resolution. "
             + f"Your session should implement this! -> {self.__class__.__name__}"
         )
-        task.set_choice(importer.Action.SKIP)
+        task.set_choice(BeetsImportAction.SKIP)
 
-    def choose_item(self, task: importer.ImportTask):
+    def choose_item(self, task: BeetsImportTask):
         """Overload default choose item and skip it.
 
         This session should not reach this stage.
         """
         self.logger.debug(f"skipping choose_item {task}")
-        return importer.Action.SKIP
+        return BeetsImportAction.SKIP
 
     def should_resume(self, path):
         """Overload default should_resume and skip it.
@@ -340,7 +344,7 @@ class BaseSession(importer.ImportSession, ABC):
         self.logger.debug(f"skipping should_resume {path}")
         return False
 
-    def identify_duplicates(self, task: importer.ImportTask):
+    def identify_duplicates(self, task: BeetsImportTask):
         """For all candidates, check if they have duplicates in the library.
 
         This stage should only be run for preview sessions, but we still have
@@ -350,7 +354,7 @@ class BaseSession(importer.ImportSession, ABC):
             f"This session should not reach this stage. {self.__class__.__name__}"
         )
 
-    def lookup_candidates(self, task: importer.ImportTask):
+    def lookup_candidates(self, task: BeetsImportTask):
         """Lookup candidates for the task.
 
         This stage should only be run for preview sessions, but we still have
@@ -360,7 +364,7 @@ class BaseSession(importer.ImportSession, ABC):
             f"This session should not reach this stage. {self.__class__.__name__}"
         )
 
-    def finalize(self, task: importer.ImportTask):
+    def finalize(self, task: BeetsImportTask):
         """Last stage called and customizable any session."""
         if len(self.config_overlay) > 0:
             # make sure we dont leave overlays in beets
@@ -381,7 +385,7 @@ class BaseSession(importer.ImportSession, ABC):
         Take care of this in subclasses.
         """
         # For now, until we improve the upstream beets config logic,
-        # adhere to importer.ImportSession convention and create a local copy
+        # adhere to BeetsImportSession convention and create a local copy
         # of the config.
         config = get_config().beets_config
         self.set_config(config["import"])
@@ -403,7 +407,7 @@ class BaseSession(importer.ImportSession, ABC):
         try:
             assert self.pipeline is not None
             await self.pipeline.run_async()
-        except importer.ImportAbortError:
+        except ImportAbortError:
             log.debug(f"Interactive import session aborted by user")
         except ApiException as e:
             if e.persist_in_db:
@@ -476,7 +480,7 @@ class PreviewSession(BaseSession):
 
     # --------------------------- Stage Definitions -------------------------- #
 
-    def identify_duplicates(self, task: importer.ImportTask):
+    def identify_duplicates(self, task: BeetsImportTask):
         """For all candidates, check if they have duplicates in the library."""
         task_state = self.state.get_task_state_for_task_raise(task)
 
@@ -489,7 +493,7 @@ class PreviewSession(BaseSession):
             if len(duplicates) > 0:
                 log.debug(f"Found duplicates for {cs.id=}: {duplicates}")
 
-    def lookup_candidates(self, task: importer.ImportTask):
+    def lookup_candidates(self, task: BeetsImportTask):
         """Lookup candidates for the task."""
 
         search_ids = self.config["search_ids"].as_str_seq()  # might be an empty list
@@ -542,7 +546,7 @@ class AddCandidatesSession(PreviewSession):
                 if s != "skip":
                     task.set_progress(Progress.LOOKING_UP_CANDIDATES - 1)
 
-    def lookup_candidates(self, task: importer.ImportTask):
+    def lookup_candidates(self, task: BeetsImportTask):
         """Amend the found candidate to the already existing candidates (if any)."""
         # see ref in lookup_candidates in beets/importer.py
 
@@ -627,7 +631,7 @@ class AddCandidatesSession(PreviewSession):
             )
             self.state.exc = None
 
-    def finalize(self, task: importer.ImportTask):
+    def finalize(self, task: BeetsImportTask):
         """Restore initial taks and session states."""
 
         task_state = self.state.get_task_state_for_task_raise(task)
@@ -769,7 +773,7 @@ class ImportSession(BaseSession):
 
         return stages
 
-    def finalize(self, task: importer.ImportTask):
+    def finalize(self, task: BeetsImportTask):
         """
         Reset previous match threshold exceptions.
 
@@ -792,7 +796,7 @@ class ImportSession(BaseSession):
 
     # --------------------------- Stage Definitions -------------------------- #
 
-    def choose_match(self, task: importer.ImportTask):
+    def choose_match(self, task: BeetsImportTask):
         self.logger.setLevel(logging.DEBUG)
         self.logger.debug(f"choose_match {task}")
 
@@ -833,12 +837,12 @@ class ImportSession(BaseSession):
         # ASIS
         if candidate_state.id == task_state.asis_candidate.id:
             log.debug(f"Importing {task} as-is")
-            return importer.Action.ASIS
+            return BeetsImportAction.ASIS
 
         return candidate_state.match
 
     def resolve_duplicate(
-        self, task: importer.ImportTask, found_duplicates: list[BeetsAlbum]
+        self, task: BeetsImportTask, found_duplicates: list[BeetsAlbum]
     ):
         log.debug(
             f"Resolving duplicates for {task} with action {self.duplicate_actions}"
@@ -853,7 +857,7 @@ class ImportSession(BaseSession):
         task_state.duplicate_action = task_duplicate_action
         match task_duplicate_action:
             case "skip":
-                task.set_choice(importer.Action.SKIP)
+                task.set_choice(BeetsImportAction.SKIP)
             case "keep":
                 pass
             case "remove":
@@ -861,7 +865,7 @@ class ImportSession(BaseSession):
             case "merge":
                 task.should_merge_duplicates = True
             case "ask":
-                # task.set_choice(importer.action.SKIP)
+                # task.set_choice(BeetsImportAction.SKIP)
                 raise DuplicateException(
                     "You have set the duplicate action to 'ask' in your beets config."
                 )
@@ -985,13 +989,13 @@ class AutoImportSession(ImportSession):
         stages.insert(before="user_query", stage=match_threshold(self))
         return stages
 
-    def match_threshold(self, task: importer.ImportTask):
+    def match_threshold(self, task: BeetsImportTask):
         """Check if the match quality is good enough to import.
 
         Returns true if candidates were found, and the match quality is better than
         threshlold.
 
-        Note: What stops the pipeline is that we set task.choice to importer.action.SKIP,
+        Note: What stops the pipeline is that we set task.choice to BeetsImportAction.SKIP,
         or raise an exception.
 
         Currently raising, as we do not have a dedicated progress for "not imported".
@@ -1018,7 +1022,7 @@ class AutoImportSession(ImportSession):
             t = (1 - self.import_threshold) * 100
             raise NotImportedException(f"Match below threshold ({d:.0f}% < {t:.0f}%)")
             # beets would handle this via the task action:
-            task.set_choice(importer.action.SKIP)
+            task.set_choice(BeetsImportAction.SKIP)
         else:
             log.info(
                 f"Best candidate was better than threshold, importing to library. {distance=} {self.import_threshold=}"

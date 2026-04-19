@@ -1,20 +1,21 @@
 flowchart LR
-    subgraph Object
+    subgraph Beets
         direction TB
-        LF["Folder | Archive"]
-        LS[BaseSession]
+        LS[BeetsImportSession]
         LT[BeetsImportTask]
         LC["BeetsAlbumMatch | BeetsTrackMatch"]
     end
 
-    subgraph Live State
+
+    subgraph BeetsFlask
         direction TB
+        LF["Folder | Archive"]
         SS[SessionState]
         ST[TaskState]
         SC[CandidateState]
     end
 
-    subgraph DB State
+    subgraph BeetsFlask Database
         direction TB
         DF[(FolderInDb)]
         DS[(SessionStateInDb)]
