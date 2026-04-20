@@ -6,7 +6,7 @@ To keep an overview which types come from beets native, we prefix them to `Beets
 
 ### Items
 
-In Beets, an `Item` is a single track. The `Item` can be stored 
+In Beets, an `Item` is a single track. The `Item` can be stored
 in the beets database. It represents a tracks metadata on disk.
 
 ### Candidates (TrackInfo & AlbumInfo)
@@ -30,11 +30,15 @@ Matches are ranked through predefined penalties and using linear assignment prob
 
 ### Task(s)
 
-A `Task` is a specific import operation. Tasks need to be started on a folder i.e. `items` and looks up `candidates` online. The goal of task is to assign `items` to `candidates` by finding `matches`. A user can than pick a match. 
+A `Task` is a specific import operation. Tasks need to be started on a folder (which contains the music files – `items`) and looks up `candidates` online. The goal of task is to assign `items` to `candidates` by finding `matches`. A user can than pick a match.
+
+```{eval-rst}
+.. mermaid:: ../../diagrams/tasks.mmd
+```
 
 ## Sessions and Queues
 
-In Beets and BeetsFlask, folder imports are abstracted into sessions.
+In Beets and BeetsFlask, imports are abstracted into sessions. Most of the time, we have a clean hierarchy of one folder, one session, one task.
 In BeetsFlask, each `Session` gets placed in a redis `Queue`, depending on its type:
 Previews can take place in parallel, while imports take place one at a time, since this requires file movements on disk and writes into the beets database.
 
@@ -55,10 +59,4 @@ The state objects have a hierachy close to the beets internal logic:
 
 ```{eval-rst}
 .. mermaid:: ../../diagrams/objects_state_relation.mmd
-```
-
-## PR279
-
-```{eval-rst}
-.. mermaid:: ../../diagrams/pr279.mmd
 ```

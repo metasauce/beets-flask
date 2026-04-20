@@ -7,7 +7,7 @@ erDiagram
   album_match_track_mappings {
     VARCHAR album_match_id FK
     VARCHAR track_info_id FK "nullable"
-    JSON item "nullable"
+    VARCHAR item_id FK "nullable"
     VARCHAR id PK
   }
 
@@ -16,6 +16,12 @@ erDiagram
     VARCHAR parent_distance_id FK "nullable"
     FLOAT raw_distance
     FLOAT max_distance
+    VARCHAR id PK
+  }
+
+  items {
+    JSON fixed_values
+    JSON flex_values
     VARCHAR id PK
   }
 
@@ -44,6 +50,7 @@ erDiagram
 
   matches_album ||--o{ album_match_track_mappings : album_match_id
   track_info ||--o{ album_match_track_mappings : track_info_id
+  items ||--o{ album_match_track_mappings : item_id
   track_info ||--o{ distances : track_info_id
   distances ||--o{ distances : parent_distance_id
   album_info ||--o{ matches_album : info_id

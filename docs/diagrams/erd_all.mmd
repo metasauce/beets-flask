@@ -9,7 +9,7 @@ erDiagram
   album_match_track_mappings {
     VARCHAR album_match_id FK
     VARCHAR track_info_id FK "nullable"
-    JSON item "nullable"
+    VARCHAR item_id FK "nullable"
     VARCHAR id PK
     DATETIME created_at "indexed"
     DATETIME updated_at
@@ -38,6 +38,14 @@ erDiagram
   folder {
     VARCHAR full_path PK "indexed"
     BOOLEAN is_album "nullable"
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  items {
+    JSON fixed_values
+    JSON flex_values
     VARCHAR id PK
     DATETIME created_at "indexed"
     DATETIME updated_at
@@ -95,9 +103,9 @@ erDiagram
     DATETIME updated_at
   }
 
-  task_pending_items {
+  tasks_items {
     VARCHAR task_id FK
-    JSON item
+    VARCHAR item_id FK
     VARCHAR id PK
     DATETIME created_at "indexed"
     DATETIME updated_at
@@ -113,6 +121,7 @@ erDiagram
 
   matches_album ||--o{ album_match_track_mappings : album_match_id
   track_info ||--o{ album_match_track_mappings : track_info_id
+  items ||--o{ album_match_track_mappings : item_id
   task ||--o{ candidate : task_id
   matches ||--o{ candidate : match_id
   track_info ||--o{ distances : track_info_id
@@ -126,5 +135,6 @@ erDiagram
   folder ||--o{ session : folder_hash
   session ||--o{ task : session_id
   candidate ||--o{ task : chosen_candidate_id
-  task ||--o{ task_pending_items : task_id
+  task ||--o{ tasks_items : task_id
+  items ||--o{ tasks_items : item_id
   album_info ||--o{ track_info : album_id

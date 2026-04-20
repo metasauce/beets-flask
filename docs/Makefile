@@ -32,7 +32,7 @@ help:
 # to do exact filtering we need to use e.g. --include-tables "^track_info$$"
 diagrams:
 	@$(DIAGRAMCMD) \
-		> ./diagrams/all.mmd
+		> ./diagrams/erd_all.mmd
 
 	@$(DIAGRAMCMD) \
 		--include-tables "task" \
@@ -42,13 +42,13 @@ diagrams:
 		--include-tables "^matches$$" \
 		--include-tables "^items$$" \
 		$(DIGRAMGREP) \
-		> ./diagrams/high_level.mmd
+		> ./diagrams/erd_high_level.mmd
 
 	@$(DIAGRAMCMD) \
 		--include-tables "candidate" \
 		--include-tables "matches" \
 		$(DIGRAMGREP) \
-		> ./diagrams/matches_overview.mmd
+		> ./diagrams/erd_matches_overview.mmd
 
 	@$(DIAGRAMCMD) \
 		--include-tables "matches_album" \
@@ -59,7 +59,7 @@ diagrams:
 		--include-tables "track" \
 		--include-tables "^items$$" \
 		$(DIGRAMGREP) \
-		> ./diagrams/matches_types.mmd
+		> ./diagrams/erd_matches_types.mmd
 
 clean:
 	rm -rf $(BUILDDIR)/*
