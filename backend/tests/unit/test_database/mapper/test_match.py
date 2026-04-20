@@ -284,8 +284,9 @@ class TestAlbumMatchMapper:
         assert result.info.tracks[1].title == "Test Track 2"
         assert result.distance.raw_distance == beets_album_match.distance.raw_distance
         assert len(result.mapping) == 1
-        assert extra_item1 in result.mapping
-        assert result.mapping[extra_item1].title == beets_track1.title
+        # Check dedbped worked as expected
+        assert result.extra_items[0] in result.mapping.keys()
+        assert result.mapping[result.extra_items[0]].title == beets_track1.title
         assert len(result.extra_items) == 2
         assert len(result.extra_tracks) == 1
 
