@@ -40,6 +40,7 @@ diagrams:
 		--include-tables "session" \
 		--include-tables "candidate" \
 		--include-tables "^matches$$" \
+		--include-tables "^items$$" \
 		$(DIGRAMGREP) \
 		> ./diagrams/high_level.mmd
 
@@ -56,6 +57,7 @@ diagrams:
 		--include-tables "penalties" \
 		--include-tables "album" \
 		--include-tables "track" \
+		--include-tables "^items$$" \
 		$(DIGRAMGREP) \
 		> ./diagrams/matches_types.mmd
 
