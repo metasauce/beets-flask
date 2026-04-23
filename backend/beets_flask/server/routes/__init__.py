@@ -1,6 +1,8 @@
 from quart import Blueprint, Quart
+from quart_schema import ExternalDocumentation, Info, QuartSchema
 
 from .art_preview import art_blueprint
+from .beets import beets_bp
 from .config import config_bp
 from .db_models import register_state_models
 from .exception import error_bp
@@ -22,6 +24,10 @@ backend_bp.register_blueprint(inbox_bp)
 backend_bp.register_blueprint(library_bp)
 backend_bp.register_blueprint(monitor_bp)
 
+# Public api
+api_bp = Blueprint("api_v1", __name__, url_prefix="/api_v1")
+api_bp.register_blueprint(beets_bp)
+
 
 def register_routes(app: Quart):
     # Register database state models
@@ -29,6 +35,7 @@ def register_routes(app: Quart):
     register_state_models(backend_bp)
 
     app.register_blueprint(backend_bp)
+    app.register_blueprint(api_bp)
     app.register_blueprint(frontend_bp)
 
 

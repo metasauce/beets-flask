@@ -76,7 +76,7 @@ R_I = TypeVar("R_I", bound=Resource)
 
 
 class SingleResourceDocumentWithIncluded(SingleResourceDocument[R], Generic[R, R_I]):
-    included: NotRequired[list[R_I]]
+    included: list[R_I]
 
 
 class MultiResourceDocument(TypedDict, Generic[R]):
@@ -112,6 +112,8 @@ MultiItemDocument = MultiResourceDocument[ItemResource]
 
 
 class AlbumAttributes(TypedDict, total=False):
+    """Album Attributes"""
+
     title: str
 
 

@@ -41,6 +41,7 @@ dependencies = [
     "typing_extensions",
     "polars>=1.36.1",
     "alembic>=1.18.4",
+    "quart-schema[msgspec] @ git+https://github.com/semohr/quart-schema.git@defs_msgspec",
 ]
 
 [dependency-groups]
@@ -98,7 +99,8 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
-"**/alembic/**/*" = ["D", "I"]
+"**/alembic/**/*" = ["D","I"]
+"beets_flask/server/**/*" = ["D400"]
 
 [tool.ruff.lint]
 select = [
