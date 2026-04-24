@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 from quart import Blueprint, g
 from quart_schema import validate_querystring, validate_request, validate_response
 
+from beets_flask.importer.types import BeetsAlbum, BeetsItem
 from beets_flask.server.exceptions import NotFoundException
 
 from ._types import (
     AlbumAttributes,
+    AlbumResource,
+    ItemResource,
     MultiAlbumDocument,
     SingleAlbumDocument,
 )
@@ -19,27 +23,54 @@ if TYPE_CHECKING:
 
 albums_bp = Blueprint("albums", __name__, url_prefix="/albums")
 
+
+def get_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumResource:
+    return {
+        "type": "album",
+        "id": str(album.id),
+        "attributes": {"title": album.album},
+        "relationships": [
+            {
+                "type": "item",
+                "id": str(item.id),
+            }
+            for item in items
+        ],
+    }
+
+
 # ---------------------------------- Single ---------------------------------- #
+class GetQueryParams(TypedDict, total=False):
+    include: Literal["items"]
+    # whether to include related items in the response
 
 
 @albums_bp.route("/<int:album_id>", methods=["GET"])
+@validate_querystring(GetQueryParams)
 @validate_response(SingleAlbumDocument)
-async def get_album(album_id: int) -> SingleAlbumDocument:
+async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDocument:
     """GET album - Retrieve a single beets album by ID"""
-
     album = g.lib.get_album(album_id)
     if not album:
         raise NotFoundException(f"Album with beets_id:{id!r} not found in beets db.")
-    document: SingleAlbumDocument = {
-        "data": {
-            "id": str(album.id),
-            "type": "album",
-            "attributes": {"title": album.album},
-            "relationships": [],
-        },
-        "included": [],  # TODO add items
+
+    items = album.items()
+    if query_args.get("include") == "items":
+        included: list[ItemResource] = [
+            {
+                "type": "item",
+                "id": str(item.id),
+                "attributes": {"title": item.title},
+            }
+            for item in items
+        ]
+    else:
+        included = []
+
+    return {
+        "data": get_album_resource(album, items),
+        "included": included,
     }
-    return document
 
 
 @albums_bp.route("/<int:album_id>", methods=["PATCH"])
@@ -65,7 +96,7 @@ class BulkGetQueryParams(TypedDict, total=False):
 @albums_bp.route("/", methods=["GET"])
 @validate_querystring(BulkGetQueryParams)
 @validate_response(MultiAlbumDocument)
-async def get_items(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
+async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
     """GET albums - Retrieve beets albums
 
     Lets you retrieve beets albums.
@@ -85,7 +116,7 @@ class BulkPatchQueryParams(TypedDict, total=False):
 @validate_querystring(BulkPatchQueryParams)
 @validate_request(AlbumAttributes)
 @validate_response(MultiAlbumDocument)
-async def patch_items(
+async def patch_albums(
     query_args: BulkPatchQueryParams, data: AlbumAttributes
 ) -> MultiAlbumDocument:
     """PATCH albums - Update beets albums
@@ -103,7 +134,7 @@ class BulkDeleteQueryParams(TypedDict, total=False):
 
 @albums_bp.route("/", methods=["DELETE"])
 @validate_querystring(BulkDeleteQueryParams)
-async def delete_items(query_args: BulkDeleteQueryParams):
+async def delete_albums(query_args: BulkDeleteQueryParams):
     """DELETE albums - Delete beets albums
 
     Will delete related items if the are dangling and have no

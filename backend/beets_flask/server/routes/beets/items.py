@@ -1,35 +1,60 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
-from quart import Blueprint
+from quart import Blueprint, g
 from quart_schema import validate_querystring, validate_request
 from quart_schema.validation import validate_response
 
+from beets_flask.importer.types import BeetsItem
+from beets_flask.server.routes.exception import NotFoundException
+
 from ._types import (
     ItemAttributes,
+    ItemResource,
     MultiItemDocument,
     SingleItemDocument,
 )
 
+if TYPE_CHECKING:
+    # For type hinting the global g object
+    from . import g
+
 items_bp = Blueprint("items", __name__, url_prefix="/items")
+
+
+def get_item_resource(item: BeetsItem) -> ItemResource:
+    return {
+        "type": "item",
+        "id": str(item.id),
+        "attributes": {"title": item.title},
+    }
+
 
 # ---------------------------------- Single ---------------------------------- #
 
 
-@items_bp.route("/<item_id>", methods=["GET"])
+@items_bp.route("/<int:item_id>", methods=["GET"])
 @validate_response(SingleItemDocument)
-async def get_item(item_id: str) -> SingleItemDocument:
+async def get_item(item_id: int) -> SingleItemDocument:
     """GET item - Retrieve a single beets item by ID"""
-    return "foo"
+    item = g.lib.get_item(item_id)
+    if not item:
+        raise NotFoundException(
+            f"Item with beets_id:{item_id!r} not found in beets db."
+        )
+
+    return {
+        "data": get_item_resource(item),
+    }
 
 
-@items_bp.route("/<item_id>", methods=["PATCH"])
+@items_bp.route("/<int:item_id>", methods=["PATCH"])
 @validate_request(ItemAttributes)
 @validate_response(SingleItemDocument)
-async def patch_item(item_id: str, data: ItemAttributes) -> SingleItemDocument:
+async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
     """PATCH item - Update a single beets item by ID"""
-    return "bar"
+    raise NotImplemented
 
 
 # ----------------------------------- Bulk ----------------------------------- #
@@ -51,7 +76,7 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
 
     Lets you retrieve beets items.
     """
-    return "foo"
+    raise NotImplemented
 
 
 class BulkPatchQueryParams(TypedDict, total=False):
@@ -72,7 +97,7 @@ async def patch_items(
 
     Lets you update beets items.
     """
-    return "bar"
+    return NotImplemented
 
 
 class BulkDeleteQueryParams(TypedDict, total=False):
@@ -85,4 +110,4 @@ class BulkDeleteQueryParams(TypedDict, total=False):
 @validate_querystring(BulkDeleteQueryParams)
 async def delete_items(query_args: BulkDeleteQueryParams):
     """DELETE items - Bulk delete beets items via filter"""
-    return ""
+    raise NotImplemented
