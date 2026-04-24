@@ -6,6 +6,7 @@ from quart import Blueprint, g
 from quart_schema import validate_querystring, validate_request
 from quart_schema.validation import validate_response
 
+from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsItem
 from beets_flask.server.routes.exception import NotFoundException
 
@@ -54,7 +55,26 @@ async def get_item(item_id: int) -> SingleItemDocument:
 @validate_response(SingleItemDocument)
 async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
     """PATCH item - Update a single beets item by ID"""
-    raise NotImplemented
+    item = g.lib.get_item(item_id)
+    if not item:
+        raise NotFoundException(
+            f"Item with beets_id:{item_id!r} not found in beets db."
+        )
+
+    if get_config().data.gui.library.readonly:
+        raise ValueError("Library is read-only")
+
+    update_data: ItemAttributes = {}
+    if "title" in data:
+        update_data["title"] = data["title"]
+
+    if update_data:
+        item.update(update_data)
+        item.try_sync(True, False)
+
+    return {
+        "data": get_item_resource(item),
+    }
 
 
 # ----------------------------------- Bulk ----------------------------------- #

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 from quart import Blueprint, g
 from quart_schema import validate_querystring, validate_request, validate_response
 
+from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsAlbum, BeetsItem
 from beets_flask.server.exceptions import NotFoundException
 
@@ -74,11 +75,49 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
 
 
 @albums_bp.route("/<int:album_id>", methods=["PATCH"])
+@validate_querystring(GetQueryParams)
 @validate_request(AlbumAttributes)
 @validate_response(SingleAlbumDocument)
-async def patch_album(album_id: str, data: AlbumAttributes) -> SingleAlbumDocument:
+async def patch_album(
+    album_id: int, query_args: GetQueryParams, data: AlbumAttributes
+) -> SingleAlbumDocument:
     """PATCH album - Update a single beets album by ID"""
-    raise NotImplemented
+    album = g.lib.get_album(album_id)
+    if not album:
+        raise NotFoundException(
+            f"Album with beets_id:{album_id!r} not found in beets db."
+        )
+
+    if get_config().data.gui.library.readonly:
+        raise ValueError("Library is read-only")
+
+    # Translate API attribute names to beets album field names.
+    update_data: dict[str, str] = {}
+    if "title" in data:
+        update_data["album"] = data["title"]
+
+    if update_data:
+        # Write back to file
+        album.update(update_data)
+        album.try_sync(True, False)
+
+    items = album.items()
+    if query_args.get("include") == "items":
+        included: list[ItemResource] = [
+            {
+                "type": "item",
+                "id": str(item.id),
+                "attributes": {"title": item.title},
+            }
+            for item in items
+        ]
+    else:
+        included = []
+
+    return {
+        "data": get_album_resource(album, items),
+        "included": included,
+    }
 
 
 # ----------------------------------- Bulk ----------------------------------- #
