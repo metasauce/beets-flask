@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Config validation. When loading config files we now check that specified options will work. If not, the frontend will show an error message with details on what's wrong. This applies to `gui` settings (i.e. our own ones, `beets-flask/config.yaml`) and very select ones from native beets (only those which we use directly). Hopefully, this will eventually cover all config options of beets native, but this is more of an upsream task. [#224](https://github.com/pSpitzner/beets-flask/pull/224).
+- Config validation (when loading config files):
+  - Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/pSpitzner/beets-flask/pull/305)
+  - We now check that specified options will work. If not, the frontend will show an error message with details on what's wrong. This applies to `gui` settings (i.e. our own ones, `beets-flask/config.yaml`) and very select ones from native beets (only those which we use directly). Hopefully, this will eventually cover all config options of beets native, but this is more of an upsream task. [#224](https://github.com/pSpitzner/beets-flask/pull/224).
 - Upload Files via the WebUI. You can now drag-and-drop single files into an inbox. To upload whole albums, zip them on your host first (uploading of folders directly is not implemented, as it would require a secure context).
 - New config option `gui.terminal.enabled` (default: true) [#254](https://github.com/pSpitzner/beets-flask/pull/224)
 - You can now alternatively use `PUID` and `PGID` instead of `GROUP_ID` and `USER_ID` environment variables. Good for [yaml anchors](https://docs.docker.com/reference/compose-file/fragments/). [#260](https://github.com/pSpitzner/beets-flask/issues/260)
