@@ -13,6 +13,8 @@ from beets.plugins import get_plugin_names, load_plugins
 from eyconf import ConfigExtra
 from eyconf.asdict import asdict_with_aliases
 from eyconf.validation import ConfigurationError, MultiConfigurationError
+from yaml import YAMLError
+from yaml.scanner import ScannerError
 
 from beets_flask.logger import log
 from beets_flask.utility import deprecation_warning
@@ -86,7 +88,21 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
                 if not isinstance(loaded, dict):
                     raise yaml.YAMLError("Config is not a YAML dictionary.")
                 self.update(loaded)
-            except yaml.YAMLError as e:
+            except ScannerError as e:
+                message = str(e)
+                # handle using beets template function identifier as the first character
+                if "'%' that cannot start any token" in str(e):
+                    message += "\nTo use the template function you should surround the content with quotes"
+                    log.error(
+                        f"Unquoted template function starting value in {label} config at {path}: {e}"
+                    )
+                else:
+                    log.error(f"Failed to parse {label} config at {path}: {e}")
+                self._config_errors.append(
+                    ConfigurationError(message=message, section=f"{path}")
+                )
+            except YAMLError as e:
+                print(e.__class__)
                 log.error(f"Failed to parse {label} config at {path}: {e}")
                 self._config_errors.append(
                     ConfigurationError(message=str(e), section=f"{path}")
