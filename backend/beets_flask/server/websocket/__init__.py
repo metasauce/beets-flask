@@ -3,7 +3,6 @@ from collections.abc import Callable
 from typing import cast
 
 import socketio
-from eyconf.validation import ConfigurationError, MultiConfigurationError
 
 from beets_flask.config import get_config
 from beets_flask.logger import log
@@ -44,14 +43,30 @@ def register_socketio(app):
 
     register_status()
 
-    terminal_enabled = True
-    try:
-        terminal_enabled = get_config().data.gui.terminal.enabled
-    except (MultiConfigurationError, ConfigurationError):
-        # We don't want to let the exception propagate here as it won't reach the frontend.
-        log.debug("Encountered config error. Will raise on next call to get_config()")
+    cfg = get_config()
+    if not cfg.is_healthy:
+        log.warning(
+            f"Config loaded with {len(cfg.errors)} error(s), app running on defaults"
+        )
 
-    if terminal_enabled:
+    @sio.on("connect")
+    async def on_connect(sid, environ):
+        """Push config health to every client on connection."""
+        current_cfg = get_config()
+        await sio.emit(
+            "config_status",
+            {
+                "healthy": current_cfg.is_healthy,
+                "errors": [
+                    {"message": e.message, "section": str(e.section)}
+                    for e in current_cfg.errors
+                ],
+            },
+            to=sid,
+        )
+
+    # Terminal setup uses the already-loaded config
+    if cfg.data.gui.terminal.enabled:
         log.info("Setting up Web-Terminal")
         from .terminal import register_tmux
 

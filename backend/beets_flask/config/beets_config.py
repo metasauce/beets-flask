@@ -29,6 +29,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
     def __init__(self):
         """Initialize the config object with the default values."""
         super().__init__(schema=BeetsSchema, data=BeetsSchema())
+        self._config_errors = None
         BeetsFlaskConfig.write_examples_as_user_defaults()
         self.reload()
         self.commit_to_beets()
@@ -48,53 +49,65 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         return Path(beets_folder) / "config.yaml"
 
     def reload(self, extra_yaml_path: str | Path | None = None) -> Self:
-        """Reset the config to default values.
+        """Reload the config.
 
         This loads the user config from yaml files after resetting to defaults.
 
         The `extra_yaml_path` argument is mainly for testing purposes, to add a last
         yaml layer with high priority.
+
+        Any error messages (YAML parsing, validation) are stored for upstream handling
         """
         log.debug("Resetting/Reloading config")
         super().reset()
+        self._config_errors: list[ConfigurationError] = []
 
-        # There are 3 potential sources
-
+        # Config sources:
         # 1. beets defaults
-        # We do not load them into _out_ config.
+        # We do not load them into _our_ config.
         # They are still available in the beets_config property.
         # But: we want to encourage user to add fields that are accessed
         # from _our_ config into the schema.
         # Thus only porting requirement: copy the relevant beets default into the schema
-
+        #
         # 2. beets user config
-        if self.get_beets_config_path().exists():
-            with open(self.get_beets_config_path()) as f:
-                loaded = yaml.safe_load(f)
-                if not isinstance(loaded, dict):
-                    raise ValueError("Beets config is not a valid YAML dictionary.")
-                # EYConfs update method also validates against the schema
-                self.update(loaded)
-
         # 3. beets-flask user config
-        if self.get_beets_flask_config_path().exists():
-            with open(self.get_beets_flask_config_path()) as f:
-                loaded = yaml.safe_load(f)
+
+        for label, path_fn in [
+            ("beets", self.get_beets_config_path),
+            ("beets-flask", self.get_beets_flask_config_path),
+        ]:
+            path = path_fn()
+            if not path.exists():
+                continue
+            try:
+                with open(path) as f:
+                    loaded = yaml.safe_load(f)
                 if not isinstance(loaded, dict):
-                    raise ValueError(
-                        "Beets flask config is not a valid YAML dictionary."
-                    )
+                    raise yaml.YAMLError("Config is not a YAML dictionary.")
                 self.update(loaded)
+            except yaml.YAMLError as e:
+                log.error(f"Failed to parse {label} config at {path}: {e}")
+                self._config_errors.append(
+                    ConfigurationError(message=str(e), section=f"{path}")
+                )
 
         # extra
         if extra_yaml_path is not None:
+            # Dev/test — still raise immediately so CI catches it
             with open(extra_yaml_path) as f:
                 loaded = yaml.safe_load(f)
-                if not isinstance(loaded, dict):
-                    raise ValueError("Extra config is not a valid YAML dictionary.")
-                self.update(loaded)
+            if not isinstance(loaded, dict):
+                raise ValueError("Extra config is not a valid YAML dictionary.")
+            self.update(loaded)
 
-        self.validate()
+        try:
+            self.validate()
+        except MultiConfigurationError as e:
+            self._config_errors.extend(e.errors)
+        except ConfigurationError as e:
+            self._config_errors.append(e)
+
         return self
 
     def commit_to_beets(self) -> None:
@@ -277,6 +290,14 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         if gui_globs is None or gui_globs == "_use_beets_ignore":
             gui_globs = self.data.ignore
         return cast(list[str], gui_globs)
+
+    @property
+    def errors(self) -> list[ConfigurationError]:
+        return getattr(self, "_config_errors", [])
+
+    @property
+    def is_healthy(self) -> bool:
+        return len(self.errors) == 0
 
 
 config: BeetsFlaskConfig | None = None
