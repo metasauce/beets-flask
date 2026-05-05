@@ -31,7 +31,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
     def __init__(self):
         """Initialize the config object with the default values."""
         super().__init__(schema=BeetsSchema, data=BeetsSchema())
-        self._config_errors = None
+        self._config_errors: list[ConfigurationError] = []
         BeetsFlaskConfig.write_examples_as_user_defaults()
         self.reload()
         self.commit_to_beets()
@@ -62,7 +62,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         """
         log.debug("Resetting/Reloading config")
         super().reset()
-        self._config_errors: list[ConfigurationError] = []
+        self._config_errors = []
 
         # Config sources:
         # 1. beets defaults
