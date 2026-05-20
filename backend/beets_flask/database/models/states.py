@@ -429,7 +429,8 @@ class TaskStateInDb(Base):
                 TaskItem(item=mapper.from_beets(item, ctx)) for item in state.items
             ],
             candidates=[
-                CandidateStateInDb.from_live_state(c) for c in state.candidate_states
+                CandidateStateInDb.from_live_state(c, ctx)
+                for c in state.candidate_states
             ],
             chosen_candidate_id=state.chosen_candidate_state_id,
             progress=state.progress.progress,
@@ -499,6 +500,10 @@ class CandidateStateInDb(Base):
     duplicate_ids: Mapped[str]
 
     # association between tracks online and items on disk, from int to int
+    # TODO: !!
+    # We should be able to remove this as there now is an
+    # direct item linkage
+    # !!
     mapping: Mapped[dict[int, int]]
 
     def __init__(
@@ -515,11 +520,12 @@ class CandidateStateInDb(Base):
         self.mapping = mapping
 
     @classmethod
-    def from_live_state(cls, state: CandidateState) -> CandidateStateInDb:
+    def from_live_state(cls, state: CandidateState, ctx: Context) -> CandidateStateInDb:
         """Create the DB representation of a live CandidateState."""
+
         return cls(
             id=state.id,
-            match=MatchMapper().from_beets(state.match, Context()),
+            match=MatchMapper().from_beets(state.match, ctx),
             duplicate_ids=state.duplicate_ids,
             mapping=state._mapping,
         )

@@ -138,17 +138,20 @@ class TrackMatchMapper(BeetsMapper[BeetsTrackMatch, TrackMatch]):
     def __init__(self):
         self.track_info_mapper = TrackInfoMapper()
         self.distance_mapper = DistanceMapper()
+        self.item_mapper = ItemMapper()
 
     def _from_beets(self, obj: BeetsTrackMatch, ctx: Context) -> TrackMatch:
         return TrackMatch(
             info=self.track_info_mapper.from_beets(obj.info, ctx),
             distance=self.distance_mapper.from_beets(obj.distance, ctx),
+            item=self.item_mapper.from_beets(obj.item, ctx),
         )
 
     def _to_beets(self, model: TrackMatch, ctx: Context) -> BeetsTrackMatch:
         return BeetsTrackMatch(
             info=self.track_info_mapper.to_beets(model.info, ctx),
             distance=self.distance_mapper.to_beets(model.distance, ctx),
+            item=self.item_mapper.to_beets(model.item, ctx),
         )
 
 

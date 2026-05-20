@@ -15,6 +15,7 @@ from beets_flask.database.mapper.match import (
     TrackMatchMapper,
 )
 from beets_flask.database.models.match import TrackInfo
+from beets_flask.importer.types import BeetsItem
 from tests.conftest import beets_lib_item
 
 
@@ -304,7 +305,15 @@ class TestTrackMatchMapper:
             length=180.0,
             index=1,
         )
-        original = BeetsTrackMatch(distance=track_distance, info=beets_track1)
+        beets_item = BeetsItem(
+            title="Test Item 1",
+        )
+
+        original = BeetsTrackMatch(
+            distance=track_distance,
+            info=beets_track1,
+            item=beets_item,
+        )
 
         mapper = TrackMatchMapper()
         ctx = Context()
@@ -316,6 +325,7 @@ class TestTrackMatchMapper:
         assert model.info.data["artist"] == "Test Artist"
         assert model.info.data["length"] == 180.0
         assert model.distance.raw_distance == track_distance.raw_distance
+        assert model.item.fixed_values["title"] == beets_item.title
         assert len(model.distance.penalties) == 2
 
         # Test to_beets
@@ -325,6 +335,7 @@ class TestTrackMatchMapper:
         assert result.info.artist == beets_track1.artist
         assert result.info.length == beets_track1.length
         assert result.distance.raw_distance == original.distance.raw_distance
+        assert result.item.title == beets_item.title
 
         # Verify penalties are preserved
         penalty_keys = {p.key for p in model.distance.penalties}
@@ -356,9 +367,13 @@ class TestTrackMatchMapper:
 
         track_distance = BeetsDistance()
         track_distance.add("artist", 0.1)
-
         beets_track = BeetsTrackInfo(title="Test Track")
-        beets_track_match = BeetsTrackMatch(distance=track_distance, info=beets_track)
+        beets_item = BeetsItem(title="Test Item 1")
+        beets_track_match = BeetsTrackMatch(
+            distance=track_distance,
+            info=beets_track,
+            item=beets_item,
+        )
 
         mapper = MatchMapper()
         ctx = Context()
@@ -369,3 +384,4 @@ class TestTrackMatchMapper:
         assert isinstance(result, BeetsTrackMatch)
         assert result.info.title == "Test Track"
         assert result.distance.raw_distance == track_distance.raw_distance
+        assert result.item.title == beets_item.title
