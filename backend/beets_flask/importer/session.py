@@ -500,7 +500,7 @@ class PreviewSession(BaseSession):
 
         task.lookup_candidates(search_ids)
 
-        if len(task.candidates) == 0:
+        if not task.candidates or len(task.candidates) == 0:
             raise NoCandidatesFoundException(persist_in_db=True)
 
         # Update our state
@@ -984,7 +984,7 @@ class AutoImportSession(ImportSession):
         except (AttributeError, TypeError):
             distance = 2.0
 
-        if len(task.candidates) == 0:
+        if not task.candidates or len(task.candidates) == 0:
             raise NoCandidatesFoundException()
 
         if distance > self.import_threshold:
