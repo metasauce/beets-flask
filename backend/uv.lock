@@ -203,7 +203,7 @@ wheels = [
 
 [[package]]
 name = "beets"
-version = "2.7.1"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -221,9 +221,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unidecode" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/9d/4f72fc5f772ca958f48263ca688bc60752bc7d752a248d6191c62e3bafb1/beets-2.7.1.tar.gz", hash = "sha256:95f20c4087be2f4b2ab400be07cbea380bec2720e2a83180b025a972ee94bd22", size = 2189644, upload-time = "2026-03-08T08:31:30.568Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/69/cfb8188520f2b50988e71a2c3d451874b819395b01fc63fa583d14311e8b/beets-2.8.0.tar.gz", hash = "sha256:5db90eddffe640e42a76e5207adc0993d2ce3d96e6a64ce3f2bfbd12d7b3a3cf", size = 2195951, upload-time = "2026-03-28T13:11:31.076Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/3b/1ad6e0c1f3e3d3e6113634ec97f372b00f1caad5ead91b9744358964b4e2/beets-2.7.1-py3-none-any.whl", hash = "sha256:bbe5a6b29aa55f520e635ef9d4222d8f3d53431bd0d78c68ee5c8bb0f80426f1", size = 610663, upload-time = "2026-03-08T08:31:28.363Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/8f/8cc7713b92842ec487d9801631cd61cb2e535f7144c2eb4a0bf06ad5f1f8/beets-2.8.0-py3-none-any.whl", hash = "sha256:10a4e19c6205d54060557b4ade82046cb9604f2c229f35d7a6b49074475383c0", size = 615487, upload-time = "2026-03-28T13:11:28.921Z" },
 ]
 
 [[package]]
@@ -265,7 +265,6 @@ dev = [
     { name = "mypy" },
     { name = "myst-nb" },
     { name = "myst-parser" },
-    { name = "pandas-stubs" },
     { name = "paracelsus" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -304,7 +303,6 @@ test = [
 ]
 typed = [
     { name = "mypy" },
-    { name = "pandas-stubs" },
     { name = "types-aiofiles" },
     { name = "types-cachetools" },
     { name = "types-deprecated" },
@@ -317,7 +315,7 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "alembic", specifier = ">=1.18.4" },
-    { name = "beets", specifier = "==2.7.1" },
+    { name = "beets", specifier = "==2.8.0" },
     { name = "cachetools", specifier = ">=5.3.3" },
     { name = "confuse", specifier = ">=2.0.1" },
     { name = "deprecated", specifier = ">=1.2.18" },
@@ -348,7 +346,6 @@ dev = [
     { name = "mypy", specifier = ">=1.14.1" },
     { name = "myst-nb", specifier = ">=1.1.2" },
     { name = "myst-parser", specifier = ">=4.0.0" },
-    { name = "pandas-stubs" },
     { name = "paracelsus", specifier = ">=0.15.0" },
     { name = "pre-commit", specifier = ">=3.8.0" },
     { name = "pytest", specifier = ">=8.2.2" },
@@ -387,7 +384,6 @@ test = [
 ]
 typed = [
     { name = "mypy", specifier = ">=1.14.1" },
-    { name = "pandas-stubs" },
     { name = "types-aiofiles" },
     { name = "types-cachetools" },
     { name = "types-deprecated" },
@@ -1437,18 +1433,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d7/f1/e7a6dd94a8d4a5626c03e4e99c87f241ba9e350cd9e6d75123f992427270/packaging-26.2.tar.gz", hash = "sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661", size = 228134, upload-time = "2026-04-24T20:15:23.917Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195, upload-time = "2026-04-24T20:15:22.081Z" },
-]
-
-[[package]]
-name = "pandas-stubs"
-version = "3.0.0.260204"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/27/1d/297ff2c7ea50a768a2247621d6451abb2a07c0e9be7ca6d36ebe371658e5/pandas_stubs-3.0.0.260204.tar.gz", hash = "sha256:bf9294b76352effcffa9cb85edf0bed1339a7ec0c30b8e1ac3d66b4228f1fbc3", size = 109383, upload-time = "2026-02-04T15:17:17.247Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7c/2f/f91e4eee21585ff548e83358332d5632ee49f6b2dcd96cb5dca4e0468951/pandas_stubs-3.0.0.260204-py3-none-any.whl", hash = "sha256:5ab9e4d55a6e2752e9720828564af40d48c4f709e6a2c69b743014a6fcb6c241", size = 168540, upload-time = "2026-02-04T15:17:15.615Z" },
 ]
 
 [[package]]
