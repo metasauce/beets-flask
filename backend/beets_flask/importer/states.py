@@ -259,7 +259,9 @@ class TaskState(BaseState):
         # we might run into inconsistencies here, if candidates of the task
         # change. but I do not know when or why they would.
         self.task = task
-        self.candidate_states = [CandidateState(c, self) for c in self.task.candidates]
+        self.candidate_states = [
+            CandidateState(c, self) for c in (self.task.candidates or [])
+        ]
         self.progress = ProgressState()
 
     def __repr__(self) -> str:
@@ -278,7 +280,7 @@ class TaskState(BaseState):
         self,
     ) -> Sequence[BeetsAlbumMatch | BeetsTrackMatch]:
         """Task candidates, i.e. possible matches to choose from."""
-        return self.task.candidates
+        return self.task.candidates or []
 
     @property
     def asis_candidate_id(self) -> str:
@@ -296,11 +298,11 @@ class TaskState(BaseState):
         insert_at: int = 0,
     ) -> list[CandidateState]:
         """Add new candidates to the selection state."""
-        if len(self.task.candidates) == 0 or len(self.candidate_states) == 0:
+        if len(self.candidates) == 0 or len(self.candidate_states) == 0:
             insert_at = 0
 
         # task.candidates is a sequence and thus immutable
-        _ = list(self.task.candidates)
+        _ = list(self.candidates)
         _[insert_at:insert_at] = candidates
         self.task.candidates = _
 
