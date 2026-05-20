@@ -174,7 +174,10 @@ class TrackMatch(Match):
     id: Mapped[str] = mapped_column(ForeignKey("matches.id"), primary_key=True)
 
     info_id: Mapped[str] = mapped_column(ForeignKey("track_info.id"))
+    item_id: Mapped[str] = mapped_column(ForeignKey("items.id"))
+
     info: Mapped[TrackInfo] = relationship()
+    item: Mapped[Item] = relationship()
 
     __mapper_args__ = {
         "polymorphic_identity": "track",
@@ -184,10 +187,12 @@ class TrackMatch(Match):
         self,
         info: TrackInfo,
         distance: Distance,
+        item: Item,
         id: str | None = None,
     ) -> None:
         self.info = info
         self.distance = distance
+        self.item = item
         super().__init__(id)
 
 
