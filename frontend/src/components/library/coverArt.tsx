@@ -182,18 +182,19 @@ function CoverArtFromQuery({
     }
 
     if (isError) {
-        if (error instanceof HTTPError) {
-            return (
-                <CoverArtError
-                    sx={coverSx}
-                    error={error}
-                    size={size}
-                    {...props}
-                />
-            );
-        } else {
-            throw error;
-        }
+        const coverArtError =
+            error instanceof HTTPError
+                ? error
+                : new HTTPError(error?.message || String(error));
+
+        return (
+            <CoverArtError
+                sx={coverSx}
+                error={coverArtError}
+                size={size}
+                {...props}
+            />
+        );
     }
 
     if (art) {
