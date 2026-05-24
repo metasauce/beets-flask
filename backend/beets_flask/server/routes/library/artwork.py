@@ -2,7 +2,6 @@ import os
 from io import BytesIO
 from typing import TYPE_CHECKING, cast
 
-from beets import util as beets_util
 from mediafile import Image, MediaFile  # comes with the beets install
 from PIL import Image as PILImage
 from quart import (
@@ -22,6 +21,7 @@ from beets_flask.server.exceptions import (
     InvalidUsageException,
     NotFoundException,
 )
+from beets_flask.server.routes.library.path_utils import resolve_library_path
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -112,7 +112,7 @@ async def item_art_idx(item_id: int):
             f"Item with beets_id:'{item_id}' not found in beets db."
         )
 
-    item_path = beets_util.syspath(item.path)
+    item_path = resolve_library_path(item.path)
     count = get_image_count_from_file(item_path)
     return jsonify({"count": count}), 200
 
@@ -129,7 +129,7 @@ async def item_art(item_id: int):
             f"Item with beets_id:'{item_id}' not found in beets db."
         )
 
-    item_path = beets_util.syspath(item.path)
+    item_path = resolve_library_path(item.path)
     img_data = get_image_data_from_file(item_path, idx)
     return await send_image(img_data, size)
 
@@ -151,7 +151,7 @@ async def album_art(album_id: int):
 
     # Has art set on album level
     if album.artpath and idx == 0:
-        art_path = beets_util.syspath(album.artpath)
+        art_path = resolve_library_path(album.artpath)
         if not os.path.exists(art_path):
             raise IntegrityException(
                 f"Album art file '{art_path}' does not exist for album beets_id:'{album_id}'."

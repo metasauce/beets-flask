@@ -7,11 +7,11 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from beets import util as beets_util
 from quart import Blueprint, g
 from tinytag import TinyTag
 
 from beets_flask.server.exceptions import IntegrityException, NotFoundException
+from beets_flask.server.routes.library.path_utils import resolve_library_path
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -36,7 +36,7 @@ async def item_metadata(item_id: int):
         )
 
     # File path
-    item_path = beets_util.syspath(item.path)
+    item_path = resolve_library_path(item.path)
     if not os.path.exists(item_path):
         raise IntegrityException(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."

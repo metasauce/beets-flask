@@ -12,13 +12,13 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 import aiofiles
 import numpy as np
-from beets import util as beets_util
 from cachetools import Cache, TTLCache
 from cachetools.keys import hashkey
 from quart import Blueprint, Response, g
 
 from beets_flask.logger import log
 from beets_flask.server.exceptions import IntegrityException, NotFoundException
+from beets_flask.server.routes.library.path_utils import resolve_library_path
 
 audio_bp = Blueprint("audio", __name__)
 
@@ -45,7 +45,7 @@ async def item_audio(item_id: int):
             f"Item with beets_id:'{item_id}' not found in beets db."
         )
 
-    item_path = beets_util.syspath(item.path)
+    item_path = resolve_library_path(item.path)
     if not os.path.exists(item_path):
         raise IntegrityException(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."
@@ -70,7 +70,7 @@ async def item_audio_peaks(item_id: int):
             f"Item with beets_id:'{item_id}' not found in beets db."
         )
 
-    item_path = beets_util.syspath(item.path)
+    item_path = resolve_library_path(item.path)
     if not os.path.exists(item_path):
         raise IntegrityException(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."

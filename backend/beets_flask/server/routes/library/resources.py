@@ -30,6 +30,7 @@ from quart import Blueprint, Response, abort, g, json, jsonify, request
 
 from beets_flask.config import get_config
 from beets_flask.logger import log
+from beets_flask.server.routes.library.path_utils import resolve_library_path
 from beets_flask.server.exceptions import NotFoundException
 from beets_flask.server.routes.exception import InvalidUsageException
 from beets_flask.server.utility import pop_query_param
@@ -636,7 +637,7 @@ def _repr_Item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseM
         ]
     else:
         # Use all keys
-        keys = item.keys(True) + ["name"]
+        keys = [k for k in item.keys(True) if k != "filesize"] + ["name"]
 
         # Check data source prefixes:
         # plugins such as spotify, tidal, discogs add a prefix to the id,
@@ -722,7 +723,7 @@ def _repr_Item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseM
     # Get the size (in bytes) of the backing file. This is useful
     # for the Tomahawk resolver API.
     try:
-        out["size"] = os.path.getsize(beets_util.syspath(path=item.path))
+        out["size"] = os.path.getsize(resolve_library_path(item.path))
     except OSError:
         out["size"] = 0
 
