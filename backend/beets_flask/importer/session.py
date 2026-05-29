@@ -35,7 +35,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, TypedDict, TypeGuard, TypeVar
 
-import nest_asyncio
 from beets import autotag, plugins
 from beets.importer import ImportAbortError
 from beets.ui import UserError, _open_library
@@ -78,8 +77,6 @@ from .stages import (
     user_query,
 )
 from .states import ProgressState, SessionState
-
-nest_asyncio.apply()
 
 # ---------------------------------------------------------------------------- #
 #                               Types and helpers                              #

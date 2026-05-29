@@ -19,7 +19,10 @@ class TypedAsyncServer(socketio.AsyncServer):
 if os.environ.get("PYTEST_CURRENT_TEST", ""):
     client_manager = None
 else:
-    client_manager = socketio.AsyncRedisManager("redis://")
+    client_manager = socketio.AsyncRedisManager(
+        os.environ.get("REDIS_URL", "redis://"),
+        redis_options={"socket_timeout": None},
+    )
 
 sio: TypedAsyncServer = cast(
     TypedAsyncServer,
