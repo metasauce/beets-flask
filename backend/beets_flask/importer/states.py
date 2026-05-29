@@ -529,7 +529,10 @@ class CandidateState(BaseState):
 
         tracks = [BeetsTrackInfo(**_generate_kwargs(i)) for i in items]
 
-        match = BeetsAlbumMatch(
+        # This is a hacky workaround to not trigger the event for album creation...
+        from beets_flask.database.mapper.match import AlbumMatchMapper
+
+        match = AlbumMatchMapper.create_without_event(
             distance=BeetsDistance(),
             info=BeetsAlbumInfo(
                 tracks=tracks,
@@ -539,6 +542,7 @@ class CandidateState(BaseState):
             extra_tracks=[],
             mapping={i: tracks[idx] for idx, i in enumerate(items)},
         )
+
         candidate = cls(match=match, task_state=task_state)
         candidate.id = task_state.asis_candidate_id
         # As the asis candidate state is not maintained we not to
