@@ -3,7 +3,6 @@ import logging
 import os
 import pickle
 import shutil
-import tempfile
 from collections.abc import Callable, Generator
 from contextlib import _GeneratorContextManager
 from pathlib import Path
@@ -212,58 +211,68 @@ def local_redis(monkeypatch):
     monkeypatch.undo()
 
 
-lookup_cache_dir: Path
-
-
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def mock_tag_album():
-    """Fixture that monkeypatches beets tag_album to use cached lookups."""
-    # Create temp lookup cache directory once per module
-    global lookup_cache_dir
+    """Fixture that monkeypatches beets tag_album to use cached lookups.
 
-    lookup_cache_dir = Path(tempfile.mkdtemp(prefix="beets_lookup_cache_"))
+    Caches MusicBrainz lookups in ``/tmp/beets_lookup_cache_<version>/`` so
+    they survive across test runs but are keyed by beets version.
 
-    original_tag_album = autotag.tag_album
-    autotag.tag_album = tag_album
-    yield lookup_cache_dir
-    autotag.tag_album = original_tag_album
+    We must patch both ``beets.autotag.tag_album`` (the public API) and
+    ``beets.importer.tasks.tag_album`` (where the actual call site lives,
+    imported directly from ``beets.autotag.match``, bypassing the public API).
+    """
+    import beets
+    import beets.importer.tasks as tasks_mod
 
+    # Persistent cache in /tmp, keyed by beets version
+    cache_dir = Path(f"/tmp/beets_lookup_cache_{beets.__version__}")
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
-def tag_album(
-    items,
-    search_artist: str | None = None,
-    search_name: str | None = None,
-    search_ids: list[str] = [],
-):
-    global lookup_cache_dir
-    # Compute items hash based on the items
-    m = hashlib.md5()
-    for item in items:
-        m.update(item.path)
-    if search_artist:
-        m.update(search_artist.encode("utf-8"))
-    if search_name:
-        m.update(search_name.encode("utf-8"))
-    for search_id in search_ids:
-        m.update(search_id.encode("utf-8"))
-    items_hash = m.hexdigest()[:8]
+    # Save originals from both patched locations.
+    # beeets.importer.tasks imports tag_album directly from
+    # beets.autotag.match (not via beets.autotag), so we must
+    # patch that module's attribute too.  Use setattr to avoid
+    # pyright reportPrivateImportUsage on the re-imported name.
+    _original_autotag = autotag.tag_album
+    _original_tasks = getattr(tasks_mod, "tag_album")
 
-    cache_file = lookup_cache_dir / f"lookup_{items_hash}.pickle"
-    if cache_file.exists():
-        log.debug(f"Using cached lookup from temp dir {cache_file}")
-        with open(cache_file, "rb") as f:
-            return pickle.load(f)
-    else:
-        # TODO: This pickle contains absolute paths to the files
-        # while undesired (no use in having them in the git repo) its for now the
-        # easiest way... and we hope music brainz does not change its data too often!
+    def _cached_tag_album(
+        items,
+        search_artist: str | None = None,
+        search_name: str | None = None,
+        search_ids: list[str] = [],
+    ):
+        # Compute stable hash from items and search parameters
+        m = hashlib.md5()
+        for item in items:
+            m.update(item.path)
+        if search_artist:
+            m.update(search_artist.encode("utf-8"))
+        if search_name:
+            m.update(search_name.encode("utf-8"))
+        for search_id in search_ids:
+            m.update(search_id.encode("utf-8"))
+        items_hash = m.hexdigest()[:8]
+
+        cache_file = cache_dir / f"lookup_{items_hash}.pickle"
+        if cache_file.exists():
+            log.debug(f"Using cached lookup from {cache_file}")
+            with open(cache_file, "rb") as f:
+                return pickle.load(f)
+
+        # Real lookup on cache miss
         res = _tag_album(items, search_artist, search_name, search_ids)
-
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
         with open(cache_file, "wb") as f:
             pickle.dump(res, f)
-
         return res
 
+    # Patch both locations so the wrapper intercepts all call paths
+    autotag.tag_album = _cached_tag_album
+    setattr(tasks_mod, "tag_album", _cached_tag_album)
 
-autotag.tag_album = tag_album
+    yield cache_dir
+
+    # Restore originals
+    autotag.tag_album = _original_autotag
+    setattr(tasks_mod, "tag_album", _original_tasks)
