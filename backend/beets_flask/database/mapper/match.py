@@ -217,13 +217,34 @@ class AlbumMatchMapper(BeetsMapper[BeetsAlbumMatch, AlbumMatch]):
             elif tm.item is not None:
                 extra_items.append(self.item_mapper.to_beets(tm.item, ctx))
 
-        return BeetsAlbumMatch(
+        return self.create_without_event(
             distance=self.distance_mapper.to_beets(model.distance, ctx),
             info=self.album_info_mapper.to_beets(model.info, ctx),
             mapping=mapping,
             extra_items=extra_items,
             extra_tracks=extra_tracks,
         )
+
+    @staticmethod
+    def create_without_event(
+        distance: BeetsDistance,
+        info: BeetsAlbumInfo,
+        mapping: dict[BeetsItem, BeetsTrackInfo],
+        extra_items: list[BeetsItem],
+        extra_tracks: list[BeetsTrackInfo],
+    ) -> BeetsAlbumMatch:
+        """Workaround to not fire 'albumn_matched' event from deserialization.
+
+        see https://github.com/beetbox/beets/pull/6184/changes#r2554116434
+        """
+        match = object.__new__(BeetsAlbumMatch)
+        match.distance = distance
+        match.info = info
+        match.mapping = mapping
+        match.extra_items = extra_items
+        match.extra_tracks = extra_tracks
+
+        return match
 
 
 class ItemMapper(BeetsMapper[BeetsItem, Item]):
