@@ -1,6 +1,5 @@
 import asyncio
 import os
-import signal
 from pathlib import Path
 from typing import Any, Literal
 
@@ -74,12 +73,6 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
     )
 
     watchdog.start()
-
-    # Stop watchdog on exit signals.
-    signal.signal(signal.SIGINT, lambda s, f: watchdog.stop())
-    signal.signal(signal.SIGHUP, lambda s, f: watchdog.stop())
-    signal.signal(signal.SIGTERM, lambda s, f: watchdog.stop())
-    signal.signal(signal.SIGQUIT, lambda s, f: watchdog.stop())
 
     # user would expect autotagging inboxes to automatically scan on first launch
     async def auto_tag_wait_for_workers(f: Path):

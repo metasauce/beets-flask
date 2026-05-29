@@ -25,7 +25,6 @@ dependencies = [
     "cachetools>=5.3.3",
     "libtmux>=0.37.0",
     "Deprecated>=1.2.18",
-    "nest_asyncio>=1.6.0",
     # Used for hosting the web-interface & api
     "uvicorn>=0.36.0",
     # beets plugin dependencies
@@ -137,10 +136,10 @@ filterwarnings = [
     "ignore::DeprecationWarning",
 ]
 pythonpath = ["."]
-asyncio_mode = "auto"
 log_format = "%(relativeCreated)-8d [%(levelname)-5s] %(name)s %(filename)-8s:%(lineno)d %(message)s"
+asyncio_mode = "auto"
+asyncio_default_test_loop_scope = "function"
 asyncio_default_fixture_loop_scope = "function"
-
 
 [tool.coverage.report]
 omit = ["*/tests/*"]
@@ -161,7 +160,6 @@ module = [
     "socketio.*",
     "confuse.*",
     "mediafile.*",
-    "nest_asyncio",
     "beetsplug.*",
     "eyconf.*",
 ]
