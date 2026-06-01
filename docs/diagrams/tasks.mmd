@@ -1,0 +1,20 @@
+flowchart LR
+
+    Folder --> Session --> Task
+    Folder --> Items
+
+    subgraph Task
+        direction LR
+        Items@{ shape: processes, label: "$$N_i \\times $$Items"}
+        Items <--> AlbumMatch
+
+        subgraph Candidates["$$N_c \\times $$ Candidates"]
+            direction LR
+            AlbumMatch <--> AlbumInfo
+            AlbumInfo <--> TrackInfo
+
+            TrackInfo@{ shape: processes, label: "$$N_t \\times $$ TrackInfo"}
+        end
+
+
+    end

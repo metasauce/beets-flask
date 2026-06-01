@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import json
+from array import array
 from typing import Any
 
 from sqlalchemy import types
@@ -65,3 +68,34 @@ class StrDictType(DictType):
 
     allowed_keys_types = (str,)
     allowed_values_types = (str,)
+
+
+class FloatListType(types.TypeDecorator):
+    """Stores a list[float] as binary using array.array ('d' = float64)."""
+
+    impl = types.LargeBinary
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: list[float] | None, dialect: Any
+    ) -> bytes | None:
+        if value is None:
+            return None
+        if not isinstance(value, list):
+            raise ValueError("Value must be a list")
+        if not all(isinstance(v, int | float) for v in value):
+            raise ValueError(f"All values must be float, got: {value}")
+        arr = array("d", value)
+        return arr.tobytes()
+
+    def process_result_value(
+        self, value: bytes | None, dialect: Any
+    ) -> list[float] | None:
+        if value is None:
+            return None
+        arr = array("d")
+        arr.frombytes(value)
+        return arr.tolist()
+
+    def copy(self, **kw: Any) -> FloatListType:
+        return self.__class__()

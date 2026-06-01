@@ -21,6 +21,8 @@ from beets.autotag.hooks import AlbumInfo as BeetsAlbumInfo
 from beets.autotag.hooks import AlbumMatch as BeetsAlbumMatch
 from beets.autotag.hooks import TrackInfo as BeetsTrackInfo
 from beets.autotag.hooks import TrackMatch as BeetsTrackMatch
+from beets.importer import Action as BeetsImportAction
+from beets.importer import ImportSession as BeetsImportSession
 from beets.importer import ImportTask as BeetsImportTask
 from beets.library import Album as BeetsAlbum
 from beets.library import Item as BeetsItem
@@ -42,7 +44,9 @@ __all__ = [
     "BeetsTrackMatch",
     "BeetsLibrary",
     "BeetsDistance",
+    "BeetsImportAction",
     "BeetsImportTask",
+    "BeetsImportSession",
 ]
 
 # to be consistent with beets, here we do not use an enum.

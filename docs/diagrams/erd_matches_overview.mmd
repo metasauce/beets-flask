@@ -1,0 +1,28 @@
+erDiagram
+  candidate {
+    VARCHAR task_id FK
+    VARCHAR match_id FK
+    VARCHAR duplicate_ids
+    TEXT mapping
+    VARCHAR id PK
+  }
+
+  matches {
+    VARCHAR id PK
+    VARCHAR type
+    VARCHAR distance_id FK
+  }
+
+  matches_album {
+    VARCHAR id PK,FK
+    VARCHAR info_id FK
+  }
+
+  matches_track {
+    VARCHAR id PK,FK
+    VARCHAR info_id FK
+  }
+
+  matches ||--o{ candidate : match_id
+  matches ||--o| matches_album : id
+  matches ||--o| matches_track : id

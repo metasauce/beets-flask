@@ -18,7 +18,7 @@ from sqlalchemy.sql import func
 
 from beets_flask.logger import log
 
-from .types import DictType, IntDictType, StrDictType
+from .types import DictType, FloatListType, IntDictType, StrDictType
 
 
 class Base(DeclarativeBase):
@@ -30,6 +30,7 @@ class Base(DeclarativeBase):
             dict[int, int]: IntDictType,
             dict[str, str]: StrDictType,
             dict[str, Any]: DictType,
+            list[float]: FloatListType,
         }
     )
 

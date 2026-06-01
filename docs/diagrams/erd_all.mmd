@@ -1,0 +1,140 @@
+erDiagram
+  album_info {
+    JSON data
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  album_match_track_mappings {
+    VARCHAR album_match_id FK
+    VARCHAR track_info_id FK "nullable"
+    VARCHAR item_id FK "nullable"
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  candidate {
+    VARCHAR task_id FK
+    VARCHAR match_id FK
+    VARCHAR duplicate_ids
+    TEXT mapping
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  distances {
+    VARCHAR track_info_id FK "nullable"
+    VARCHAR parent_distance_id FK "nullable"
+    FLOAT raw_distance
+    FLOAT max_distance
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  folder {
+    VARCHAR full_path PK "indexed"
+    BOOLEAN is_album "nullable"
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  items {
+    JSON fixed_values
+    JSON flex_values
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  matches {
+    VARCHAR id PK
+    VARCHAR type
+    VARCHAR distance_id FK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  matches_album {
+    VARCHAR id PK,FK
+    VARCHAR info_id FK
+  }
+
+  matches_track {
+    VARCHAR id PK,FK
+    VARCHAR info_id FK
+  }
+
+  penalties {
+    VARCHAR key "indexed"
+    BLOB value
+    VARCHAR distance_id FK
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  session {
+    VARCHAR folder_hash FK
+    INTEGER folder_revision
+    ENUM progress
+    BLOB exc "nullable"
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  task {
+    VARCHAR session_id FK
+    VARCHAR chosen_candidate_id FK "nullable"
+    BLOB toppath "nullable"
+    BLOB paths
+    BLOB old_paths "nullable"
+    ENUM choice_flag "nullable"
+    VARCHAR cur_artist "nullable"
+    VARCHAR cur_album "nullable"
+    ENUM progress
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  tasks_items {
+    VARCHAR task_id FK
+    VARCHAR item_id FK
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  track_info {
+    VARCHAR album_id FK "nullable"
+    JSON data
+    VARCHAR id PK
+    DATETIME created_at "indexed"
+    DATETIME updated_at
+  }
+
+  matches_album ||--o{ album_match_track_mappings : album_match_id
+  track_info ||--o{ album_match_track_mappings : track_info_id
+  items ||--o{ album_match_track_mappings : item_id
+  task ||--o{ candidate : task_id
+  matches ||--o{ candidate : match_id
+  track_info ||--o{ distances : track_info_id
+  distances ||--o{ distances : parent_distance_id
+  distances ||--o{ matches : distance_id
+  matches ||--o| matches_album : id
+  album_info ||--o{ matches_album : info_id
+  matches ||--o| matches_track : id
+  track_info ||--o{ matches_track : info_id
+  distances ||--o{ penalties : distance_id
+  folder ||--o{ session : folder_hash
+  session ||--o{ task : session_id
+  candidate ||--o{ task : chosen_candidate_id
+  task ||--o{ tasks_items : task_id
+  items ||--o{ tasks_items : item_id
+  album_info ||--o{ track_info : album_id
