@@ -154,7 +154,7 @@ class Search(TypedDict):
 
     search_ids: list[str]
     search_artist: str | None
-    search_album: str | None
+    search_name: str | None
 
 
 def _is_search(d: Any) -> TypeGuard[Search]:
@@ -564,44 +564,20 @@ class AddCandidatesSession(PreviewSession):
             and search["search_artist"].strip() == ""
         ):
             search["search_artist"] = None
-        if search["search_album"] is not None and search["search_album"].strip() == "":
-            search["search_album"] = None
+        if search["search_name"] is not None and search["search_name"].strip() == "":
+            search["search_name"] = None
         search["search_ids"] = list(
             filter(lambda x: x.strip() != "", search["search_ids"])
         )
 
         log.debug(f"Using {search=} for {task_state.id=}, {task_state.paths=}")
 
-        try:
-            _, _, prop = autotag.tag_album(
-                task.items,
-                search_ids=search["search_ids"],
-                search_album=search["search_album"],
-                search_artist=search["search_artist"],
-            )
-        except Exception as e:
-            # TODO: With beets 2.6.0 this should be revisited
-            # since beets should than be able to handle these exceptions
-            # gracefully upstream.
-            # https://github.com/beetbox/beets/pull/5965
-            from beetsplug.musicbrainz import MusicBrainzAPIError
-            from beetsplug.spotify import APIError as SpotifyAPIError
-
-            if isinstance(e, MusicBrainzAPIError):
-                raise NoCandidatesFoundException(
-                    f"Failed to contact Musicbrainz API: {e.get_message()}",
-                    persist_in_db=False,
-                )
-            elif isinstance(e, SpotifyAPIError):
-                raise NoCandidatesFoundException(
-                    f"Failed to contact Spotify API: {e}",
-                    persist_in_db=False,
-                )
-            else:
-                raise NoCandidatesFoundException(
-                    f"Failed to contact online APIs.",
-                    persist_in_db=False,
-                )
+        _, _, prop = autotag.tag_album(
+            task.items,
+            search_ids=search["search_ids"],
+            search_name=search["search_name"],
+            search_artist=search["search_artist"],
+        )
 
         task_state.add_candidates(prop.candidates)
 
@@ -614,8 +590,8 @@ class AddCandidatesSession(PreviewSession):
                 error_text += f"ids: {', '.join(search['search_ids'])}; "
             if search["search_artist"]:
                 error_text += f"artist: {search['search_artist']}; "
-            if search["search_album"]:
-                error_text += f"album: {search['search_album']}; "
+            if search["search_name"]:
+                error_text += f"album: {search['search_name']}; "
             error_text += NoCandidatesFoundException.metadata_plugin_info()
             raise NoCandidatesFoundException(
                 error_text,
