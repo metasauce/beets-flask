@@ -31,7 +31,7 @@ This documentation is very much a work in progress. If you have any questions or
 
 getting-started.md
 configuration.md
-plugins.md
+plugins/index.md
 limitations.md
 faq.md
 ```
