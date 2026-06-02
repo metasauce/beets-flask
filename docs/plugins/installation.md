@@ -8,7 +8,7 @@ in either the `/config` folder or `/config/beets-flask` folder. The `requirement
 [python dependencies](https://pip.pypa.io/en/stable/reference/requirements-file-format/), and the
 `startup.sh` file may be an executable shell script compatible with the container's debian base.
 
-On startup, the container runs the startup script if present, then installs requirements from
+On startup, the container runs as root the startup script if present, then installs requirements from
 `requirements.txt` using [uv](https://docs.astral.sh/uv/pip/).
 
 ```{note}
