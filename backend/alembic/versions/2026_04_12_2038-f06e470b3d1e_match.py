@@ -215,13 +215,13 @@ def migrate_data():
             # We depend on our mappers here and hope they do not change in the future
             db_match: Any
             if isinstance(beets_match, AlbumMatchStub):
-                db_match = AlbumMatchMapper().from_beets(
+                db_match = AlbumMatchMapper().to_db(
                     beets_match,  # type: ignore[arg-type]
                     Context(),
                 )
 
             else:
-                db_match = TrackMatchMapper().from_beets(
+                db_match = TrackMatchMapper().to_db(
                     beets_match,  # type: ignore[arg-type]
                     Context(),
                 )

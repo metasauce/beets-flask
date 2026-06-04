@@ -40,7 +40,7 @@ class TestTrackInfoMapper:
         ctx = Context()
 
         # Test from_beets
-        model = mapper.from_beets(original, ctx)
+        model = mapper.to_db(original, ctx)
         assert isinstance(model, TrackInfo)
         assert model.data["title"] == "Test Track"
         assert model.data["artist"] == "Test Artist"
@@ -49,7 +49,7 @@ class TestTrackInfoMapper:
         assert model.data["index"] == 1
 
         # Test to_beets
-        result = mapper.to_beets(model, ctx)
+        result = mapper.from_db(model, ctx)
         assert result.title == original.title
         assert result.artist == original.artist
         assert result.album == original.album
@@ -80,14 +80,14 @@ class TestAlbumInfoMatcher:
         ctx = Context()
 
         # Test from_beets
-        model = mapper.from_beets(original, ctx)
+        model = mapper.to_db(original, ctx)
         assert model.data["year"] == 1
         assert len(model.tracks) == 2
         assert model.tracks[0].data["title"] == "a"
         assert model.tracks[1].data["title"] == "b"
 
         # Test to_beets
-        result = mapper.to_beets(model, ctx)
+        result = mapper.from_db(model, ctx)
         assert result.year == original.year
         assert len(result.tracks) == len(original.tracks)
         assert result.tracks[0].title == original.tracks[0].title
@@ -112,12 +112,12 @@ class TestDistanceMapper:
         ctx = Context()
 
         # Test from_beets
-        model = mapper.from_beets(original, ctx)
+        model = mapper.to_db(original, ctx)
         assert model.max_distance == original.max_distance
         assert model.raw_distance == original.raw_distance
 
         # Test to_beets
-        result = mapper.to_beets(model, ctx)
+        result = mapper.from_db(model, ctx)
         assert result.distance == original.distance
         assert result.max_distance == original.max_distance
         assert result.raw_distance == original.raw_distance
@@ -260,7 +260,7 @@ class TestAlbumMatchMapper:
         ctx = Context()
 
         # Test from_beets conversion
-        model = mapper.from_beets(beets_album_match, ctx)
+        model = mapper.to_db(beets_album_match, ctx)
         assert model.info.data["album_id"] == "abc123"
         assert model.info.data["album"] == "Test Album"
         assert model.info.data["artist"] == "Test Artist"
@@ -276,7 +276,7 @@ class TestAlbumMatchMapper:
         )
 
         # Test to_beets conversion
-        result = mapper.to_beets(model, ctx)
+        result = mapper.from_db(model, ctx)
         assert result.info.album_id == "abc123"
         assert result.info.album == "Test Album"
         assert result.info.artist == "Test Artist"
@@ -319,7 +319,7 @@ class TestTrackMatchMapper:
         ctx = Context()
 
         # Test from_beets
-        model = mapper.from_beets(original, ctx)
+        model = mapper.to_db(original, ctx)
         assert isinstance(model.info, TrackInfo)
         assert model.info.data["title"] == "Test Track 1"
         assert model.info.data["artist"] == "Test Artist"
@@ -329,7 +329,7 @@ class TestTrackMatchMapper:
         assert len(model.distance.penalties) == 2
 
         # Test to_beets
-        result = mapper.to_beets(model, ctx)
+        result = mapper.from_db(model, ctx)
         assert isinstance(result, BeetsTrackMatch)
         assert result.info.title == beets_track1.title
         assert result.info.artist == beets_track1.artist
@@ -354,8 +354,8 @@ class TestTrackMatchMapper:
         mapper = MatchMapper()
         ctx = Context()
 
-        model = mapper.from_beets(beets_album_match, ctx)
-        result = mapper.to_beets(model, ctx)
+        model = mapper.to_db(beets_album_match, ctx)
+        result = mapper.from_db(model, ctx)
 
         assert isinstance(result, BeetsAlbumMatch)
         assert result.info.album_id == "abc123"
@@ -378,8 +378,8 @@ class TestTrackMatchMapper:
         mapper = MatchMapper()
         ctx = Context()
 
-        model = mapper.from_beets(beets_track_match, ctx)
-        result = mapper.to_beets(model, ctx)
+        model = mapper.to_db(beets_track_match, ctx)
+        result = mapper.from_db(model, ctx)
 
         assert isinstance(result, BeetsTrackMatch)
         assert result.info.title == "Test Track"
