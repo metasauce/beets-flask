@@ -381,7 +381,7 @@ class TaskStateInDb(Base):
     def items(self) -> list[BeetsItem]:
         ctx = Context()
         mapper = ItemMapper()
-        return [mapper.to_beets(row.item, ctx) for row in self.pending_items]
+        return [mapper.from_db(row.item, ctx) for row in self.pending_items]
 
     def __init__(
         self,
@@ -426,7 +426,7 @@ class TaskStateInDb(Base):
             toppath=str(state.toppath).encode("utf-8") if state.toppath else None,
             paths=state.task.paths,
             pending_items=[
-                TaskItem(item=mapper.from_beets(item, ctx)) for item in state.items
+                TaskItem(item=mapper.to_db(item, ctx)) for item in state.items
             ],
             candidates=[
                 CandidateStateInDb.from_live_state(c, ctx)
@@ -525,7 +525,7 @@ class CandidateStateInDb(Base):
 
         return cls(
             id=state.id,
-            match=MatchMapper().from_beets(state.match, ctx),
+            match=MatchMapper().to_db(state.match, ctx),
             duplicate_ids=state.duplicate_ids,
             mapping=state._mapping,
         )
@@ -535,7 +535,7 @@ class CandidateStateInDb(Base):
         if task_state is None:
             task_state = self.task.to_live_state()
         live_state = CandidateState(
-            MatchMapper().to_beets(self.match, Context()),
+            MatchMapper().from_db(self.match, ctx),
             task_state,
             mapping=self.mapping,
         )
