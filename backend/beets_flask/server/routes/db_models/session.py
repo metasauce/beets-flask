@@ -8,6 +8,8 @@ from sqlalchemy import select
 
 from beets_flask import invoker
 from beets_flask.database import db_session_factory
+from beets_flask.database.mapper.base import Context
+from beets_flask.database.mapper.states import SessionStateMapper
 from beets_flask.database.models.states import (
     FolderInDb,
     SessionStateInDb,
@@ -72,7 +74,9 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                     status_code=200,
                 )
 
-            return jsonify(item.to_dict())
+            mapper = SessionStateMapper(want_to_serialize=True)
+            live_state = mapper.from_db(item, Context())
+            return jsonify(live_state.serialize())
 
     async def enqueue(self):
         """Start a new session for a given folder hash or enqueue a new job for an existing session.

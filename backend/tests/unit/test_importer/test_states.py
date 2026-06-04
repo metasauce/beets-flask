@@ -130,11 +130,6 @@ class TestCandidateState(StateTest):
         assert candidate.url == task.candidates[0].info.data_url
         assert candidate.url == "url"
 
-        # _mapping is set statically in the user_query stage, not via fixture.
-        # but mapping has a fallback that uses candidate.match.mapping
-        assert candidate._mapping == candidate.current_mapping
-        assert candidate.mapping == {0: 0}
-
     def test_asis_candidate(self):
         # Test asis candidate (last in list)
         asis_candidate = self.task_state.asis_candidate

@@ -16,7 +16,7 @@ from __future__ import annotations
 import pickle
 from pathlib import Path
 
-from beets.importer import Action, ImportTask
+from beets.importer import Action
 from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
@@ -30,20 +30,11 @@ from sqlalchemy.orm import (
 )
 
 from beets_flask.database.mapper.base import Context
-from beets_flask.database.mapper.match import ItemMapper, MatchMapper
 from beets_flask.database.models.base import Base
 from beets_flask.database.models.match import Match
 from beets_flask.disk import Archive, Folder
 from beets_flask.importer.progress import Progress
-from beets_flask.importer.states import (
-    CandidateState,
-    SerializedCandidateState,
-    SerializedSessionState,
-    SerializedTaskState,
-    SessionState,
-    TaskState,
-)
-from beets_flask.importer.types import BeetsItem
+from beets_flask.importer.states import SessionState
 from beets_flask.logger import log
 from beets_flask.server.exceptions import SerializedException
 
@@ -235,50 +226,9 @@ class SessionStateInDb(Base):
         self.progress = progress
         self.exc = pickle.dumps(exc) if exc else None
 
-    @classmethod
-    def from_live_state(cls, state: SessionState) -> SessionStateInDb:
-        """Create the DB representation of a live SessionState.."""
-
-        session = cls(
-            folder=FolderInDb(state.folder_path, state.folder_hash),
-            id=state.id,
-            tasks=[TaskStateInDb.from_live_state(ts) for ts in state.task_states],
-            progress=state.progress.progress,
-            exc=state.exc,
-        )
-
-        return session
-
     @property
     def folder_path(self) -> Path:
         return self.folder.path
-
-    def to_live_state(self, new_folder=True) -> SessionState:
-        """Recreate the live SessionState with underlying task from its stored version in the db.
-
-        HACK: new_folder param is a bit hacky, as if we do not include the children if we
-        are not recomputing the folder hash. Might lead to some issues down the line.
-        """
-
-        if new_folder:
-            s_state = SessionState(self.folder.path)
-        else:
-            s_state = SessionState(self.folder.to_live_folder())
-
-        if s_state.folder_hash != self.folder.hash:
-            log.warning(
-                f"Folder hash mismatch for {self.folder.path}. "
-                f"Expected {self.folder.hash} but got {s_state.folder_hash}."
-            )
-        s_state.id = self.id
-        s_state.created_at = self.created_at
-        s_state.updated_at = self.updated_at
-        s_state._task_states = [task.to_live_state(s_state) for task in self.tasks]
-        s_state.exc = pickle.loads(self.exc) if self.exc else None
-        return s_state
-
-    def to_dict(self) -> SerializedSessionState:
-        return self.to_live_state(False).serialize()
 
     @classmethod
     def get_by_hash_and_path(
@@ -322,6 +272,31 @@ class SessionStateInDb(Base):
     def exception(self) -> SerializedException | None:
         """Returns the exception of the session if it failed."""
         return pickle.loads(self.exc) if self.exc else None
+
+    def to_live_state(self):
+        """To live state.
+
+        Outlook: We should remove this at some point once we refactor
+        the live_state logic!
+        """
+        from beets_flask.database.mapper.states import SessionStateMapper
+
+        mapper = SessionStateMapper()
+        ctx = Context()
+        return mapper.from_db(self, ctx)
+
+    @classmethod
+    def from_live_state(cls, live_state: SessionState):
+        """From live state.
+
+        Outlook: We should remove this at some point once we refactor
+        the live_state logic!
+        """
+        from beets_flask.database.mapper.states import SessionStateMapper
+
+        mapper = SessionStateMapper()
+        ctx = Context()
+        return mapper.to_db(live_state, ctx)
 
 
 class TaskStateInDb(Base):
@@ -377,12 +352,6 @@ class TaskStateInDb(Base):
 
     progress: Mapped[Progress]
 
-    @property
-    def items(self) -> list[BeetsItem]:
-        ctx = Context()
-        mapper = ItemMapper()
-        return [mapper.from_db(row.item, ctx) for row in self.pending_items]
-
     def __init__(
         self,
         id: str | None = None,
@@ -410,73 +379,6 @@ class TaskStateInDb(Base):
         self.cur_artist = cur_artist
         self.cur_album = cur_album
 
-    @classmethod
-    def from_live_state(cls, state: TaskState) -> TaskStateInDb:
-        """Create the DB representation of a live TaskState."""
-        if hasattr(state.task, "old_paths"):
-            old_paths = state.task.old_paths
-        else:
-            old_paths = None
-
-        ctx = Context()
-        mapper = ItemMapper()
-
-        task = cls(
-            id=state.id,
-            toppath=str(state.toppath).encode("utf-8") if state.toppath else None,
-            paths=state.task.paths,
-            pending_items=[
-                TaskItem(item=mapper.to_db(item, ctx)) for item in state.items
-            ],
-            candidates=[
-                CandidateStateInDb.from_live_state(c, ctx)
-                for c in state.candidate_states
-            ],
-            chosen_candidate_id=state.chosen_candidate_state_id,
-            progress=state.progress.progress,
-            choice_flag=state.task.choice_flag,
-            cur_artist=state.task.cur_artist,
-            cur_album=state.task.cur_album,
-            old_paths=old_paths,
-        )
-        return task
-
-    def to_live_state(self, session_state: SessionState | None = None) -> TaskState:
-        """Recreate the live TaskState with underlying task from its stored version in the db."""
-
-        # We just assume it is a normal import task
-        beets_task = ImportTask(
-            toppath=self.toppath,
-            paths=pickle.loads(self.paths),
-            items=self.items,
-        )
-        beets_task.choice_flag = self.choice_flag
-        beets_task.cur_artist = self.cur_artist
-        beets_task.cur_album = self.cur_album
-        old_paths: list[bytes] | None = (
-            pickle.loads(self.old_paths) if self.old_paths else None
-        )
-        # TODO: Update type hints once beets is updated
-        beets_task.old_paths = old_paths  # type: ignore
-
-        live_state = TaskState(beets_task)
-        live_state.id = self.id
-        live_state.created_at = self.created_at
-        live_state.updated_at = self.updated_at
-        live_state.candidate_states = [
-            c.to_live_state(live_state) for c in self.candidates
-        ]
-        live_state.chosen_candidate_state_id = self.chosen_candidate_id
-        live_state.progress.progress = self.progress
-
-        # Set candidate of beets_task
-        live_state.task.candidates = [c.match for c in live_state.candidate_states]
-
-        return live_state
-
-    def to_dict(self) -> SerializedTaskState:
-        return self.to_live_state().serialize()
-
 
 class CandidateStateInDb(Base):
     """Represents a candidate (potential match) for an import task.
@@ -497,19 +399,12 @@ class CandidateStateInDb(Base):
     match: Mapped[Match] = relationship()
 
     # Duplicate ids (if any) (beets_id)
+    # TODO: We should recompute the duplicates on fetching data from the database
     duplicate_ids: Mapped[str]
-
-    # association between tracks online and items on disk, from int to int
-    # TODO: !!
-    # We should be able to remove this as there now is an
-    # direct item linkage
-    # !!
-    mapping: Mapped[dict[int, int]]
 
     def __init__(
         self,
         match: Match,
-        mapping: dict[int, int],
         duplicate_ids: list[str] = [],
         id: str | None = None,
     ):
@@ -517,39 +412,6 @@ class CandidateStateInDb(Base):
 
         self.match = match
         self.duplicate_ids = ";".join(map(str, duplicate_ids))
-        self.mapping = mapping
-
-    @classmethod
-    def from_live_state(cls, state: CandidateState, ctx: Context) -> CandidateStateInDb:
-        """Create the DB representation of a live CandidateState."""
-
-        return cls(
-            id=state.id,
-            match=MatchMapper().to_db(state.match, ctx),
-            duplicate_ids=state.duplicate_ids,
-            mapping=state._mapping,
-        )
-
-    def to_live_state(self, task_state: TaskState | None) -> CandidateState:
-        """Recreate the live CandidateState with underlying task from its stored version in the db."""
-        if task_state is None:
-            task_state = self.task.to_live_state()
-        live_state = CandidateState(
-            MatchMapper().from_db(self.match, ctx),
-            task_state,
-            mapping=self.mapping,
-        )
-        live_state.id = self.id
-        live_state.created_at = self.created_at
-        live_state.updated_at = self.updated_at
-        live_state.duplicate_ids = (
-            # edge case: "".split() gives ['']
-            [] if len(self.duplicate_ids) == 0 else self.duplicate_ids.split(";")
-        )
-        return live_state
-
-    def to_dict(self) -> SerializedCandidateState:
-        return self.to_live_state(self.task.to_live_state()).serialize()
 
 
 __all__ = ["SessionStateInDb", "TaskStateInDb", "CandidateStateInDb"]
