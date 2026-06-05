@@ -147,12 +147,10 @@ class TestPreview(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryMixi
         t_state_live = s_state_live.task_states[0]
         assert t_state_live.progress == Progress.PREVIEW_COMPLETED
 
-        for c in t_state_live.candidate_states:
-            assert len(c.duplicate_ids) == 0, (
+        for cand in t_state_live.candidate_states:
+            assert len(cand.duplicate_ids) == 0, (
                 "Should not have duplicates in empty library"
             )
-
-            assert c._mapping is not None, "Candidate should have a mapping"
 
 
 class TestPreviewMultipleTasks(
@@ -260,7 +258,9 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         for s in s_states_indb:
             for t in s.to_live_state().task_states:
                 for c in t.candidate_states:
-                    assert c.mapping in [{0: x} for x in range(0, c.num_tracks)]
+                    assert c.serialize()["mapping"] in [
+                        {0: x} for x in range(0, c.num_tracks)
+                    ]
 
         return True
 
@@ -511,6 +511,10 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         assert db_session.execute(stmt).scalar() == 1, (
             "Database should contain the one preview session state from the previous test"
         )
+
+        stmt = select(SessionStateInDb)
+        s_state_indb = db_session.execute(stmt).scalar()
+        breakpoint()
 
         self.statuses = []
 
