@@ -9,7 +9,7 @@ from beets_flask.database.models.states import (
     TaskStateInDb,
 )
 from beets_flask.importer.states import CandidateState, SessionState, TaskState
-from beets_flask.importer.types import BeetsImportTask
+from beets_flask.importer.types import BeetsAlbumMatch, BeetsImportTask
 from beets_flask.logger import log
 
 from .base import Context, DBMapper
@@ -97,21 +97,53 @@ class TaskStateMapper(DBMapper[TaskState, TaskStateInDb]):
         return obj
 
     def _to_db(self, obj: TaskState, ctx: Context) -> TaskStateInDb:
+        # Ensure task.items and all candidate mapping keys share identity.
+        # Beets mutates only match.items (via imported_items()) during import,
+        # and DB roundtrips produce divergent Item objects. Collapse all
+        # references here so to_db creates a single Item DB row per logical item.
+        for idx, task_item in enumerate(obj.task.items):
+            for cs in obj.candidate_states:
+                if not isinstance(cs.match, BeetsAlbumMatch):
+                    continue
+                for match_item in cs.match.mapping.keys():
+                    if (
+                        match_item.track == task_item.track
+                        and match_item.title == task_item.title
+                    ):
+                        obj.task.items[idx] = match_item
+                        break
+                else:
+                    continue
+                break
+
+        # Also replace mapping dict keys in ALL candidates so every
+        # candidate shares the same Item objects as task.items.
+        for cs in obj.candidate_states:
+            if not isinstance(cs.match, BeetsAlbumMatch):
+                continue
+            new_map = {}
+            for mi, track in cs.match.mapping.items():
+                for ti in obj.task.items:
+                    if mi.track == ti.track and mi.title == ti.title:
+                        new_map[ti] = track
+                        break
+                else:
+                    new_map[mi] = track
+            cs.match.mapping = new_map
+
         if hasattr(obj.task, "old_paths"):
             old_paths = obj.task.old_paths
         else:
             old_paths = None
 
-        return TaskStateInDb(
+        model = TaskStateInDb(
             id=obj.id,
             toppath=str(obj.toppath).encode("utf-8") if obj.toppath else None,
             paths=obj.task.paths,
             pending_items=[
                 TaskItem(item=self.item_mapper.to_db(i, ctx)) for i in obj.items
             ],
-            candidates=[
-                self.candidate_mapper.to_db(c, ctx) for c in obj.candidate_states
-            ],
+            candidates=[],
             chosen_candidate_id=obj.chosen_candidate_state_id,
             progress=obj.progress.progress,
             choice_flag=obj.task.choice_flag,
@@ -119,6 +151,12 @@ class TaskStateMapper(DBMapper[TaskState, TaskStateInDb]):
             cur_album=obj.task.cur_album,
             old_paths=old_paths,
         )
+        ctx.to_cache[id(obj)] = model
+
+        model.candidates = [
+            self.candidate_mapper.to_db(c, ctx) for c in obj.candidate_states
+        ]
+        return model
 
 
 class CandidateStateMapper(DBMapper[CandidateState, CandidateStateInDb]):
@@ -148,4 +186,5 @@ class CandidateStateMapper(DBMapper[CandidateState, CandidateStateInDb]):
             id=obj.id,
             match=self.match_mapper.to_db(obj.match, ctx),
             duplicate_ids=obj.duplicate_ids,
+            task=self.task_mapper.to_db(obj.task_state, ctx),
         )

@@ -512,10 +512,6 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             "Database should contain the one preview session state from the previous test"
         )
 
-        stmt = select(SessionStateInDb)
-        s_state_indb = db_session.execute(stmt).scalar()
-        breakpoint()
-
         self.statuses = []
 
         exc = await run_import_candidate(
