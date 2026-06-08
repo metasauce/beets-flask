@@ -1,4 +1,5 @@
 import pickle
+from functools import cached_property
 
 from beets_flask.database.models.pending import TaskItem
 from beets_flask.database.models.states import (
@@ -78,6 +79,10 @@ class TaskStateMapper(DBMapper[TaskState, TaskStateInDb]):
         beets_task.old_paths = old_paths  # type: ignore
 
         obj = TaskState(beets_task)
+        # Slightly hacky: we add the task to the cache early to allow
+        # the candidate mapper to find the reference before a return here
+        ctx.from_cache[id(model)] = obj
+
         obj.id = model.id
         obj.created_at = model.created_at
         obj.updated_at = model.updated_at
@@ -119,7 +124,10 @@ class TaskStateMapper(DBMapper[TaskState, TaskStateInDb]):
 class CandidateStateMapper(DBMapper[CandidateState, CandidateStateInDb]):
     def __init__(self) -> None:
         self.match_mapper = MatchMapper()
-        self.task_mapper = TaskStateMapper()
+
+    @cached_property
+    def task_mapper(self):
+        return TaskStateMapper()
 
     def _from_db(self, model: CandidateStateInDb, ctx: Context) -> CandidateState:
         obj = CandidateState(
