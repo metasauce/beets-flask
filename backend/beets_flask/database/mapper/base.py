@@ -46,21 +46,22 @@ class DBMapper(Protocol[B, M]):
     def to_db(self, obj: B, ctx: Context) -> M:
         """Convert a Beets object into a model instance with caching."""
         key = id(obj)
-        if key in ctx.from_cache:
-            return ctx.from_cache[key]
+        if key in ctx.to_cache:
+            return ctx.to_cache[key]
 
         model = self._to_db(obj, ctx)
-        ctx.from_cache[key] = model
+        ctx.to_cache[key] = model
         return model
 
     def from_db(self, model: M, ctx: Context) -> B:
         """Convert a model instance back into a Beets object with caching."""
         key = id(model)
-        if key in ctx.to_cache:
-            return ctx.to_cache[key]
+        if key in ctx.from_cache:
+            return ctx.from_cache[key]
 
+        # Backward-compatible single-phase path
         obj = self._from_db(model, ctx)
-        ctx.to_cache[key] = obj
+        ctx.from_cache[key] = obj
         return obj
 
     def _to_db(self, obj: B, ctx: Context) -> M:

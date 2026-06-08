@@ -15,7 +15,6 @@ from beets.autotag.hooks import TrackInfo as BeetsTrackInfo
 from beets.autotag.hooks import TrackMatch as BeetsTrackMatch
 
 from beets_flask.database.mapper.base import Context
-from beets_flask.database.mapper.match import ItemMapper, MatchMapper
 from beets_flask.database.mapper.states import (
     CandidateStateMapper,
     SessionStateMapper,
@@ -31,44 +30,6 @@ from beets_flask.importer.states import CandidateState, SessionState, TaskState
 from beets_flask.importer.types import BeetsItem
 from tests.conftest import beets_lib_item
 from tests.unit.test_database.mapper.test_match import create_beets_album_match
-
-# ---------------------------------------------------------------------------
-# Helper: build mapper instances without triggering infinite recursion
-# ---------------------------------------------------------------------------
-# The mappers have a circular __init__ dependency:
-#   TaskStateMapper -> CandidateStateMapper -> TaskStateMapper -> ...
-# We bypass __init__ via object.__new__ and wire up the sub-mappers manually,
-# sharing instances to break the cycle.
-
-
-def _build_candidate_mapper() -> CandidateStateMapper:
-    """Build a CandidateStateMapper with a shared TaskStateMapper to avoid recursion."""
-    cm = object.__new__(CandidateStateMapper)
-    cm.match_mapper = MatchMapper()
-    cm.task_mapper = _build_task_mapper(candidate_mapper=cm)
-    return cm
-
-
-def _build_task_mapper(
-    candidate_mapper: CandidateStateMapper | None = None,
-) -> TaskStateMapper:
-    """Build a TaskStateMapper, optionally reusing an existing CandidateStateMapper."""
-    tm = object.__new__(TaskStateMapper)
-    tm.item_mapper = ItemMapper()
-    if candidate_mapper is not None:
-        tm.candidate_mapper = candidate_mapper
-    else:
-        tm.candidate_mapper = _build_candidate_mapper()
-    return tm
-
-
-def _build_session_mapper(want_to_serialize: bool = False) -> SessionStateMapper:
-    """Build a SessionStateMapper that owns a fresh TaskStateMapper chain."""
-    sm = object.__new__(SessionStateMapper)
-    sm.task_mapper = _build_task_mapper()
-    sm.want_to_serialize = want_to_serialize
-    return sm
-
 
 # ---------------------------------------------------------------------------
 # Helper: create a minimal BeetsImportTask for testing
@@ -102,7 +63,7 @@ class TestSessionStateMapper:
 
     def test_roundtrip_empty_session(self, tmp_path: Path):
         """Roundtrip a SessionState with no tasks."""
-        mapper = _build_session_mapper()
+        mapper = SessionStateMapper()
         ctx = Context()
 
         # Create a live SessionState pointing at a real temp directory
@@ -133,7 +94,7 @@ class TestSessionStateMapper:
         """Roundtrip a SessionState that carries a serialized exception."""
         from beets_flask.server.exceptions import SerializedException
 
-        mapper = _build_session_mapper()
+        mapper = SessionStateMapper()
         ctx = Context()
 
         original = SessionState(tmp_path)
@@ -155,7 +116,7 @@ class TestSessionStateMapper:
 
     def test_roundtrip_with_want_to_serialize(self, tmp_path: Path):
         """When want_to_serialize=True, from_db uses folder.to_live_folder()."""
-        mapper = _build_session_mapper(want_to_serialize=True)
+        mapper = SessionStateMapper(want_to_serialize=True)
         ctx = Context()
 
         original = SessionState(tmp_path)
@@ -175,7 +136,7 @@ class TestTaskStateMapper:
 
     def test_roundtrip_minimal_task(self):
         """Roundtrip a TaskState with no candidates."""
-        mapper = _build_task_mapper()
+        mapper = TaskStateMapper()
         ctx = Context()
 
         beets_task = _make_import_task()
@@ -210,7 +171,7 @@ class TestTaskStateMapper:
 
     def test_roundtrip_with_old_paths(self):
         """Roundtrip a TaskState whose underlying task has old_paths set."""
-        mapper = _build_task_mapper()
+        mapper = TaskStateMapper()
         ctx = Context()
 
         beets_task = _make_import_task()
@@ -231,7 +192,7 @@ class TestTaskStateMapper:
 
     def test_task_items_roundtrip_preserves_fixed_and_flex_values(self):
         """Verify that BeetsItem fixed/flex attrs survive the roundtrip."""
-        mapper = _build_task_mapper()
+        mapper = TaskStateMapper()
         ctx = Context()
 
         # Create an item with specific flex attributes
@@ -254,7 +215,7 @@ class TestTaskStateMapper:
         """Roundtrip a task that has choice_flag, cur_artist, cur_album set."""
         from beets.importer import Action
 
-        mapper = _build_task_mapper()
+        mapper = TaskStateMapper()
         ctx = Context()
 
         beets_task = _make_import_task()
@@ -281,12 +242,12 @@ class TestCandidateStateMapper:
     @pytest.fixture
     def candidate_mapper(self) -> CandidateStateMapper:
         """Build a CandidateStateMapper wired to a shared TaskStateMapper."""
-        return _build_candidate_mapper()
+        return CandidateStateMapper()
 
     @pytest.fixture
     def task_mapper(self) -> TaskStateMapper:
         """Build a standalone TaskStateMapper for use in tests."""
-        return _build_task_mapper()
+        return TaskStateMapper()
 
     def test_roundtrip_album_candidate_no_duplicates(
         self,
@@ -457,7 +418,7 @@ class TestTaskStateWithCandidatesIntegration:
     def test_roundtrip_task_with_candidates(self):
         """Full roundtrip: TaskState with candidates -> TaskStateInDb -> TaskState."""
         # Build shared mappers (avoiding recursion)
-        task_mapper = _build_task_mapper()
+        task_mapper = TaskStateMapper()
         ctx = Context()
 
         # ---- build live TaskState with candidates ----
@@ -471,7 +432,7 @@ class TestTaskStateWithCandidatesIntegration:
             album_id="int-1",
             tracks=[beets_track],
             mapping={item: beets_track},
-            distance_penalties={"source": 0.5},
+            distance_penalties={"data_source": 0.5},
         )
         # Simulate beets setting candidates on the task
         beets_task.candidates = [album_match]
