@@ -441,6 +441,7 @@ class TestTaskStateWithCandidatesIntegration:
         # ---- to_db ----
         model: TaskStateInDb = task_mapper.to_db(task_state, ctx)
         assert len(model.candidates) == 1
+        assert isinstance(model.candidates[0].match, AlbumMatch)
         assert model.candidates[0].match.info.data["album_id"] == "int-1"
 
         # Wire up reverse relationships on the candidate models
