@@ -405,12 +405,14 @@ class CandidateStateInDb(Base):
     def __init__(
         self,
         match: Match,
+        task: TaskStateInDb,
         duplicate_ids: list[str] = [],
         id: str | None = None,
     ):
         super().__init__(id)
 
         self.match = match
+        self.task = task
         self.duplicate_ids = ";".join(map(str, duplicate_ids))
 
 
