@@ -36,6 +36,7 @@ async def stats():
     config_dir = get_config().data.directory
 
     with g.lib.transaction() as tx:
+        # TODO: Genre needs to be split by seperator!
         album_stats = tx.query(
             "SELECT COUNT(*), COUNT(DISTINCT genre), COUNT(DISTINCT label), COUNT(DISTINCT albumartist) FROM albums"
         )

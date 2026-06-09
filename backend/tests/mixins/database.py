@@ -74,6 +74,9 @@ class IsolatedBeetsLibraryMixin(ABC):
         self,
     ):
         """Automatically reset the beets library before and after ALL tests in this class."""
+        import shutil
+        from pathlib import Path
+
         import beets.library
 
         try:
@@ -87,6 +90,14 @@ class IsolatedBeetsLibraryMixin(ABC):
         config = get_config().reload()
         config.data.directory = os.environ["BEETSDIR"] + "/imported"
         config.commit_to_beets()
+
+        # Copy test audio data so computed properties (has_cover_art, etc.)
+        # that read from disk can access the backing files.
+        audio_src = Path(__file__).parent.parent / "data" / "audio"
+        audio_dest = Path(os.environ["HOME"]) / "audio"
+        audio_dest.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(audio_src, audio_dest, dirs_exist_ok=True)
+
         # Reset the beets library to a clean state
         yield
         print("Resetting beets library to a clean state...")
