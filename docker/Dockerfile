@@ -176,10 +176,9 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 RUN apt-get install -y nodejs
 
-# Install pnpm
-RUN npm install --global corepack@latest
-RUN corepack enable pnpm
-RUN corepack use pnpm@latest-10
+# Install pnpm globally (not via corepack) so it's available to all users
+# without per-user cache downloads at runtime.
+RUN npm install --global pnpm@latest-11
 
 # Copy the lock files and install dependencies
 WORKDIR /repo

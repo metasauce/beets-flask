@@ -1,32 +1,21 @@
-import { defineConfig } from "vite";
-import reactProd from "@vitejs/plugin-react";
-import reactDev from "@vitejs/plugin-react-swc";
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
-import tsconfigPaths from "vite-tsconfig-paths";
-import svgr from "vite-plugin-svgr";
-
-const ReactCompilerConfig = {
-    target: "19", // '17' | '18' | '19'
-};
+import { defineConfig } from 'vite';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import { tanstackRouter } from '@tanstack/router-plugin/vite';
+import svgr from 'vite-plugin-svgr';
+import babel from '@rolldown/plugin-babel';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-    const isProd = mode === "production";
+    const isProd = mode === 'production';
 
     return {
         plugins: [
-            tsconfigPaths(),
             tanstackRouter({ autoCodeSplitting: true }),
             // React compiler plugin for production builds
-            isProd
-                ? reactProd({
-                      babel: {
-                          plugins: [
-                              ["babel-plugin-react-compiler", ReactCompilerConfig],
-                          ],
-                      },
-                  })
-                : reactDev(),
+            react(),
+            babel({
+                presets: [reactCompilerPreset()],
+            }),
             svgr(),
         ],
         // not minifying helped when debugging in production mode
@@ -47,24 +36,25 @@ export default defineConfig(({ mode }) => {
              * to and from the same port.
              */
             proxy: {
-                "^/api_v1/.*": {
-                    target: "http://localhost:5001",
+                '^/api_v1/.*': {
+                    target: 'http://localhost:5001',
                     changeOrigin: true,
                     // proxyTimeout: 60000, // 60 seconds, possibly needed for file uploads
                     // timeout: 60000,
                 },
-                "^/socket.io/.*": {
-                    target: "http://localhost:5001",
+                '^/socket.io/.*': {
+                    target: 'http://localhost:5001',
                     changeOrigin: true,
                     ws: true,
                 },
             },
-            allowedHosts: ["belar"],
+            allowedHosts: ['belar'],
         },
+        resolve: { tsconfigPaths: true },
         define: {
             // Load from package.json
             __FRONTEND_VERSION__: JSON.stringify(
-                process.env.npm_package_version || "unk"
+                process.env.npm_package_version || 'unk'
             ),
             __MODE__: JSON.stringify(mode),
         },
