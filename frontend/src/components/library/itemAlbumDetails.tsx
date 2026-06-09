@@ -93,18 +93,18 @@ export function DetailsTable({
         keys = keys.filter((key) => key !== 'name');
     }
 
-    keys = keys as string[];
+    const keys_list: string[] = keys as string[];
 
     const maxKeyWidth = useMemo(() => {
-        const keyWidths = keys.map((key) => key.length);
+        const keyWidths = keys_list.map((key) => key.length);
         return Math.max(...keyWidths) * 10;
-    }, [keys]);
+    }, [keys_list]);
 
     return (
         <TableContainer>
             <Table size="small">
                 <TableBody>
-                    {keys.map((key, i) => {
+                    {keys_list.map((key, i) => {
                         return (
                             <TableRow
                                 key={i}

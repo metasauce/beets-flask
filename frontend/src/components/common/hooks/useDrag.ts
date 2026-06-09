@@ -35,7 +35,7 @@ export function useDragAndDrop(
 
         // use the timeout to reset drag state so users dont have to reload the page
         // if something goes wrong
-        let timeout: NodeJS.Timeout | null = null;
+        let timeout: number | null = null;
         const eventHandlers = {
             dragend: (e: DragEvent) => {
                 setIsDragging(false);
