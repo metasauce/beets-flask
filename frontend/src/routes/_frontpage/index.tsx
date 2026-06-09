@@ -5,13 +5,13 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { inboxStatsQueryOptions } from '@/api/inbox';
 import { libraryStatsQueryOptions } from '@/api/library';
+import { GithubIcon } from '@/components/common/icons';
 import { Link as InternalLink } from '@/components/common/link';
 import { PageWrapper } from '@/components/common/page';
 import {
     InboxStatsCard,
     LibraryStatsCard,
 } from '@/components/frontpage/statsCard';
-import { GithubIcon } from '@/components/common/icons';
 
 /* ------------------------------ Route layout ------------------------------ */
 
