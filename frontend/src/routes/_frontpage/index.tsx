@@ -1,4 +1,4 @@
-import { BookOpenIcon, BugIcon, GithubIcon } from 'lucide-react';
+import { BookOpenIcon, BugIcon } from 'lucide-react';
 import { Box, Link, Typography, useTheme } from '@mui/material';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
@@ -11,6 +11,7 @@ import {
     InboxStatsCard,
     LibraryStatsCard,
 } from '@/components/frontpage/statsCard';
+import { GithubIcon } from '@/components/common/icons';
 
 /* ------------------------------ Route layout ------------------------------ */
 
