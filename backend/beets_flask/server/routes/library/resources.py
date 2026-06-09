@@ -572,9 +572,8 @@ class ItemResponse(ItemResponseMinimal):
     atleast type all field that are used in the frontend.
     """
 
-    # The genre of the item, if multiple genres are present they are
-    # separated by a semicolon (;)
-    genre: str
+    # The genres of the album, empty if none
+    genres: list[str]
 
     # The label in which the item was published
     label: str
@@ -761,9 +760,8 @@ class AlbumResponse(AlbumResponseMinimal):
     atleast type all field that are used in the frontend.
     """
 
-    # The genre of the album, if multiple genres are present they are
-    # separated by a semicolon (;)
-    genre: str
+    # The genres of the album, empty if none
+    genres: list[str]
 
     # The label in which the album was published
     label: str

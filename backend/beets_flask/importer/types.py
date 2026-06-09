@@ -89,7 +89,7 @@ class MusicInfo(ABC):
     data_url: str | None
     data_source: str | None
     year: int | None
-    genre: str | None
+    genres: list[str] | None
     media: str | None
 
     @classmethod

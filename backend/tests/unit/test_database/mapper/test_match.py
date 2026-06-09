@@ -55,7 +55,7 @@ class TestTrackInfoMapper:
         assert result.album == original.album
         assert result.length == original.length
         assert result.index == original.index
-        assert result.genre == original.genre
+        assert result.genres == original.genres
 
 
 class TestAlbumInfoMatcher:
