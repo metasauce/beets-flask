@@ -264,7 +264,7 @@ const importTerminalMutationOptions: UseMutationOptions<
         }
 
         terminalContext.clearInput();
-        let text = '';
+        let text: string;
         const importId = 'cli-' + Math.random().toString(36).slice(2, 16);
         const importDate = formatDate(new Date(), '%Y%m%d_%H%M%S');
         const selectedPaths = selected.paths.map(_escapePathForBash);

@@ -44,7 +44,7 @@ function candidateMatchText({
 }: {
     candidate: SerializedCandidateState;
 }) {
-    let text = '';
+    let text: string;
     const match = 1 - candidate.distance;
     if (match > 0.95) {
         text = 'This is a perfect match!';

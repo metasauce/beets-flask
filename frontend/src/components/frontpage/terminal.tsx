@@ -13,7 +13,7 @@ import { Terminal as xTerminal } from '@xterm/xterm';
 
 import useSocket from '@/components/common/websocket/useSocket';
 
-import 'node_modules/@xterm/xterm/css/xterm.css';
+import '@xterm/xterm/css/xterm.css';
 import { useConfig } from '@/api/config.ts';
 import { Socket } from 'socket.io-client';
 

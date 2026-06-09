@@ -28,7 +28,7 @@ function RouteComponent() {
         const folders = [];
         for (const item of walkFolder(data[0])) {
             if (item.type === 'directory') {
-                folders.push(item as Folder);
+                folders.push(item);
             }
         }
         return folders;
@@ -47,7 +47,7 @@ function RouteComponent() {
             }}
         >
             {flat.map((folder, i) => (
-                <FolderComponent key={i} folder={folder} />
+                <FolderComponent key={i} folder={folder as Folder} />
             ))}
         </Box>
     );

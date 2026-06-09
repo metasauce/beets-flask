@@ -93,7 +93,7 @@ export function StatusContextProvider({
     );
 }
 
-export const useStatusSocket = () => {
+export function useStatusSocket() {
     const context = useContext(StatusContext);
     if (!context) {
         throw new Error(
@@ -101,4 +101,4 @@ export const useStatusSocket = () => {
         );
     }
     return context;
-};
+}
