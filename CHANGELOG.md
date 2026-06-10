@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a database migration setup using [Alembic](https://alembic.sqlalchemy.org/) for future database migrations.
 - Upgraded `beets` from `v2.5.1` to `v2.6.1`
 - Removed unnecessary `nest_asyncio` dependency. 
+- Upgraded a number of frontend dependencies to their latest versions
 
 ## [1.2.0] - 25-12-17
 

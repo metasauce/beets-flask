@@ -37,7 +37,7 @@ export const libraryStatsQueryOptions = () => {
                 lastItemModified: dat.lastItemModified
                     ? new Date(dat.lastItemModified)
                     : undefined,
-            } as LibraryStats;
+            };
         },
     });
 };

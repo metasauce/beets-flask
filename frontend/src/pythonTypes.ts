@@ -115,6 +115,7 @@ export interface LibrarySectionSchema {
 export interface InboxSectionSchema {
     ignore: '_use_beets_ignore' | Array<string>;
     debounce_before_autotag: number;
+    temp_dir: string;
     folders: Record<string, InboxFolderSchema>;
 }
 

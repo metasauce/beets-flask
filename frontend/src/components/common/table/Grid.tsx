@@ -1,5 +1,5 @@
 import { ComponentType } from 'react';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 import { List, ListProps, type RowComponentProps } from 'react-window';
 
 export type CellComponentProps<D extends object> = RowComponentProps<D> & {
@@ -31,10 +31,7 @@ export interface DynamicFlowGridProps<D extends object = object> extends Omit<
 /**
  * A virtualized grid component that efficiently renders items in a fixed-size list layout.
  * We allow the cells to flow dynamically based on the available width.
- *
  * @template D - Type of the data items in the grid
- * @param {FixedGridProps<D>} props - Component props
- * @returns {JSX.Element} A virtualized grid component
  */
 export function DynamicFlowGrid<D extends object>({
     cellHeight,
@@ -47,8 +44,9 @@ export function DynamicFlowGrid<D extends object>({
     ...props
 }: DynamicFlowGridProps<D>) {
     return (
-        <AutoSizer id="dynamic-flow-grid-autosizer">
-            {({ height, width }) => {
+        <AutoSizer
+            id="dynamic-flow-grid-autosizer"
+            renderProp={({ height, width = 0 }) => {
                 // Split all album covers by row to fit width
                 const colCount = Math.floor(width / cellWidth);
                 const rowCount = Math.ceil(cellCount / colCount);
@@ -162,6 +160,6 @@ export function DynamicFlowGrid<D extends object>({
                     </div>
                 );
             }}
-        </AutoSizer>
+        />
     );
 }

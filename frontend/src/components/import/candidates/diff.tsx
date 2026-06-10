@@ -620,7 +620,7 @@ function TrackRow({
 
     let fixedFrom: ItemInfo;
     let fixedTo: ItemInfo | TrackInfo;
-    let missingKind = undefined;
+    let missingKind: 'item' | 'track';
     // simply map the missing item to the present one,
     // then no changes visible.
     if (!from) {

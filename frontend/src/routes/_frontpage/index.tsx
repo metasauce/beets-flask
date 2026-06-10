@@ -1,10 +1,11 @@
-import { BookOpenIcon, BugIcon, GithubIcon } from 'lucide-react';
+import { BookOpenIcon, BugIcon } from 'lucide-react';
 import { Box, Link, Typography, useTheme } from '@mui/material';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { inboxStatsQueryOptions } from '@/api/inbox';
 import { libraryStatsQueryOptions } from '@/api/library';
+import { GithubIcon } from '@/components/common/icons';
 import { Link as InternalLink } from '@/components/common/link';
 import { PageWrapper } from '@/components/common/page';
 import {

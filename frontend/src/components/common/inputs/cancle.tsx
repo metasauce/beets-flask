@@ -31,8 +31,8 @@ export function CancelButton({
     ref?: React.Ref<CancelButtonRef>;
     onCancel: () => void;
 } & Omit<ButtonProps, 'onClick' | 'ref'>) {
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const timeoutRef = useRef<number | null>(null);
+    const intervalRef = useRef<number | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);
     const [remainingTime, setRemainingTime] = useState(0);
 
