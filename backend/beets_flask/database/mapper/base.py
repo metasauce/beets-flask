@@ -17,12 +17,12 @@ class Context:
         self.to_cache: dict[int, Any] = {}
 
 
-class BeetsMapper(Protocol[B, M]):
+class DBMapper(Protocol[B, M]):
     """Protocol for bidirectional mapping between Beets objects and models.
 
     This mapper provides cached conversion in both directions:
-    - Beets → Model via `from_beets`
-    - Model → Beets via `to_beets`
+    - Beets|LiveState → Model via `to_db`
+    - Model → Beets|LiveState via `from_db`
 
     Identity-based caching (via `id()`) ensures:
     - stable object graphs during recursive mapping
@@ -30,34 +30,44 @@ class BeetsMapper(Protocol[B, M]):
     - consistent reuse of already-mapped instances
 
     Subclasses must implement:
-    - `_from_beets`
-    - `_to_beets`
+    - `_to_db`
+    - `_from_db`
+
+    This solves the following problem:
+    Consider we want to deserialize a Task with Candidates C1 and C2, where
+    C1 and C2 hold references to the task and vice versa.
+    - C1(ref to Task)
+    - C2(ref to Task)
+    - Task(C1,C2)
+    We dont want to create copies of the objects, references only!
+    The mapper avoids drilling and thinking about this more than necessary :)
     """
 
-    def from_beets(self, obj: B, ctx: Context) -> M:
+    def to_db(self, obj: B, ctx: Context) -> M:
         """Convert a Beets object into a model instance with caching."""
         key = id(obj)
-        if key in ctx.from_cache:
-            return ctx.from_cache[key]
-
-        result = self._from_beets(obj, ctx)
-        ctx.from_cache[key] = result
-        return result
-
-    def to_beets(self, model: M, ctx: Context) -> B:
-        """Convert a model instance back into a Beets object with caching."""
-        key = id(model)
         if key in ctx.to_cache:
             return ctx.to_cache[key]
 
-        result = self._to_beets(model, ctx)
-        ctx.to_cache[key] = result
-        return result
+        model = self._to_db(obj, ctx)
+        ctx.to_cache[key] = model
+        return model
 
-    def _from_beets(self, obj: B, ctx: Context) -> M:
+    def from_db(self, model: M, ctx: Context) -> B:
+        """Convert a model instance back into a Beets object with caching."""
+        key = id(model)
+        if key in ctx.from_cache:
+            return ctx.from_cache[key]
+
+        # Backward-compatible single-phase path
+        obj = self._from_db(model, ctx)
+        ctx.from_cache[key] = obj
+        return obj
+
+    def _to_db(self, obj: B, ctx: Context) -> M:
         """Implement Beets → model conversion."""
         raise NotImplementedError
 
-    def _to_beets(self, model: M, ctx: Context) -> B:
+    def _from_db(self, model: M, ctx: Context) -> B:
         """Implement model → Beets conversion."""
         raise NotImplementedError

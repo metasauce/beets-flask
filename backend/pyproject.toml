@@ -15,7 +15,7 @@ classifiers = [
 dependencies = [
     "quart>=0.20.0",
     "confuse>=2.0.1",
-    "beets==2.7.1",
+    "beets==2.8.0",
     "sqlalchemy>=2.0.35",
     "rq>=2.0.0",
     "watchdog>=5.0.3",
@@ -79,7 +79,6 @@ typed = [
     "types-Deprecated",
     "types-aiofiles",
     "types-pyyaml",
-    "pandas-stubs",
 ]
 
 [build-system]

@@ -67,11 +67,12 @@ class TestTaskState(StateTest):
         assert task_state.items == [self.task.items[0]]
         assert task_state.progress == Progress.NOT_STARTED
 
-        assert len(task_state.candidate_states) == len(self.task.candidates)
+        assert len(task_state.candidate_states) == len(self.task.candidates or [])
 
     def test_best_candidate(self):
         task_state = self.task_state
         assert task_state.best_candidate_state is not None
+        assert self.task.candidates is not None
         assert task_state.best_candidate_state.match is self.task.candidates[0]
 
         self.task.candidates = []
@@ -115,6 +116,7 @@ class TestCandidateState(StateTest):
 
         assert isinstance(candidate, CandidateState)
         assert candidate.id is not None
+        assert task.candidates is not None
         assert candidate.match == task.candidates[0]
         assert candidate.task_state == self.task_state
         assert candidate.type == "album"
@@ -127,11 +129,6 @@ class TestCandidateState(StateTest):
         assert candidate.num_items == len(candidate.items)
         assert candidate.url == task.candidates[0].info.data_url
         assert candidate.url == "url"
-
-        # _mapping is set statically in the user_query stage, not via fixture.
-        # but mapping has a fallback that uses candidate.match.mapping
-        assert candidate._mapping == candidate.current_mapping
-        assert candidate.mapping == {0: 0}
 
     def test_asis_candidate(self):
         # Test asis candidate (last in list)

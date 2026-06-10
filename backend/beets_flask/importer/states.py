@@ -259,7 +259,9 @@ class TaskState(BaseState):
         # we might run into inconsistencies here, if candidates of the task
         # change. but I do not know when or why they would.
         self.task = task
-        self.candidate_states = [CandidateState(c, self) for c in self.task.candidates]
+        self.candidate_states = [
+            CandidateState(c, self) for c in (self.task.candidates or [])
+        ]
         self.progress = ProgressState()
 
     def __repr__(self) -> str:
@@ -278,7 +280,7 @@ class TaskState(BaseState):
         self,
     ) -> Sequence[BeetsAlbumMatch | BeetsTrackMatch]:
         """Task candidates, i.e. possible matches to choose from."""
-        return self.task.candidates
+        return self.task.candidates or []
 
     @property
     def asis_candidate_id(self) -> str:
@@ -296,11 +298,11 @@ class TaskState(BaseState):
         insert_at: int = 0,
     ) -> list[CandidateState]:
         """Add new candidates to the selection state."""
-        if len(self.task.candidates) == 0 or len(self.candidate_states) == 0:
+        if len(self.candidates) == 0 or len(self.candidate_states) == 0:
             insert_at = 0
 
         # task.candidates is a sequence and thus immutable
-        _ = list(self.task.candidates)
+        _ = list(self.candidates)
         _[insert_at:insert_at] = candidates
         self.task.candidates = _
 
@@ -439,24 +441,15 @@ class CandidateState(BaseState):
     # Reference upwards
     task_state: TaskState
 
-    _mapping: dict[int, int]  # index mapping from items to tracks
-
     def __init__(
         self,
         match: BeetsAlbumMatch | BeetsTrackMatch,
         task_state: TaskState,
-        mapping: dict[int, int] | None = None,
     ) -> None:
         super().__init__()
         self.match = match
         self.duplicate_ids = []  # checked and set by session
         self.task_state = task_state
-
-        # current_mapping is dynamic and looks at the match to generate integer / index mapping
-        # this can cause problems, when loading a previously imported candidate from the db
-        # as, in this case, the mapping is wrong and _index_mapping will fail.
-        # we take care of this by manually overwriting when constructing from the db.
-        self._mapping = mapping or self.current_mapping
 
     def __repr__(self) -> str:
         return (
@@ -468,7 +461,6 @@ class CandidateState(BaseState):
             + f" * penalties={self.penalties}\n"
             + f" * {len(self.items)=}\n"
             + f" * {len(self.tracks)=}\n"
-            + f" * mapping={self.mapping}\n"
         )
 
     @property
@@ -527,7 +519,10 @@ class CandidateState(BaseState):
 
         tracks = [BeetsTrackInfo(**_generate_kwargs(i)) for i in items]
 
-        match = BeetsAlbumMatch(
+        # This is a hacky workaround to not trigger the event for album creation...
+        from beets_flask.database.mapper.match import AlbumMatchMapper
+
+        match = AlbumMatchMapper.create_without_event(
             distance=BeetsDistance(),
             info=BeetsAlbumInfo(
                 tracks=tracks,
@@ -537,6 +532,7 @@ class CandidateState(BaseState):
             extra_tracks=[],
             mapping={i: tracks[idx] for idx, i in enumerate(items)},
         )
+
         candidate = cls(match=match, task_state=task_state)
         candidate.id = task_state.asis_candidate_id
         # As the asis candidate state is not maintained we not to
@@ -649,22 +645,6 @@ class CandidateState(BaseState):
         """Returns True if this is an "as is" candidate."""
         return self.id.startswith("asis-")
 
-    @property
-    def mapping(self) -> dict[int, int]:
-        return self._mapping
-
-    @property
-    def current_mapping(self) -> dict[int, int]:
-        """Get the current mapping from items to tracks, calculated from the match."""
-        if isinstance(self.match, BeetsAlbumMatch):
-            return _index_mapping(
-                self.match.mapping,
-                self.items,
-                self.tracks,
-            )
-
-        raise ValueError("Current mapping only available for album matches.")
-
     # ------------------------------------ utility ----------------------------------- #
 
     def identify_duplicates(self, lib: BeetsLibrary | None = None) -> list[BeetsAlbum]:
@@ -723,29 +703,26 @@ class CandidateState(BaseState):
         # we lift the match.info to reduce nesting in the frontend.
         info: TrackInfo | AlbumInfo
         tracks: list[TrackInfo]
-        mapping: dict[int, int] = {}
+        mapping: dict[int, int]
 
-        if isinstance(self.match.info, BeetsTrackInfo):
+        if isinstance(self.match, BeetsTrackMatch):
             # This hardly ever happens, we might support this more in the future
             info = TrackInfo.from_beets(self.match.info)
             tracks = [TrackInfo.from_beets(self.match.info)]
-        elif isinstance(self.match.info, BeetsAlbumInfo):
+            mapping = {}
+        elif isinstance(self.match, BeetsAlbumMatch):
             info = AlbumInfo.from_beets(self.match.info)
-
             # Map beets types to our types, allows serialization magic
             tracks = [TrackInfo.from_beets(track) for track in self.match.info.tracks]
-
-            # mapping = _index_mapping(
-            #     self.match.mapping,  # type: ignore
-            #     self.items,
-            #     self.tracks,
-            # )
-            mapping = self.mapping
-
+            mapping = _index_mapping(
+                self.match.mapping,
+                self.items,
+                self.tracks,
+            )
         else:
             raise ValueError(f"Unknown type of matchinfo {type(self.match.info)}")
 
-        res = SerializedCandidateState(
+        return SerializedCandidateState(
             **super().serialize(),
             penalties=self.penalties,
             duplicate_ids=self.duplicate_ids,
@@ -756,8 +733,6 @@ class CandidateState(BaseState):
             mapping=mapping,
         )
 
-        return res
-
 
 def _index_mapping(
     mapping: dict[BeetsItem, BeetsTrackInfo],
@@ -766,8 +741,8 @@ def _index_mapping(
 ) -> dict[int, int]:
     """Helper to create an index mapping from items to tracks.
 
-    the mapping of a beets albummatch uses objects, but we don not want
-    to send them over redundantly. convert to an index mapping,
+    The mapping of a beets albummatch uses objects, but we dont want
+    to send them over redundantly. Convert to an index mapping,
     where first index is in self.items, and second is in self.match.info.tracks
 
     This is used to serialize the mapping of a candidate state.
@@ -876,7 +851,10 @@ class SerializedCandidateState(SerializedBaseState):
 
     info: TrackInfo | ItemInfo | AlbumInfo
 
-    # Mapping from items to tracks index based
+    # We need a way to reconstruct the AlbumMatch.mapping in the frontend
+    # Without sending duplicate objects. we opted for index based mapping
+    # for the transfer layer
+    # TODO: Might make sense to use ids here and adjust the frontend
     mapping: dict[int, int]
     tracks: list[TrackInfo]
 

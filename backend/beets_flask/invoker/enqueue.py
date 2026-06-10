@@ -458,6 +458,7 @@ async def run_preview(
             )
             max_rev = db_session.execute(stmt).scalar_one_or_none()
             new_rev = 0 if max_rev is None else max_rev + 1
+
             s_state_indb = SessionStateInDb.from_live_state(p_session.state)
             s_state_indb.folder_revision = new_rev
 
