@@ -11,7 +11,9 @@ log "Starting development environment..."
 
 
 cd /repo/frontend
-
+# pnpm want to overwrite locally isntalled packages and has a user prompt here
+# ci=true skips this prompt
+export CI="true"
 # pnpm run build:dev &  # use this for debugging with ios, port 5001 (no cors allowed)
 pnpm run dev & # normal dev, port 5173
 vite_pid=$!
