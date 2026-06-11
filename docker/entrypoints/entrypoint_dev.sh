@@ -20,7 +20,8 @@ vite_pid=$!
 sleep 3  # Give Vite a moment to start
 if ! kill -0 $vite_pid 2>/dev/null; then
     log_warning "starting vite failed, will try to fix this by installing dependencies ..."
-    pnpm install
+    pnpm approve-builds --all
+    pnpm install --frozen-lockfile
     pnpm run dev &
 fi
 

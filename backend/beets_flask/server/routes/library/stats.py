@@ -5,6 +5,7 @@ from quart import Blueprint, g, jsonify
 
 from beets_flask.config import get_config
 from beets_flask.disk import dir_size
+from beets_flask.importer.types import BEETS_DB_MULTI_VALUE_DELIMITER
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -36,7 +37,7 @@ async def stats():
     config_dir = get_config().data.directory
 
     with g.lib.transaction() as tx:
-        # TODO: Genre needs to be split by seperator!
+
         album_stats = tx.query(
             "SELECT COUNT(*), COUNT(DISTINCT genre), COUNT(DISTINCT label), COUNT(DISTINCT albumartist) FROM albums"
         )
@@ -44,12 +45,24 @@ async def stats():
             "SELECT COUNT(*), MAX(added), MAX(mtime), SUM(length) FROM items"
         )
 
+        genre_rows = tx.query("""
+            SELECT DISTINCT TRIM(genres) AS genres
+            FROM albums
+            WHERE genres IS NOT NULL AND TRIM(genres) != ''
+        """)
+        genres = sorted({
+            g.strip()
+            for row in genre_rows
+            for g in row["genres"].split(BEETS_DB_MULTI_VALUE_DELIMITER)
+            if g.strip()
+        })
+
     ret: LibraryStats = {
         "libraryPath": str(config_dir),
         "items": items_stats[0][0],
         "albums": album_stats[0][0],
         "artists": album_stats[0][3],
-        "genres": album_stats[0][1],
+        "genres": len(genres),
         "labels": album_stats[0][2],
         "size": dir_size(Path(config_dir)),
         "lastItemAdded": (
