@@ -37,9 +37,8 @@ async def stats():
     config_dir = get_config().data.directory
 
     with g.lib.transaction() as tx:
-
         album_stats = tx.query(
-            "SELECT COUNT(*), COUNT(DISTINCT genre), COUNT(DISTINCT label), COUNT(DISTINCT albumartist) FROM albums"
+            "SELECT COUNT(*), COUNT(DISTINCT label), COUNT(DISTINCT albumartist) FROM albums"
         )
         items_stats = tx.query(
             "SELECT COUNT(*), MAX(added), MAX(mtime), SUM(length) FROM items"
@@ -50,12 +49,14 @@ async def stats():
             FROM albums
             WHERE genres IS NOT NULL AND TRIM(genres) != ''
         """)
-        genres = sorted({
-            g.strip()
-            for row in genre_rows
-            for g in row["genres"].split(BEETS_DB_MULTI_VALUE_DELIMITER)
-            if g.strip()
-        })
+        genres = sorted(
+            {
+                g.strip()
+                for row in genre_rows
+                for g in row["genres"].split(BEETS_DB_MULTI_VALUE_DELIMITER)
+                if g.strip()
+            }
+        )
 
     ret: LibraryStats = {
         "libraryPath": str(config_dir),
