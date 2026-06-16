@@ -56,7 +56,7 @@ As the minimum, you need to update the information about your music folders. Edi
 directory: /music_path/clean/
 ```
 
-Please checkout the [configuration](configuration.md) page for more customization options and further 
+Please checkout the [configuration](configuration.md) page for more customization options and further
 details about the configuration files.
 
 ### Use your existing beets library
@@ -75,7 +75,13 @@ volumes:
 
 Make sure that the `library` location in your beets `config.yaml` is either set to the path _inside_ the container, or not specified (the default should work).
 
-Note that `/music_path/clean/` needs to be consistent inside and outside of the container. Otherwise beets will not be able to manage files correctly. For instance if your music is in `/home/user/music/`, you should mount with `/home/user/music/:/home/user/music/`.
+```{note}
+The `/music_path/clean/` needs to be consistent inside and outside of the container. Otherwise beets will not be able to manage files correctly. For instance if your music is in `/home/user/music/`, you should mount with `/home/user/music/:/home/user/music/`.
+```
+
+```{warning}
+You might get mixed results if your beets library comes from a newer version than we ship with beets-flask. Beets currently does not handle library downgrades. **Make a backup first!**
+```
 
 ### To start from scratch or with a copy of your existing library
 
