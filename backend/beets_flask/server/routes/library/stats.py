@@ -62,9 +62,9 @@ async def stats():
         "libraryPath": str(config_dir),
         "items": items_stats[0][0],
         "albums": album_stats[0][0],
-        "artists": album_stats[0][3],
+        "artists": album_stats[0][2],
         "genres": len(genres),
-        "labels": album_stats[0][2],
+        "labels": album_stats[0][1],
         "size": dir_size(Path(config_dir)),
         "lastItemAdded": (
             round(items_stats[0][1] * 1000) if items_stats[0][1] is not None else None
