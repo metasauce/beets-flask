@@ -3,7 +3,7 @@ revision = 3
 requires-python = "==3.12.*"
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-06-13T17:44:14.659653Z"
 exclude-newer-span = "P3D"
 
 [[package]]
@@ -203,7 +203,7 @@ wheels = [
 
 [[package]]
 name = "beets"
-version = "2.9.0"
+version = "2.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -221,9 +221,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unidecode" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/9b/c27bd0c1982e22594310654ec0ac861a89beec02b65b9f03057c10e753b1/beets-2.9.0.tar.gz", hash = "sha256:3669354d0198d5b7a0a74bc6fbdcc2caaccc9cd6e02d77860310adf9b131a141", size = 2233449, upload-time = "2026-04-11T11:57:31.933Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/de/d7caf1c5c67986eaf9e99e5ba78ac4cf4b0f429f2b06b180f8a3b9c35159/beets-2.10.0.tar.gz", hash = "sha256:af2ca69e0dfd8281b921d71834ec4a0d04e7ea61a9afc69f90dd63c1454cbfca", size = 2282966, upload-time = "2026-04-19T19:11:20.777Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/54/52/ab6d87938777791fc3a07313d1d486cef661ab4d1fcb382eae78c9fb72ea/beets-2.9.0-py3-none-any.whl", hash = "sha256:4283a0b74e6d9bd1cffc0b47e130648dd352de03e2f110a56a8538806fa9f00f", size = 624258, upload-time = "2026-04-11T11:57:30.24Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/28/ac07f025b86735c6913af8d25911b951e0aca0968cc81c083c970da57ed6/beets-2.10.0-py3-none-any.whl", hash = "sha256:8ae79a7cad92913dc440c3d32612e8b685c6b60927a328678b97c690ea91894f", size = 631163, upload-time = "2026-04-19T19:11:18.926Z" },
 ]
 
 [[package]]
@@ -315,7 +315,7 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "alembic", specifier = ">=1.18.4" },
-    { name = "beets", specifier = "==2.9.0" },
+    { name = "beets", specifier = "==2.10.0" },
     { name = "cachetools", specifier = ">=5.3.3" },
     { name = "confuse", specifier = ">=2.0.1" },
     { name = "deprecated", specifier = ">=1.2.18" },
