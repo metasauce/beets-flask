@@ -45,7 +45,9 @@ def setup_and_teardown(tmpdir_factory):
 
     # Let's not create default configs that wouldnt pass our tests
     with open(tmp_dir / "beets-flask/config.yaml", "w") as f:
-        yaml.dump({"gui": {"num_preview_workers": 4}}, f)
+        yaml.dump(
+            {"gui": {"num_preview_workers": 4, "terminal": {"enabled": False}}}, f
+        )
 
     # we have one test that does replacements on this file
     # and assumes the default 4 workers
@@ -80,12 +82,15 @@ def fixture_runner(app):
 # Both for our and the beets database
 
 
-@pytest.fixture(name="db_session_factory")
-def db_session_factory(
-    testapp,
-) -> Callable[..., _GeneratorContextManager[Session, None, None]]:
+@pytest.fixture(name="db_session_factory", scope="session")
+def db_session_factory() -> Callable[
+    ..., _GeneratorContextManager[Session, None, None]
+]:
     from beets_flask.database import db_session_factory
+    from beets_flask.database.setup import _setup_factory, _reset_database
 
+    _setup_factory()
+    _reset_database()
     return db_session_factory
 
 
