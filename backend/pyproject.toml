@@ -1,7 +1,7 @@
 [project]
 name = "beets-flask"
 description = "An opinionated web-interface around the music organizer [beets](https://beets.io/)"
-version = "2.0.0-rc4"
+version = "2.0.0-rc5"
 authors = [
     { name = "F. Paul Spitzner", email = "paul.spitzner@gmail.com" },
     { name = "Sebastian B. Mohr", email = "sebastian@mohrenclan.de" },
@@ -98,7 +98,7 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
-"**/alembic/**/*" = ["D","I"]
+"**/alembic/**/*" = ["D", "I"]
 
 [tool.ruff.lint]
 select = [
@@ -155,13 +155,7 @@ allow_redefinition = true
 
 [[tool.mypy.overrides]]
 # Suppresses error messages about imports that cannot be resolved.
-module = [
-    "socketio.*",
-    "confuse.*",
-    "mediafile.*",
-    "beetsplug.*",
-    "eyconf.*",
-]
+module = ["socketio.*", "confuse.*", "mediafile.*", "beetsplug.*", "eyconf.*"]
 ignore_missing_imports = true
 follow_untyped_imports = true
 
