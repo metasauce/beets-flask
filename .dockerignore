@@ -28,6 +28,7 @@
 !frontend/index.html
 !frontend/package.json
 !frontend/pnpm-lock.yaml
+!frontend/pnpm-workspace.yaml
 !frontend/postcss.config.js
 !frontend/tailwind.config.js
 !frontend/tsconfig.json

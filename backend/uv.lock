@@ -3,7 +3,7 @@ revision = 3
 requires-python = "==3.12.*"
 
 [options]
-exclude-newer = "2026-06-13T19:06:58.393789Z"
+exclude-newer = "2026-06-13T19:59:13.53704Z"
 exclude-newer-span = "P3D"
 
 [[package]]
@@ -228,7 +228,7 @@ wheels = [
 
 [[package]]
 name = "beets-flask"
-version = "2.0.0rc4"
+version = "2.0.0rc5"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
