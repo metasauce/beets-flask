@@ -227,16 +227,16 @@ class TestIsWithinMultiDir:
         [Path, str],
     )
     def test_is_within_multi_dir(self, type, s_base):
-        from beets_flask.disk import is_within_multi_dir
+        from beets_flask.disk import _is_within_multi_dir
 
-        assert is_within_multi_dir(type(s_base + "/artist/album_multi/CD1"))
-        assert is_within_multi_dir(type(s_base + "/artist/album_multi/CD2"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_multi/CD1"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_multi/CD2"))
         # should work with and without trailing slashes
-        assert is_within_multi_dir(type(s_base + "/artist/album_rogue/CD1"))
-        assert is_within_multi_dir(type(s_base + "/artist/album_rogue/CD2"))
-        assert not is_within_multi_dir(type(s_base + "/artist/album_multi/"))
-        assert not is_within_multi_dir(type(s_base + "/artist/album_good/"))
-        assert not is_within_multi_dir(type(s_base + "/artist/archive/foo.zip"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_rogue/CD1"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_rogue/CD2"))
+        assert not _is_within_multi_dir(type(s_base + "/artist/album_multi/"))
+        assert not _is_within_multi_dir(type(s_base + "/artist/album_good/"))
+        assert not _is_within_multi_dir(type(s_base + "/artist/archive/foo.zip"))
 
 
 # input, use_parent_for_multidisc, expected
