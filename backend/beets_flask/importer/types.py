@@ -21,6 +21,7 @@ from beets.autotag.hooks import AlbumInfo as BeetsAlbumInfo
 from beets.autotag.hooks import AlbumMatch as BeetsAlbumMatch
 from beets.autotag.hooks import TrackInfo as BeetsTrackInfo
 from beets.autotag.hooks import TrackMatch as BeetsTrackMatch
+from beets.dbcore.types import MULTI_VALUE_DELIMITER as BEETS_DB_MULTI_VALUE_DELIMITER
 from beets.importer import Action as BeetsImportAction
 from beets.importer import ImportSession as BeetsImportSession
 from beets.importer import ImportTask as BeetsImportTask
@@ -47,6 +48,7 @@ __all__ = [
     "BeetsImportAction",
     "BeetsImportTask",
     "BeetsImportSession",
+    "BEETS_DB_MULTI_VALUE_DELIMITER",
 ]
 
 # to be consistent with beets, here we do not use an enum.
@@ -89,7 +91,7 @@ class MusicInfo(ABC):
     data_url: str | None
     data_source: str | None
     year: int | None
-    genre: str | None
+    genres: list[str] | None
     media: str | None
 
     @classmethod

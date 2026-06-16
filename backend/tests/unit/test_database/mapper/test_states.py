@@ -197,7 +197,7 @@ class TestTaskStateMapper:
 
         # Create an item with specific flex attributes
         item = beets_lib_item(title="roundtrip-title", artist="roundtrip-artist")
-        item.genre = "roundtrip-genre"  # flex attr via __setattr__
+        item.genres = ["roundtrip-genre", "foo"]  # flex attr via __setattr__
 
         beets_task = _make_import_task(items=[item])
         original = TaskState(beets_task)
@@ -209,7 +209,7 @@ class TestTaskStateMapper:
         result_item = result.items[0]
         assert result_item.title == "roundtrip-title"
         assert result_item.artist == "roundtrip-artist"
-        assert result_item.genre == "roundtrip-genre"
+        assert result_item.genres == ["roundtrip-genre", "foo"]
 
     def test_roundtrip_with_choice_flag_and_metadata(self):
         """Roundtrip a task that has choice_flag, cur_artist, cur_album set."""

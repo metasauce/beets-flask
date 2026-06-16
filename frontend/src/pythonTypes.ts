@@ -156,7 +156,7 @@ export interface AlbumResponseExpanded {
     albumartist: string;
     year: number;
     added: Date;
-    genre: string;
+    genres: Array<string>;
     label: string;
     sources: Array<AlbumSource>;
     items: Array<ItemResponse>;
@@ -171,7 +171,7 @@ export interface AlbumResponse {
     albumartist: string;
     year: number;
     added: Date;
-    genre: string;
+    genres: Array<string>;
     label: string;
     sources: Array<AlbumSource>;
 }
@@ -320,7 +320,7 @@ export interface ItemResponse {
     album_id: number;
     isrc?: string;
     size: number;
-    genre: string;
+    genres: Array<string>;
     label: string;
     samplerate: number;
     bitrate: number;
@@ -346,7 +346,7 @@ export interface MusicInfo {
     data_url: null | string;
     data_source: null | string;
     year: null | number;
-    genre: null | string;
+    genres: Array<string> | null;
     media: null | string;
 }
 
