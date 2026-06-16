@@ -10,7 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ⚠️ Breaking Changes ⚠️
 
 - **Base image changed**: The container base image is now `python:3.12-slim` (previously `python:3.11-alpine`). If you use a custom `startup.sh`, please verify compatibility, as Alpine-specific tooling and shell behavior may differ [#212](https://github.com/pSpitzner/beets-flask/issues/212)
-- Changed config option: `gui.inbox.folders.your_inbox.autotag` no longer accepts `false`, use `"off"` instead. (This was needed for consistency for the new config validation)
+- **Upgraded `beets` from `v2.5.1` to `v2.11.0`**
+    - This contains many changes and improvements, including some plugins.
+    - See the changelog at [beets.readthedocs.io](https://beets.readthedocs.io/en/stable/changelog.html)
+- Changed config options (beets-flask):
+    - `gui.inbox.folders.your_inbox.autotag` no longer accepts `false`, use `"off"` instead. (This was needed for consistency for the new config validation)
+- Changed config options (beets):
+    - `fetchart.sources` were changed, if you get errors from our previous defaults: change to `"*"`
+
 
 ### Added
 
@@ -33,9 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - We now use `uv` to manage python dependencies and run scripts in CI/CD. This should improve dependency resolution and installation times.
 - We now ship a static ffmpeg binary instead of installing ffmpeg via apt. This should reduce image size and improve compatibility across different host systems.
 - Added a database migration setup using [Alembic](https://alembic.sqlalchemy.org/) for future database migrations.
-- Upgraded `beets` from `v2.5.1` to `v2.6.1`
-- Removed unnecessary `nest_asyncio` dependency. 
-- Upgraded a number of frontend dependencies to their latest versions
+- Removed unnecessary `nest_asyncio` dependency.
+- Upgraded a number of frontend dependencies to their latest versions.
 
 ## [1.2.0] - 25-12-17
 

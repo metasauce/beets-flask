@@ -70,7 +70,7 @@ threaded: no
 fetchart:
     minwidth: 500
     enforce_ratio: 10px # yes|no or tolerance around 1:1 ratio
-    sources: coverart filesystem itunes amazon spotify albumart fanarttv
+    sources: "*"
 
 embedart:
     auto: yes

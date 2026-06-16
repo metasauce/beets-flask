@@ -14,11 +14,7 @@ from typing import (
     Literal,
 )
 
-from beets.importer.tasks import (
-    MULTIDISC_MARKERS,
-    MULTIDISC_PAT_FMT,
-    albums_in_dir,
-)
+from beets.importer.tasks import MULTIDISC_PATTERNS, albums_in_dir
 from beets.util import bytestring_path
 from cachetools import Cache, TTLCache, cached
 from natsort import os_sorted
@@ -334,7 +330,7 @@ def album_folders_from_track_paths(
         parents: set[Path] = set()
         children: set[Path] = set()
         for folder in album_folders:
-            if is_within_multi_dir(folder):
+            if _is_within_multi_dir(folder):
                 parents.add(folder.parent)
                 children.add(folder)
 
@@ -386,7 +382,6 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
         list[Path]
     """
 
-    # FIXME: For backwards compatibility, we allow a string as input
     if isinstance(root_dir, str):
         root_dir = Path(root_dir)
 
@@ -423,22 +418,19 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
     return [Path(f.decode("utf-8")) for f in folders]
 
 
-def is_within_multi_dir(path: Path | str) -> bool:
+def _is_within_multi_dir(path: Path | str) -> bool:
     """
     Minimal version of beets heuristic to check if a string matches a multi-disc pattern.
 
     E.g. "My Album CD1" or "Disc 2" will return True
     """
 
-    # FIXME: For backwards compatibility, we allow a string as input
     if isinstance(path, str):
         path = Path(path)
 
     path_str = path.name  # Use pathlib to get the basename
 
-    for marker in MULTIDISC_MARKERS:
-        p = MULTIDISC_PAT_FMT.replace(b"%s", marker)
-        marker_pat = re.compile(p, re.I)
+    for marker_pat in MULTIDISC_PATTERNS:
         match = marker_pat.match(path_str.encode("utf-8"))
         if match:
             return True

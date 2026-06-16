@@ -3,7 +3,7 @@ revision = 3
 requires-python = "==3.12.*"
 
 [options]
-exclude-newer = "2026-06-13T17:44:14.659653Z"
+exclude-newer = "2026-06-13T19:06:58.393789Z"
 exclude-newer-span = "P3D"
 
 [[package]]
@@ -203,7 +203,7 @@ wheels = [
 
 [[package]]
 name = "beets"
-version = "2.10.0"
+version = "2.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -221,9 +221,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unidecode" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5f/de/d7caf1c5c67986eaf9e99e5ba78ac4cf4b0f429f2b06b180f8a3b9c35159/beets-2.10.0.tar.gz", hash = "sha256:af2ca69e0dfd8281b921d71834ec4a0d04e7ea61a9afc69f90dd63c1454cbfca", size = 2282966, upload-time = "2026-04-19T19:11:20.777Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/f9/243df2679bc0176a425d417f62126600b011f3b2528c8ae90565ab0dfd5c/beets-2.11.0.tar.gz", hash = "sha256:f87fda8b3a723bee59c51a64ba30e94ab35d2658b3cb58c595afa29e75ed8d5f", size = 2298259, upload-time = "2026-05-06T10:07:00.397Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d8/28/ac07f025b86735c6913af8d25911b951e0aca0968cc81c083c970da57ed6/beets-2.10.0-py3-none-any.whl", hash = "sha256:8ae79a7cad92913dc440c3d32612e8b685c6b60927a328678b97c690ea91894f", size = 631163, upload-time = "2026-04-19T19:11:18.926Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/36/1dc70c9d412db96870af095b6d8bddde381f6125fde7d1e246a3d974dd3b/beets-2.11.0-py3-none-any.whl", hash = "sha256:f63481ee80f4393a6ad0de939603860d5a52a16d848342d9f51a006593a33da4", size = 642235, upload-time = "2026-05-06T10:06:58.262Z" },
 ]
 
 [[package]]
@@ -315,7 +315,7 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "alembic", specifier = ">=1.18.4" },
-    { name = "beets", specifier = "==2.10.0" },
+    { name = "beets", specifier = "==2.11.0" },
     { name = "cachetools", specifier = ">=5.3.3" },
     { name = "confuse", specifier = ">=2.0.1" },
     { name = "deprecated", specifier = ">=1.2.18" },
