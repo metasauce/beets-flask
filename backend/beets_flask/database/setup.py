@@ -28,7 +28,7 @@ def setup_database(app: Quart | None = None) -> None:
     -------
         None
     """
-    __setup_factory()
+    _setup_factory()
     if get_flask_config()["RESET_DB_ON_START"]:
         log.warning("Resetting database due to RESET_DB=True in config")
         _reset_database()
@@ -41,7 +41,7 @@ def setup_database(app: Quart | None = None) -> None:
             session_factory.remove()
 
 
-def __setup_factory():
+def _setup_factory():
     global engine
     global session_factory
 
@@ -76,7 +76,7 @@ def db_session_factory(session: Session | None = None):
         try:
             session = session_factory()
         except NameError:
-            __setup_factory()
+            _setup_factory()
             session = session_factory()
 
     try:

@@ -23,7 +23,7 @@ from beets_flask.logger import log
 def run_migrations() -> None:
     """Run all pending database migrations."""
 
-    alembic_config = Config("alembic.ini")
+    alembic_config = Config(Path(__file__).parent.parent.parent / "alembic.ini")
     db_url = get_flask_config()["DATABASE_URI"]
     engine = create_engine(db_url)
 
