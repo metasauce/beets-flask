@@ -634,8 +634,8 @@ def _repr_Item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseM
             "isrc",
         ]
     else:
-        # Use all keys
-        keys = item.keys(True) + ["name"]
+        # Use all keys, except filesize which would trigger disk io.
+        keys = [k for k in item.keys(computed=True) if k != "filesize"] + ["name"]
 
         # Check data source prefixes:
         # plugins such as spotify, tidal, discogs add a prefix to the id,
