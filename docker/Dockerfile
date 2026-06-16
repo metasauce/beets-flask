@@ -160,8 +160,9 @@ ENTRYPOINT [ \
 
 FROM base AS dev
 
-
 ENV IB_SERVER_CONFIG="dev_docker"
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     apt-get update && \
