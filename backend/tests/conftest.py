@@ -87,7 +87,7 @@ def db_session_factory() -> Callable[
     ..., _GeneratorContextManager[Session, None, None]
 ]:
     from beets_flask.database import db_session_factory
-    from beets_flask.database.setup import _setup_factory, _reset_database
+    from beets_flask.database.setup import _reset_database, _setup_factory
 
     _setup_factory()
     _reset_database()
