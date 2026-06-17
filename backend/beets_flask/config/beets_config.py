@@ -4,7 +4,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Literal, Self, cast
+from typing import Any, Literal, Self, cast
 
 import beets
 import yaml
@@ -31,7 +31,6 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
     def __init__(self):
         """Initialize the config object with the default values."""
         super().__init__(schema=BeetsSchema, data=BeetsSchema())
-        self._config_errors: list[ConfigurationError] = []
         BeetsFlaskConfig.write_examples_as_user_defaults()
         self.reload()
         self.commit_to_beets()
@@ -50,6 +49,15 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         beets_folder = os.getenv("BEETSDIR", os.path.expanduser("~/.config/beets"))
         return Path(beets_folder) / "config.yaml"
 
+    @staticmethod
+    def load_yaml(path: str | Path) -> dict[str, Any]:
+        """Try to load a yaml and reraise errors as configuration errors."""
+        try:
+            with open(path) as f:
+                return yaml.safe_load(f)
+        except (ScannerError, YAMLError) as e:
+            raise ConfigurationError(message=str(e))
+
     def reload(self, extra_yaml_path: str | Path | None = None) -> Self:
         """Reload the config.
 
@@ -62,7 +70,6 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         """
         log.debug("Resetting/Reloading config")
         super().reset()
-        self._config_errors = []
 
         # Config sources:
         # 1. beets defaults
@@ -71,58 +78,20 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         # But: we want to encourage user to add fields that are accessed
         # from _our_ config into the schema.
         # Thus only porting requirement: copy the relevant beets default into the schema
-        #
-        # 2. beets user config
-        # 3. beets-flask user config
+        # 2. beets-flask user config
+        # 3. extra config
 
-        for label, path_fn in [
-            ("beets", self.get_beets_config_path),
-            ("beets-flask", self.get_beets_flask_config_path),
-        ]:
-            path = path_fn()
-            if not path.exists():
-                continue
-            try:
-                with open(path) as f:
-                    loaded = yaml.safe_load(f)
-                if not isinstance(loaded, dict):
-                    raise yaml.YAMLError("Config is not a YAML dictionary.")
-                self.update(loaded)
-            except ScannerError as e:
-                message = str(e)
-                # handle using beets template function identifier as the first character
-                if "'%' that cannot start any token" in str(e):
-                    message += "\nTo use the template function you should surround the content with quotes"
-                    log.error(
-                        f"Unquoted template function starting value in {label} config at {path}: {e}"
-                    )
-                else:
-                    log.error(f"Failed to parse {label} config at {path}: {e}")
-                self._config_errors.append(
-                    ConfigurationError(message=message, section=f"{path}")
-                )
-            except YAMLError as e:
-                print(e.__class__)
-                log.error(f"Failed to parse {label} config at {path}: {e}")
-                self._config_errors.append(
-                    ConfigurationError(message=str(e), section=f"{path}")
-                )
-
-        # extra
+        sources: list[Path] = [
+            self.get_beets_config_path(),
+            self.get_beets_flask_config_path(),
+        ]
         if extra_yaml_path is not None:
-            # Dev/test — still raise immediately so CI catches it
-            with open(extra_yaml_path) as f:
-                loaded = yaml.safe_load(f)
-            if not isinstance(loaded, dict):
-                raise ValueError("Extra config is not a valid YAML dictionary.")
-            self.update(loaded)
+            sources.append(Path(extra_yaml_path))
 
-        try:
-            self.validate()
-        except MultiConfigurationError as e:
-            self._config_errors.extend(e.errors)
-        except ConfigurationError as e:
-            self._config_errors.append(e)
+        for path in sources:
+            if path.exists():
+                # EYConfs update method also validates against the schema
+                self.update(self.load_yaml(path))
 
         return self
 
@@ -306,14 +275,6 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         if gui_globs is None or gui_globs == "_use_beets_ignore":
             gui_globs = self.data.ignore
         return cast(list[str], gui_globs)
-
-    @property
-    def errors(self) -> list[ConfigurationError]:
-        return getattr(self, "_config_errors", [])
-
-    @property
-    def is_healthy(self) -> bool:
-        return len(self.errors) == 0
 
 
 config: BeetsFlaskConfig | None = None
