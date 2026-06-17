@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 from eyconf.validation import MultiConfigurationError
+from eyconf.validation.exceptions import ConfigurationError
 
 from beets_flask.config import get_config
 
@@ -106,41 +107,20 @@ class TestConfig:
         with open(beets_flask_path, "w") as f:
             f.write(content)
 
-    def test_config_can_handle_yaml_errors(self):
-        """Test that loading invalid config still works."""
+    def test_reraise_yaml_errors(self, tmp_path):
+        """Yaml errors need to be raised as configuration errors!"""
+        invalid_config = tmp_path / "invalid_extra.yaml"
+        with open(invalid_config, "w") as f:
+            # use an unquoted template function in the paths section
+            f.write("""
+    paths:
+        albumtype:compilation: %if{$test,Albums/$albumartist/,Compilations/}$album%aunique{}/$title
+            """)
 
         config = get_config(force_reload=True)
-        beets_path = config.get_beets_config_path()
-        config.write_examples_as_user_defaults()
-        assert beets_path.exists()
 
-        with open(beets_path) as f:
-            content = f.read()
-        # use an unquoted template function in the paths section
-        invalid_yaml = """
-paths:
-    albumtype:compilation: %if{$test,Albums/$albumartist/,Compilations/}$album%aunique{}/$title
-        """
-        invalid_content = content + invalid_yaml
-        with open(beets_path, "w") as f:
-            f.write(invalid_content)
-
-        config.reload()
-        assert config.is_healthy == False
-        assert len(config.errors) == 1
-
-        # fix invalid value
-        valid_yaml = """
-paths:
-    albumtype:compilation: "%if{$test,Albums/$albumartist/,Compilations/}$album%aunique{}/$title"
-"""
-        valid_content = content + valid_yaml
-        with open(beets_path, "w") as f:
-            f.write(valid_content)
-
-        config.reload()
-        assert config.is_healthy == True
-        assert len(config.errors) == 0
+        with pytest.raises(ConfigurationError):
+            config.reload(invalid_config)
 
     def test_commit_to_beets(self):
         """Test that committing to beets config works as expected."""
