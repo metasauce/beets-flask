@@ -95,9 +95,6 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
     # could minimize the ram usage
     df = pl.LazyFrame(rows, schema=["artist", "added"], orient="row")
 
-    # Convert added timestamps (beets stores as seconds, convert to milliseconds)
-    df = df.with_columns((pl.col("added") * 1000).alias("added"))
-
     # Split artist strings into lists and explode into separate rows
     if len(artist_separators()) > 0:
         # split does not yet support regex...
@@ -111,6 +108,7 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
         ).explode("artist")
 
     # Strip whitespace and process
+    # Convert added timestamps (beets stores as seconds, convert to milliseconds)
     df = df.with_columns(pl.col("artist").str.strip_chars(), pl.col("added") * 1000)
 
     # Group by artist and aggregate using lazy operations
