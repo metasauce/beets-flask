@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed tmux terminal could not start in some environments if `SHELL` was not set currently. We now always start a bash shell [#282](https://github.com/pSpitzner/beets-flask/issues/282)
 - Container user `beetle` now uses bash terminal by default and activates the uv environment automatically.
 - Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/pSpitzner/beets-flask/pull/305)
-
+- Fixed an issue with timestamps shown in the library view [#289](https://github.com/pSpitzner/beets-flask/issues/289)
 
 ### Other (dev)
 
