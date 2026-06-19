@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a potential memory leak when checking if files are archives. We now only check the file extension instead of trying to open the file, which should avoid the issue with `tarfile.is_tarfile` [#258](https://github.com/pSpitzner/beets-flask/issues/258)
 - Fixed tmux terminal could not start in some environments if `SHELL` was not set currently. We now always start a bash shell [#282](https://github.com/pSpitzner/beets-flask/issues/282)
 - Container user `beetle` now uses bash terminal by default and activates the uv environment automatically.
+- Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/pSpitzner/beets-flask/pull/305)
 
 
 ### Other (dev)

@@ -4,7 +4,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Literal, Self, cast
+from typing import Any, Literal, Self, cast
 
 import beets
 import yaml
@@ -13,6 +13,8 @@ from beets.plugins import get_plugin_names, load_plugins
 from eyconf import ConfigExtra
 from eyconf.asdict import asdict_with_aliases
 from eyconf.validation import ConfigurationError, MultiConfigurationError
+from yaml import YAMLError
+from yaml.scanner import ScannerError
 
 from beets_flask.logger import log
 from beets_flask.utility import deprecation_warning
@@ -47,54 +49,50 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         beets_folder = os.getenv("BEETSDIR", os.path.expanduser("~/.config/beets"))
         return Path(beets_folder) / "config.yaml"
 
+    @staticmethod
+    def load_yaml(path: str | Path) -> dict[str, Any]:
+        """Try to load a yaml and reraise errors as configuration errors."""
+        try:
+            with open(path) as f:
+                return yaml.safe_load(f)
+        except (ScannerError, YAMLError) as e:
+            raise ConfigurationError(message=str(e))
+
     def reload(self, extra_yaml_path: str | Path | None = None) -> Self:
-        """Reset the config to default values.
+        """Reload the config.
 
         This loads the user config from yaml files after resetting to defaults.
 
         The `extra_yaml_path` argument is mainly for testing purposes, to add a last
         yaml layer with high priority.
+
+        Any error messages (YAML parsing, validation) are stored for upstream handling
         """
         log.debug("Resetting/Reloading config")
         super().reset()
 
-        # There are 3 potential sources
-
+        # Config sources:
         # 1. beets defaults
-        # We do not load them into _out_ config.
+        # We do not load them into _our_ config.
         # They are still available in the beets_config property.
         # But: we want to encourage user to add fields that are accessed
         # from _our_ config into the schema.
         # Thus only porting requirement: copy the relevant beets default into the schema
+        # 2. beets-flask user config
+        # 3. extra config
 
-        # 2. beets user config
-        if self.get_beets_config_path().exists():
-            with open(self.get_beets_config_path()) as f:
-                loaded = yaml.safe_load(f)
-                if not isinstance(loaded, dict):
-                    raise ValueError("Beets config is not a valid YAML dictionary.")
-                # EYConfs update method also validates against the schema
-                self.update(loaded)
-
-        # 3. beets-flask user config
-        if self.get_beets_flask_config_path().exists():
-            with open(self.get_beets_flask_config_path()) as f:
-                loaded = yaml.safe_load(f)
-                if not isinstance(loaded, dict):
-                    raise ValueError(
-                        "Beets flask config is not a valid YAML dictionary."
-                    )
-                self.update(loaded)
-
-        # extra
+        sources: list[Path] = [
+            self.get_beets_config_path(),
+            self.get_beets_flask_config_path(),
+        ]
         if extra_yaml_path is not None:
-            with open(extra_yaml_path) as f:
-                loaded = yaml.safe_load(f)
-                if not isinstance(loaded, dict):
-                    raise ValueError("Extra config is not a valid YAML dictionary.")
-                self.update(loaded)
+            sources.append(Path(extra_yaml_path))
 
-        self.validate()
+        for path in sources:
+            if path.exists():
+                # EYConfs update method also validates against the schema
+                self.update(self.load_yaml(path))
+
         return self
 
     def commit_to_beets(self) -> None:
