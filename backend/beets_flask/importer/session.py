@@ -228,29 +228,13 @@ class BaseSession(BeetsImportSession, ABC):
             loghandler=None,
         )
         # Hacky workaround to use our logging, to allow plugins to communicate
+        # TODO: revisit after https://github.com/beetbox/beets/issues/6553 is done
         self.logger.handlers = log.handlers
         log.debug(f"Created new {self.__class__.__name__} for {state.path}")
 
     @property
     def path(self) -> Path:
         return self.state.path
-
-    @deprecated
-    def run_and_capture_output(self) -> tuple[str, str]:
-        """Run the import session and capture the output.
-
-        Uses the original beets import session run method,
-        with lots of overhead.
-        Sets self.preivew to output and error messages occuring during run.
-
-        Returns
-        -------
-            tuple[str, str]: out, err
-        """
-        self.logger.debug(f"{self.paths}")
-        out, err, _ = capture_stdout_stderr(self.run)
-        self.preview = out + "\n\n" + err if err else out
-        return out, err
 
     def get_config_value(self, key: str, type_func: Callable | None = None) -> Any:
         """Get a config value from the overlay or default.
