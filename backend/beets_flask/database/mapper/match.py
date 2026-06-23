@@ -245,7 +245,8 @@ class AlbumMatchMapper(DBMapper[BeetsAlbumMatch, AlbumMatch]):
 
 class ItemMapper(DBMapper[BeetsItem, Item]):
     def _from_db(self, model: Item, ctx) -> BeetsItem:
-        return BeetsItem._awaken(
+        return BeetsItem(
+            db=None,
             fixed_values={k: self._decode(v) for k, v in model.fixed_values.items()},
             flex_values={k: self._decode(v) for k, v in model.flex_values.items()},
         )
