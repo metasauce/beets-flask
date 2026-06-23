@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 from beets import importer
 from beets.autotag.distance import Distance as BeetsDistance
-from beets.autotag.hooks import AlbumMatch as BeetsAlbumMatch
 from beets.autotag.hooks import TrackInfo as BeetsTrackInfo
-from beets.autotag.hooks import TrackMatch as BeetsTrackMatch
+from beets.autotag.match import AlbumMatch as BeetsAlbumMatch
+from beets.autotag.match import TrackMatch as BeetsTrackMatch
 
 from beets_flask.database.mapper.base import Context
 from beets_flask.database.mapper.states import (

@@ -18,11 +18,12 @@ from typing import (
 from beets import autotag
 from beets.autotag.distance import Distance as BeetsDistance
 from beets.autotag.hooks import AlbumInfo as BeetsAlbumInfo
-from beets.autotag.hooks import AlbumMatch as BeetsAlbumMatch
 from beets.autotag.hooks import TrackInfo as BeetsTrackInfo
-from beets.autotag.hooks import TrackMatch as BeetsTrackMatch
+from beets.autotag.match import AlbumMatch as BeetsAlbumMatch
+from beets.autotag.match import TrackMatch as BeetsTrackMatch
 from beets.dbcore.types import MULTI_VALUE_DELIMITER as BEETS_DB_MULTI_VALUE_DELIMITER
 from beets.importer import Action as BeetsImportAction
+from beets.importer import DuplicateAction as BeetsDuplicateAction
 from beets.importer import ImportSession as BeetsImportSession
 from beets.importer import ImportTask as BeetsImportTask
 from beets.library import Album as BeetsAlbum
@@ -35,7 +36,6 @@ __all__ = [
     "TrackInfo",
     "ItemInfo",
     "AlbumInfo",
-    "DuplicateAction",
     # Beets stuff
     "BeetsAlbum",
     "BeetsAlbumInfo",
@@ -48,6 +48,7 @@ __all__ = [
     "BeetsImportAction",
     "BeetsImportTask",
     "BeetsImportSession",
+    "BeetsDuplicateAction",
     "BEETS_DB_MULTI_VALUE_DELIMITER",
 ]
 
