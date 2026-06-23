@@ -1,9 +1,8 @@
-from beets.autotag.distance import Distance
 from beets.autotag.distance import Distance as BeetsDistance
 from beets.autotag.hooks import AlbumInfo as BeetsAlbumInfo
-from beets.autotag.hooks import AlbumMatch as BeetsAlbumMatch
 from beets.autotag.hooks import TrackInfo as BeetsTrackInfo
-from beets.autotag.hooks import TrackMatch as BeetsTrackMatch
+from beets.autotag.match import AlbumMatch as BeetsAlbumMatch
+from beets.autotag.match import TrackMatch as BeetsTrackMatch
 
 from beets_flask.database.mapper.base import Context
 from beets_flask.database.mapper.match import (
@@ -189,14 +188,14 @@ def create_beets_album_match(
     )
 
     # Create Distance with penalties
-    distance = Distance()
+    distance = BeetsDistance()
     for key, value in distance_penalties.items():
         distance.add(key, value)
 
     # Add track-level distances
     if track_distances is not None:
         for track, penalties in track_distances.items():
-            track_distance = Distance()
+            track_distance = BeetsDistance()
             for key, value in penalties.items():
                 track_distance.add(key, value)
             distance.tracks[track] = track_distance
