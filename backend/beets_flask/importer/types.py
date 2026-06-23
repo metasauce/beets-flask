@@ -52,9 +52,12 @@ __all__ = [
     "BEETS_DB_MULTI_VALUE_DELIMITER",
 ]
 
-# to be consistent with beets, here we do not use an enum.
-# (beets uses strings for duplicate actions)
-DuplicateAction = Literal["skip", "keep", "remove", "merge", "ask"]
+
+def default_duplicate_action_from_config(config) -> BeetsDuplicateAction:
+    choice = config["import"]["duplicate_action"].as_choice(
+        BeetsDuplicateAction.choices()
+    )
+    return BeetsDuplicateAction(choice)  # type: ignore[call-arg]
 
 
 class PromptChoice(NamedTuple):
