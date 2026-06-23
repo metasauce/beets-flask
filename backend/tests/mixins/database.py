@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import os
 from abc import ABC
-from collections import namedtuple
 from functools import cached_property
 from typing import TYPE_CHECKING
-from unittest import mock
 
 import pytest
 
@@ -120,9 +118,4 @@ class IsolatedBeetsLibraryMixin(ABC):
         config.data.directory = os.environ["BEETSDIR"] + "/imported"
         config.commit_to_beets()
 
-        # mock needed for the library to be available in the resources endpoints
-        with mock.patch(
-            "beets_flask.server.routes.library.resources.g",
-            namedtuple("g", ["lib", "config"])(lib, None),  # type: ignore[call-arg, arg-type]
-        ):
-            return lib
+        return lib

@@ -21,7 +21,6 @@ from typing import (
 
 from beets import library, plugins
 from beets.importer import (
-    Action,
     ImportTask,
     SentinelImportTask,
 )
@@ -40,7 +39,7 @@ from beets_flask.server.exceptions import (
 )
 
 from .progress import Progress, ProgressState
-from .types import BeetsImportTask
+from .types import BeetsDuplicateAction, BeetsImportAction, BeetsImportTask
 
 if TYPE_CHECKING:
     from beets_flask.importer.session import (
@@ -485,7 +484,7 @@ def user_query(
     # TODO: Import as singletons i.e. task.choice_flag is action.TRACKS
 
     # As albums: group items by albums and create task for each album
-    if task.choice_flag is Action.ALBUMS:
+    if task.choice_flag is BeetsImportAction.ALBUMS:
         log.warning("This should never run via beets-flask!")
         return _extend_pipeline(
             [task],
@@ -500,7 +499,7 @@ def user_query(
     # as it only calls the sessions method, anyway.
     session.resolve_duplicate(task, found_duplicates)
 
-    if task.should_merge_duplicates:
+    if task.duplicate_action is BeetsDuplicateAction.MERGE:
         # Create a new task for tagging the current items
         # and duplicates together
         duplicate_items = task.duplicate_items(session.lib)
@@ -580,7 +579,7 @@ def manipulate_files(
     finalizes each task.
     """
     if not task.skip:
-        if task.should_remove_duplicates:
+        if task.duplicate_action is BeetsDuplicateAction.REMOVE:
             task.remove_duplicates(session.lib)
 
         if session.config["copy"]:
@@ -604,7 +603,9 @@ def manipulate_files(
             )
             operation = MoveOperation.COPY
 
-        task.manipulate_files(session, operation, write=session.config["write"])
+        task.manipulate_files(
+            session, operation, write=session.config["write"].get(bool)
+        )
 
     # Progress, cleanup, and event.
     task.finalize(session)

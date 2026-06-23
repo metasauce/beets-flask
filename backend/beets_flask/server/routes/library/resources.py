@@ -24,7 +24,7 @@ from typing import (
 
 from beets import util as beets_util
 from beets.dbcore import Model, Query, Results
-from beets.dbcore.query import Sort
+from beets.dbcore.sort import Sort
 from beets.library import Album, Item, Library, parse_query_string
 from quart import Blueprint, Response, abort, g, json, jsonify, request
 
@@ -803,7 +803,7 @@ def _rep_Album(
         keys = ["id", "name", "albumartist", "year", "added"]
     else:
         # Use all keys
-        keys = album.keys() + ["name"]
+        keys = list(album.keys()) + ["name"]
 
         # Parse sources
         out["sources"] = list()

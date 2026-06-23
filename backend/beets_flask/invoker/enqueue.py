@@ -35,7 +35,7 @@ from beets_flask.importer.session import (
     UndoSession,
     delete_from_beets,
 )
-from beets_flask.importer.types import DuplicateAction
+from beets_flask.importer.types import BeetsDuplicateAction
 from beets_flask.logger import log
 from beets_flask.redis import import_queue, preview_queue
 from beets_flask.server.exceptions import (
@@ -258,7 +258,7 @@ def enqueue_import_candidate(
     """
 
     candidate_ids: TaskIdMappingArg[CandidateChoice] = kwargs.pop("candidate_ids", None)
-    duplicate_actions: TaskIdMappingArg[DuplicateAction] = kwargs.pop(
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction] = kwargs.pop(
         "duplicate_actions", None
     )
 
@@ -318,7 +318,7 @@ def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
     group_albums: bool | None = kwargs.pop("group_albums", None)
     autotag: bool | None = kwargs.pop("autotag", None)
     import_threshold: float | None = kwargs.pop("import_threshold", None)
-    duplicate_actions: TaskIdMappingArg[DuplicateAction] = kwargs.pop(
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction] = kwargs.pop(
         "duplicate_actions", None
     )
 
@@ -511,7 +511,7 @@ async def run_import_candidate(
     hash: str,
     path: str,
     candidate_ids: TaskIdMappingArg[CandidateChoice],
-    duplicate_actions: TaskIdMappingArg[DuplicateAction],
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction],
 ):
     """Imports a candidate that has been fetched in a preview session.
 
@@ -550,7 +550,7 @@ async def run_import_auto(
     hash: str,
     path: str,
     import_threshold: float | None,
-    duplicate_actions: TaskIdMappingArg[DuplicateAction],
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction],
 ):
     log.info(f"Auto Import task on {hash=} {path=}")
 

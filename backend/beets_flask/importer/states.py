@@ -23,7 +23,7 @@ from beets_flask.importer.progress import (
     ProgressState,
     SerializedProgressState,
 )
-from beets_flask.importer.types import DuplicateAction
+from beets_flask.importer.types import BeetsDuplicateAction
 from beets_flask.server.exceptions import SerializedException
 from beets_flask.utility import capture_stdout_stderr
 
@@ -33,6 +33,7 @@ from .types import (
     BeetsAlbumInfo,
     BeetsAlbumMatch,
     BeetsDistance,
+    BeetsImportAction,
     BeetsImportTask,
     BeetsItem,
     BeetsLibrary,
@@ -249,7 +250,7 @@ class TaskState(BaseState):
     # User choices and user input in interactive Session
     # None if no choice has been made yet
     # (or the frontend has not marked the default selection)
-    duplicate_action: DuplicateAction | None = None
+    duplicate_action: BeetsDuplicateAction | None = None
 
     def __init__(
         self,
@@ -371,11 +372,11 @@ class TaskState(BaseState):
         return best
 
     @property
-    def choice_flag(self) -> importer.tasks.Action | None:
+    def choice_flag(self) -> BeetsImportAction | None:
         return self.task.choice_flag
 
     @choice_flag.setter
-    def choice_flag(self, value: importer.tasks.Action | None):
+    def choice_flag(self, value: BeetsImportAction | None):
         self.task.choice_flag = value
 
     @property
