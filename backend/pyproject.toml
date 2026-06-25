@@ -160,4 +160,4 @@ ignore_missing_imports = true
 follow_untyped_imports = true
 
 [tool.uv]
-# exclude-newer = "3 days"
+exclude-newer = "3 days"
