@@ -155,7 +155,7 @@ allow_redefinition = true
 
 [[tool.mypy.overrides]]
 # Suppresses error messages about imports that cannot be resolved.
-module = ["socketio.*", "confuse.*", "mediafile.*", "beetsplug.*", "eyconf.*"]
+module = ["socketio.*", "confuse.*", "mediafile.*", "eyconf.*"]
 ignore_missing_imports = true
 follow_untyped_imports = true
 

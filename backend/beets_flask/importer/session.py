@@ -36,8 +36,9 @@ from pathlib import Path
 from typing import Any, Literal, TypedDict, TypeGuard, TypeVar
 
 from beets import autotag, plugins
+from beets.exceptions import UserError
 from beets.importer import ImportAbortError
-from beets.ui import UserError, _open_library
+from beets.ui import _open_library
 from beets.util import bytestring_path
 
 from beets_flask.config import get_config
@@ -45,11 +46,13 @@ from beets_flask.disk import is_archive_file
 from beets_flask.importer.progress import Progress, ProgressState
 from beets_flask.importer.types import (
     BeetsAlbum,
+    BeetsAlbumMatch,
     BeetsDuplicateAction,
     BeetsImportAction,
     BeetsImportSession,
     BeetsImportTask,
     BeetsLibrary,
+    BeetsTrackMatch,
     default_duplicate_action_from_config,
 )
 from beets_flask.logger import log
@@ -750,7 +753,9 @@ class ImportSession(BaseSession):
 
     # --------------------------- Stage Definitions -------------------------- #
 
-    def choose_match(self, task: BeetsImportTask):
+    def choose_match(
+        self, task: BeetsImportTask
+    ) -> BeetsAlbumMatch | Literal[BeetsImportAction.ASIS]:
         self.logger.setLevel(logging.DEBUG)
         self.logger.debug(f"choose_match {task}")
 
@@ -792,6 +797,11 @@ class ImportSession(BaseSession):
         if candidate_state.id == task_state.asis_candidate.id:
             log.debug(f"Importing {task} as-is")
             return BeetsImportAction.ASIS
+
+        # Beets does currently not support item matches via this route and as
+        # we are also not support it we raise an error here
+        if isinstance(candidate_state.match, BeetsTrackMatch):
+            raise NotImplementedError("Item matches are not supported.")
 
         return candidate_state.match
 
