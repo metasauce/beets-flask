@@ -1049,7 +1049,7 @@ class TestPluginEvents(
             "obsolete_hash_import_auto",
             str(path),
             import_threshold=1.0,
-            duplicate_actions={"*": "remove"},
+            duplicate_actions={"*": BeetsDuplicateAction.REMOVE},
         )
         assert exc is None, "Should not return an error"
 
