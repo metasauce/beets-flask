@@ -249,9 +249,7 @@ function View({ sx, ...props }: BoxProps) {
                             setQueryState({
                                 ...queryState,
                                 orderBy: newSort.value as
-                                    | 'album'
-                                    | 'albumartist'
-                                    | 'year',
+                                    'album' | 'albumartist' | 'year',
                                 orderDirection: newSort.direction,
                             });
                         }}
