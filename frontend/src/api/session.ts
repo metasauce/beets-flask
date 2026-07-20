@@ -40,8 +40,7 @@ export const sessionQueryOptions = ({
         });
         // make sure we have a folder
         const res = (await response.json()) as
-            | SerializedSessionState
-            | SerializedException;
+            SerializedSessionState | SerializedException;
         // check if we have error as a key in res
         if ('type' in res) {
             // if we have an error, throw it
