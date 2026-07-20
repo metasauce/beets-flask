@@ -56,6 +56,9 @@ cd keyfinder-cli/
 cmake -DCMAKE_INSTALL_PREFIX=/usr/local -S . -B build
 cmake --build build --parallel "$(nproc)"
 cmake --install build
+
+#reload available shared libraries in debian
+ldconfig
 ```
 
 Make the script executable:
