@@ -8,7 +8,6 @@ has a well defined path to follow.
 import pickle
 from abc import ABC
 from pathlib import Path
-from typing import Literal
 from unittest import mock
 
 import pytest
@@ -26,7 +25,7 @@ from beets_flask.importer.session import (
     CandidateChoice,
     TaskIdMappingArg,
 )
-from beets_flask.importer.types import DuplicateAction
+from beets_flask.importer.types import BeetsDuplicateAction
 from beets_flask.invoker.enqueue import (
     run_import_auto,
     run_import_bootleg,
@@ -518,7 +517,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             "obsolete_hash_import",
             str(path),
             candidate_ids=None,  # None uses best match
-            duplicate_actions={"*": "ask"},
+            duplicate_actions={"*": BeetsDuplicateAction.ASK},
         )
 
         assert exc is not None
@@ -552,7 +551,9 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             "obsolete_hash_import",
             str(path / "Chant [SINGLE]"),
             candidate_ids=None,  # None uses best match
-            duplicate_actions={"*": "ask"},  # ask raises on duplicate
+            duplicate_actions={
+                "*": BeetsDuplicateAction.ASK
+            },  # ask raises on duplicate
         )
 
         # FIXME: We might want to raise our own exception here
@@ -624,9 +625,17 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         assert imported_path.exists(), "Should have imported the files"
         assert imported_path.is_file(), "Should have imported the files"
 
-    @pytest.mark.parametrize("duplicate_action", ["skip", "merge", "remove", "keep"])
+    @pytest.mark.parametrize(
+        "duplicate_action",
+        [
+            BeetsDuplicateAction.SKIP,
+            BeetsDuplicateAction.MERGE,
+            BeetsDuplicateAction.REMOVE,
+            BeetsDuplicateAction.KEEP,
+        ],
+    )
     async def test_duplicate_with_action(
-        self, db_session: Session, path: Path, duplicate_action
+        self, db_session: Session, path: Path, duplicate_action: BeetsDuplicateAction
     ):
         """Test the duplicate action with a different action.
 
@@ -677,6 +686,10 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             assert len(chosen_candidate.duplicate_ids) == 0, (
                 "Should not have duplicates after import"
             )
+
+        # Should have still only one album in beets db
+        albums = self.beets_lib.albums()
+        assert len(albums) == 1, "Should have imported one album"
 
     async def test_undo_with_missing_beets_items(self, db_session: Session, path: Path):
         f = Folder.from_path(path)
@@ -732,7 +745,7 @@ class TestImportAuto(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             "obsolete_hash_import_auto",
             str(path),
             import_threshold=0.0,
-            duplicate_actions={"*": "remove"},
+            duplicate_actions={"*": BeetsDuplicateAction.REMOVE},
         )
 
         assert len(self.statuses) == 4
@@ -744,7 +757,7 @@ class TestImportAuto(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             "obsolete_hash_import_auto",
             str(path),
             import_threshold=1.0,
-            duplicate_actions={"*": "remove"},
+            duplicate_actions={"*": BeetsDuplicateAction.REMOVE},
         )
 
         assert len(self.statuses) == 6
@@ -780,7 +793,7 @@ class TestImportAutoFails(
             "obsolete_hash_import_auto",
             str(path),
             import_threshold=-1.0,
-            duplicate_actions={"*": "remove"},
+            duplicate_actions={"*": BeetsDuplicateAction.REMOVE},
         )
         assert exc is not None, f"Should return an error {exc}"
 
@@ -799,7 +812,7 @@ class TestImportAutoFails(
             "obsolete_hash_import",
             str(path),
             candidate_ids=None,  # None uses best match
-            duplicate_actions={"*": "remove"},
+            duplicate_actions={"*": BeetsDuplicateAction.REMOVE},
         )
         assert exc is None, "Should not return an error"
 
@@ -938,12 +951,20 @@ class TestMultipleTasks(
         assert s_state_indb.folder.full_path == str(path_multiple_tasks)
         assert len(s_state_indb.tasks) > 1, "Should have multiple tasks"
 
-    @pytest.mark.parametrize("duplicate_action", ["skip", "merge", "remove", "keep"])
+    @pytest.mark.parametrize(
+        "duplicate_action",
+        [
+            BeetsDuplicateAction.SKIP,
+            BeetsDuplicateAction.MERGE,
+            BeetsDuplicateAction.REMOVE,
+            BeetsDuplicateAction.KEEP,
+        ],
+    )
     async def test_duplicate_action(
         self,
         db_session: Session,
         path_multiple_tasks: Path,
-        duplicate_action: Literal["skip", "merge", "remove", "keep"],
+        duplicate_action: BeetsDuplicateAction,
     ):
         """Test the import of the tagged folder with duplicate action."""
 
@@ -968,7 +989,7 @@ class TestMultipleTasks(
         db_session.commit()
 
         # For each task, choose a different candidate and duplicate action
-        duplicate_actions: TaskIdMappingArg[DuplicateAction] = {}
+        duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction] = {}
         candidates: TaskIdMappingArg[CandidateChoice] = {}
         assert candidates is not None
         assert duplicate_actions is not None
@@ -1028,7 +1049,7 @@ class TestPluginEvents(
             "obsolete_hash_import_auto",
             str(path),
             import_threshold=1.0,
-            duplicate_actions={"*": "remove"},
+            duplicate_actions={"*": BeetsDuplicateAction.REMOVE},
         )
         assert exc is None, "Should not return an error"
 

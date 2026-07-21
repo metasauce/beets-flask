@@ -36,21 +36,24 @@ from pathlib import Path
 from typing import Any, Literal, TypedDict, TypeGuard, TypeVar
 
 from beets import autotag, plugins
+from beets.exceptions import UserError
 from beets.importer import ImportAbortError
-from beets.ui import UserError, _open_library
+from beets.ui import _open_library
 from beets.util import bytestring_path
-from deprecated import deprecated
 
 from beets_flask.config import get_config
 from beets_flask.disk import is_archive_file
 from beets_flask.importer.progress import Progress, ProgressState
 from beets_flask.importer.types import (
     BeetsAlbum,
+    BeetsAlbumMatch,
+    BeetsDuplicateAction,
     BeetsImportAction,
     BeetsImportSession,
     BeetsImportTask,
     BeetsLibrary,
-    DuplicateAction,
+    BeetsTrackMatch,
+    default_duplicate_action_from_config,
 )
 from beets_flask.logger import log
 from beets_flask.server.exceptions import (
@@ -61,7 +64,6 @@ from beets_flask.server.exceptions import (
     NotImportedException,
     to_serialized_exception,
 )
-from beets_flask.utility import capture_stdout_stderr
 
 from .pipeline import AsyncPipeline
 from .stages import (
@@ -228,29 +230,13 @@ class BaseSession(BeetsImportSession, ABC):
             loghandler=None,
         )
         # Hacky workaround to use our logging, to allow plugins to communicate
+        # TODO: revisit after https://github.com/beetbox/beets/issues/6553 is done
         self.logger.handlers = log.handlers
         log.debug(f"Created new {self.__class__.__name__} for {state.path}")
 
     @property
     def path(self) -> Path:
         return self.state.path
-
-    @deprecated
-    def run_and_capture_output(self) -> tuple[str, str]:
-        """Run the import session and capture the output.
-
-        Uses the original beets import session run method,
-        with lots of overhead.
-        Sets self.preivew to output and error messages occuring during run.
-
-        Returns
-        -------
-            tuple[str, str]: out, err
-        """
-        self.logger.debug(f"{self.paths}")
-        out, err, _ = capture_stdout_stderr(self.run)
-        self.preview = out + "\n\n" + err if err else out
-        return out, err
 
     def get_config_value(self, key: str, type_func: Callable | None = None) -> Any:
         """Get a config value from the overlay or default.
@@ -627,14 +613,14 @@ class ImportSession(BaseSession):
     """
 
     candidate_ids: TaskIdMapping[CandidateChoice]
-    duplicate_actions: TaskIdMapping[DuplicateAction]
+    duplicate_actions: TaskIdMapping[BeetsDuplicateAction]
 
     def __init__(
         self,
         state: SessionState,
         config_overlay: dict | None = None,
         candidate_ids: TaskIdMappingArg[CandidateChoice] = None,
-        duplicate_actions: TaskIdMappingArg[DuplicateAction] = None,
+        duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction] = None,
     ):
         """Create new ImportSession.
 
@@ -662,11 +648,9 @@ class ImportSession(BaseSession):
         # Create a mapping for the duplicate action
         # each task might have a different action.
         # if none is given the default action is used from the config
-        default_action: DuplicateAction = self.get_config_value(
-            "import.duplicate_action", str
-        )
         self.duplicate_actions = parse_task_id_mapping(
-            duplicate_actions, default_action
+            duplicate_actions,
+            default_duplicate_action_from_config(get_config().beets_config),
         )
 
         # For candidates, None means to take best
@@ -769,7 +753,9 @@ class ImportSession(BaseSession):
 
     # --------------------------- Stage Definitions -------------------------- #
 
-    def choose_match(self, task: BeetsImportTask):
+    def choose_match(
+        self, task: BeetsImportTask
+    ) -> BeetsAlbumMatch | Literal[BeetsImportAction.ASIS]:
         self.logger.setLevel(logging.DEBUG)
         self.logger.debug(f"choose_match {task}")
 
@@ -812,6 +798,11 @@ class ImportSession(BaseSession):
             log.debug(f"Importing {task} as-is")
             return BeetsImportAction.ASIS
 
+        # Beets does currently not support item matches via this route and as
+        # we are also not support it we raise an error here
+        if isinstance(candidate_state.match, BeetsTrackMatch):
+            raise NotImplementedError("Item matches are not supported.")
+
         return candidate_state.match
 
     def resolve_duplicate(
@@ -822,30 +813,39 @@ class ImportSession(BaseSession):
         )
 
         if len(found_duplicates) == 0:
-            log.debug(f"No duplicates found for")
+            log.debug(f"No duplicates found")
             return
 
         task_state = self.state.get_task_state_for_task_raise(task)
         task_duplicate_action = self.duplicate_actions[task_state.id]
         task_state.duplicate_action = task_duplicate_action
-        match task_duplicate_action:
-            case "skip":
-                task.set_choice(BeetsImportAction.SKIP)
-            case "keep":
-                pass
-            case "remove":
-                task.should_remove_duplicates = True
-            case "merge":
-                task.should_merge_duplicates = True
-            case "ask":
-                # task.set_choice(BeetsImportAction.SKIP)
-                raise DuplicateException(
-                    "You have set the duplicate action to 'ask' in your beets config."
-                )
-            case _:
-                raise DuplicateException(
-                    f"Unknown duplicate action: {self.duplicate_actions}"
-                )
+        if task_duplicate_action is BeetsDuplicateAction.ASK:
+            raise DuplicateException(
+                "You have set the duplicate action to 'ask' in your beets config."
+            )
+
+        if task_duplicate_action is BeetsDuplicateAction.MERGE:
+            # Merge duplicate items into the task so they are re-tagged
+            # together. We do the merge inline here to avoid the vanilla
+            # beets pipeline extension that would re-run lookup_candidates
+            # (which ImportSession does not support since candidates are
+            # pre-selected).
+            from beets.importer.stages import _freshen_items
+
+            duplicate_items = task.duplicate_items(self.lib)
+            _freshen_items(duplicate_items)
+            duplicate_paths = [item.path for item in duplicate_items]
+            self.mark_merged(duplicate_paths)
+            # Remove old duplicate albums so only the merged result remains.
+            task.remove_duplicates(self.lib)
+            task.items += duplicate_items
+            task.paths += duplicate_paths
+            # Use KEEP for the pipeline so _apply_choice adds everything
+            # without triggering the MERGE pipeline extension.
+            task.duplicate_action = BeetsDuplicateAction.KEEP
+            return
+
+        task.duplicate_action = task_duplicate_action
 
 
 class BootlegImportSession(ImportSession):

@@ -150,11 +150,9 @@ def beets_lib_item(**kwargs):
         comments="the comments",
         path=os.environ["HOME"] + "/audio/test.mp3",
     )
-    default_kwargs.update(kwargs)
 
     i = beets.library.Item(
-        None,
-        **default_kwargs,
+        **{**default_kwargs, **kwargs},
     )
     return i
 
@@ -183,8 +181,7 @@ def beets_lib_album(**kwargs):
     default_kwargs.update(kwargs)
 
     a = beets.library.Album(
-        db=None,
-        **default_kwargs,
+        **{**default_kwargs, **kwargs},
     )
     return a
 
