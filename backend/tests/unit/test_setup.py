@@ -1,3 +1,4 @@
+import logging
 import os
 
 from beets_flask.logger import log
@@ -8,9 +9,9 @@ def test_log():
 
     assert "PYTEST_CURRENT_TEST" in os.environ
 
-    # Logger should have no handlers
-    assert not log.handlers
-    assert log.level == 10
+    # Pytest may inject capture handlers; just ensure no file handler is attached.
+    assert not any(isinstance(handler, logging.FileHandler) for handler in log.handlers)
+    assert log.level == logging.DEBUG
     assert log.name == "beets-flask"
 
 
