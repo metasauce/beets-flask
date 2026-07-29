@@ -1,7 +1,6 @@
 import {
     AudioLinesIcon,
     BadgeAlertIcon,
-    BrainIcon,
     CalendarIcon,
     CassetteTapeIcon,
     CheckIcon,
@@ -36,6 +35,15 @@ import {
     TriangleAlertIcon,
     UserRoundIcon,
 } from 'lucide-react';
+import { type ComponentType, forwardRef } from 'react';
+import type { IconType } from '@icons-pack/react-simple-icons';
+import {
+    SiBandcamp,
+    SiBeatport,
+    SiDiscogs,
+    SiMusicbrainz,
+    SiSpotify,
+} from '@icons-pack/react-simple-icons';
 import { sneaker } from '@lucide/lab';
 import { CircularProgress, Tooltip, useTheme } from '@mui/material';
 
@@ -169,29 +177,39 @@ export function PenaltyTypeIcon({
  */
 export function SourceTypeIcon({
     type,
+    useSourceColors = false,
     ...props
-}: { type: string } & LucideProps) {
-    switch (type.toLowerCase()) {
-        case 'spotify':
-            return <Spotify {...props} />;
-        case 'mb':
-        case 'musicbrainz':
-            return <BrainIcon {...props} />;
-        case 'asis':
-            return <FileMusicIcon {...props} />;
-        default:
-            console.warn(`Unknown source type: ${type}`);
-            return <BadgeAlertIcon {...props} />;
+}: { type: string; useSourceColors?: boolean } & LucideProps) {
+    const sourceType = type.toLowerCase();
+    const config = sourceTypeIconMap[sourceType];
+
+    if (!config) {
+        console.warn(`Unknown source type: ${type}`);
+        return <BadgeAlertIcon color={props.color} {...props} />;
     }
+
+    const Icon = config.icon;
+    const color = useSourceColors ? props.color || config.color : props.color;
+    return <Icon color={color} {...props} />;
 }
 
 export function SourceTypeIconWithTooltip({
     type,
+    useSourceColors = false,
     ...props
-}: { type: string } & LucideProps) {
+}: { type: string; useSourceColors?: boolean } & LucideProps) {
+    const sourceType = type.toLowerCase();
+    const config = sourceTypeIconMap[sourceType];
+    const tooltip = config?.tooltip || type;
+
     return (
-        <Tooltip title={type === 'asis' ? 'Metadata from files' : type}>
-            <SourceTypeIcon type={type} {...props} />
+        <Tooltip title={tooltip}>
+            <SourceTypeIcon
+                type={type}
+                useSourceColors={useSourceColors}
+                color={props.color}
+                {...props}
+            />
         </Tooltip>
     );
 }
@@ -254,46 +272,72 @@ export function FolderStatusIcon({
     }
 }
 
-// Manually edited spotify svg icon (removing the circle)
-function Spotify(props: LucideProps) {
-    return (
-        <svg
-            width={props.size || 24}
-            height={props.size || 24}
-            viewBox={`-1 0 18 18`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            version="1.1"
-            {...props}
-        >
-            <path
-                stroke="none"
-                d="M 0,0 H 24 V 24 H 0 Z"
-                fill="none"
-                id="path2"
-            />
-            <g transform="translate(-4.3029676,-7.9256576)" id="g1349">
-                <g id="g1196" transform="translate(0.03227154,1.7049163)">
-                    <path
-                        d="m 6.3949311,14.46672 c 3.7367129,-2.201671 8.2207679,-1.454328 11.2101379,0.7877"
-                        id="path6"
-                    />
-                    <path
-                        d="m 8.263287,18.991132 c 2.242028,-1.494685 5.978741,-1.494685 7.473426,0.747343"
-                        id="path8"
-                    />
-                    <path
-                        d="M 4.5265745,10.023022 C 7.5159444,8.5283366 13.494685,7.0336515 19.473425,10.770364"
-                        id="path10"
-                    />
-                </g>
-            </g>
-        </svg>
-    );
+interface SimpleIconBridgeProps extends LucideProps {
+    icon: IconType;
 }
+
+const SimpleIconBridge = forwardRef<SVGSVGElement, SimpleIconBridgeProps>(
+    ({ icon: Icon, color, size, ...props }, ref) => {
+        const iconSize = size ?? 24;
+        return (
+            <Icon
+                ref={ref}
+                // Lucide defaults to "currentColor".
+                // Simple Icons uses 'color' prop for the SVG fill.
+                color={color || 'currentColor'}
+                size={iconSize}
+                width={iconSize}
+                height={iconSize}
+                viewBox="0 0 24 24"
+                {...props}
+            />
+        );
+    }
+);
+
+const MusicBrainz = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
+    <SimpleIconBridge ref={ref} icon={SiMusicbrainz} {...props} />
+));
+
+const Spotify = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
+    <SimpleIconBridge ref={ref} icon={SiSpotify} {...props} />
+));
+
+const Bandcamp = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
+    <SimpleIconBridge ref={ref} icon={SiBandcamp} {...props} />
+));
+
+const Beatport = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
+    <SimpleIconBridge ref={ref} icon={SiBeatport} {...props} />
+));
+
+const Discogs = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
+    <SimpleIconBridge ref={ref} icon={SiDiscogs} {...props} />
+));
+
+interface SourceTypeIconConfig {
+    icon: ComponentType<LucideProps>;
+    color?: string;
+    tooltip?: string;
+}
+
+const sourceTypeIconMap: Record<string, SourceTypeIconConfig> = {
+    spotify: { icon: Spotify, color: '#1ED760', tooltip: 'Spotify' },
+    bandcamp: { icon: Bandcamp, color: '#408294', tooltip: 'Bandcamp' },
+    discogs: { icon: Discogs, color: undefined, tooltip: 'Discogs' }, // Brand color too dark, so we use default color
+    beatport: { icon: Beatport, color: '#01FF95', tooltip: 'Beatport' },
+    mb: { icon: MusicBrainz, color: '#BA478F', tooltip: 'MusicBrainz' },
+    musicbrainz: {
+        icon: MusicBrainz,
+        color: '#BA478F',
+        tooltip: 'MusicBrainz',
+    },
+    asis: {
+        icon: FileMusicIcon,
+        color: undefined,
+        tooltip: 'Metadata from files',
+    },
+};
 
 // Online-Globe with questionmark
 function ExtraItem(props: LucideProps) {
