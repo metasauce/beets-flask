@@ -11,7 +11,7 @@ import {
     LibraryStats as _LibraryStats,
 } from '@/pythonTypes';
 
-import { queryClient } from './common';
+import { HTTPError, queryClient } from './common';
 
 export type LibraryStats = Omit<
     _LibraryStats,
@@ -469,17 +469,22 @@ export const externalArtQueryOptions = (data_url: string) =>
     queryOptions({
         queryKey: ['externalArt', data_url],
         queryFn: async () => {
-            const blob = await fetch(
+            const response = await fetch(
                 `/art?url=${encodeURIComponent(data_url)}`
-            ).then((r) => r.blob());
-
-            const dataUrl: string = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-            });
-            return dataUrl;
+            );
+            if (!response.ok) {
+                const text = await response.text();
+                throw new HTTPError(
+                    text || `Failed to load external art: ${response.status}`,
+                    response.status
+                );
+            }
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            return objectUrl;
         },
+        retryOnMount: false,
+        ...ART_QUERY_OPTIONS,
     });
 
 /* ---------------------------- Waveforms / Peaks --------------------------- */

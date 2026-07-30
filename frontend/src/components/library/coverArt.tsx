@@ -1,5 +1,5 @@
 import { FileWarningIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@mui/material';
 import Box, { BoxProps } from '@mui/material/Box';
 import Skeleton from '@mui/material/Skeleton';
@@ -237,6 +237,16 @@ function CoverArtContent({
     src,
     ...props
 }: { src: string } & Partial<BoxProps>) {
+    useEffect(() => {
+        if (!src.startsWith('blob:')) {
+            return undefined;
+        }
+
+        return () => {
+            URL.revokeObjectURL(src);
+        };
+    }, [src]);
+
     return <Box component="img" src={src} {...props} />;
 }
 

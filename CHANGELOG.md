@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New config option `gui.terminal.enabled` (default: true) [#254](https://github.com/pSpitzner/beets-flask/pull/224)
 - You can now alternatively use `PUID` and `PGID` instead of `GROUP_ID` and `USER_ID` environment variables. Good for [yaml anchors](https://docs.docker.com/reference/compose-file/fragments/). [#260](https://github.com/pSpitzner/beets-flask/issues/260)
 - Use an external redis server by setting the `REDIS_URL` environment variable. [#277](https://github.com/pSpitzner/beets-flask/pull/277)
+- Added external artwork support for Bandcamp, Discogs, and Beatport in the `/art` backend proxy flow [#274](https://github.com/pSpitzner/beets-flask/issues/274)
+- Added backend-proxied external artwork resolution for `/art` to reduce CORS-related cover-loading failures [#275](https://github.com/pSpitzner/beets-flask/issues/275)
+- Added source logos for Spotify, Bandcamp, Discogs, and Beatport in `SourceTypeIcon` using `simple-icons`
+- Added integration test coverage for art-proxy behavior in `backend/tests/integration/test_routes/test_art_preview.py`
 
 ### Fixed
 
@@ -35,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Container user `beetle` now uses bash terminal by default and activates the uv environment automatically.
 - Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/pSpitzner/beets-flask/pull/305)
 - Fixed an issue with timestamps shown in the library view [#289](https://github.com/pSpitzner/beets-flask/issues/289)
+- External artwork now returns `404` when no image is available, so missing covers reliably trigger the existing frontend fallback path
+- Updated external artwork loading in the frontend to validate `/art` response status before treating it as success and throw `HTTPError` on non-OK responses
+- Improved missing-artwork behavior so failed external art requests no longer leave blank image states
 
 ### Other (dev)
 
