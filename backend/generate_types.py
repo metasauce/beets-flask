@@ -20,6 +20,13 @@ from beets_flask.server.routes.library.resources import (
     ItemResponseMinimal,
 )
 from beets_flask.server.routes.library.stats import LibraryStats
+from beets_flask.server.routes.musicbrainz.prepare import (
+    ChecklistItem,
+    PreparedRelease,
+    PreparedTrack,
+    ReleaseData,
+    ReleaseFlags,
+)
 from beets_flask.server.websocket.status import (
     FileSystemUpdate,
     FolderStatusUpdate,
@@ -72,6 +79,14 @@ builder.add(AlbumResponse)
 builder.add(AlbumResponseMinimal)
 builder.add(AlbumResponseExpanded)
 builder.add(AlbumResponseMinimalExpanded)
+
+# ----------------------------- musicbrainz routes ---------------------------- #
+
+builder.add(PreparedRelease)
+builder.add(ReleaseData)
+builder.add(PreparedTrack)
+builder.add(ReleaseFlags)
+builder.add(ChecklistItem)
 
 # ------------------------------ Status updates ------------------------------ #
 

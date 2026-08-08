@@ -5,6 +5,7 @@
  */
 export type File = FileSystemItem;
 
+
 export interface SerializedSessionState {
     id: string;
     created_at: Date;
@@ -28,6 +29,47 @@ export interface Search {
     search_album: null | string;
 }
 
+export interface ReleaseFlags {
+    on_musicbrainz: boolean;
+    multi_disc: boolean;
+    multi_artist: boolean;
+    missing: Array<string>;
+    missing_isrc: Array<string>;
+    missing_track_artist: Array<string>;
+}
+
+export interface ReleaseData {
+    album: string;
+    albumartist: string;
+    media?: string;
+    media_original?: string;
+    year?: number;
+    label?: string;
+    barcode?: string;
+    catalognum?: string;
+    country?: string;
+    disctotal?: number;
+    albumtype?: string;
+    genre?: string;
+    albumdisambig?: string;
+    mb_albumid?: string;
+    mb_albumartistid?: string;
+}
+
+export interface PreparedRelease {
+    album_id: number;
+    editor_url: string;
+    release: ReleaseData;
+    tracks: Array<PreparedTrack>;
+    artists: Array<PreparedArtist>;
+    flags: ReleaseFlags;
+    checklist: Array<ChecklistItem>;
+    media_formats: Array<string>;
+    default_media_format: string;
+    countries: Array<CountryOption>;
+    release_editor_fields: Array<EditorField>;
+}
+
 export interface LibraryStats {
     libraryPath: string;
     items: number;
@@ -46,7 +88,7 @@ export interface JobStatusUpdate {
     num_jobs: number;
     job_metas: Array<JobMeta>;
     exc: SerializedException | null;
-    event: 'job_status_update';
+    event: "job_status_update";
 }
 
 export interface InboxStats {
@@ -64,7 +106,7 @@ export interface FolderStatusUpdate {
     hash: string;
     status: FolderStatus;
     exc: SerializedException | null;
-    event: 'folder_status_update';
+    event: "folder_status_update";
 }
 
 export interface Folder extends FileSystemItem {
@@ -73,7 +115,7 @@ export interface Folder extends FileSystemItem {
 
 export interface FileSystemUpdate {
     exc: SerializedException | null;
-    event: 'file_system_update';
+    event: "file_system_update";
 }
 
 export interface Archive extends FileSystemItem {
@@ -86,6 +128,7 @@ export interface AlbumResponseMinimalExpanded {
     albumartist: string;
     year: number;
     added: Date;
+    mb_albumid?: string;
     items: Array<ItemResponseMinimal>;
     gui_import_id?: string;
     gui_import_date?: string;
@@ -98,6 +141,7 @@ export interface AlbumResponseMinimal {
     albumartist: string;
     year: number;
     added: Date;
+    mb_albumid?: string;
 }
 
 export interface AlbumResponseExpanded {
@@ -106,6 +150,7 @@ export interface AlbumResponseExpanded {
     albumartist: string;
     year: number;
     added: Date;
+    mb_albumid?: string;
     genre: string;
     label: string;
     sources: Array<AlbumSource>;
@@ -121,6 +166,7 @@ export interface AlbumResponse {
     albumartist: string;
     year: number;
     added: Date;
+    mb_albumid?: string;
     genre: string;
     label: string;
     sources: Array<AlbumSource>;
@@ -223,6 +269,28 @@ export interface SerializedCandidateState {
     tracks: Array<TrackInfo>;
 }
 
+export interface PreparedTrack {
+    disc: number;
+    track: number;
+    title: string;
+    artist: string;
+    length: number;
+    isrc?: string;
+    mb_trackid?: string;
+    mb_artistid?: string;
+}
+
+export interface PreparedArtist {
+    name: string;
+    sort_name?: string;
+    mbid?: string;
+    mbid_fields: Array<string>;
+    exists: "maybe" | "no" | "unknown" | "yes";
+    matches: Array<ArtistMatch>;
+    artist_url?: string;
+    create_url?: string;
+}
+
 export interface JobMeta {
     folder_hash: string;
     folder_path: string;
@@ -283,7 +351,7 @@ export interface ItemResponse {
 }
 
 export interface MusicInfo {
-    type: 'album' | 'item' | 'track';
+    type: "album" | "item" | "track";
     artist: null | string;
     album: null | string;
     data_url: null | string;
@@ -304,10 +372,38 @@ export interface ItemInfo extends MusicInfo {
 }
 
 export interface FileSystemItem {
-    type: 'archive' | 'directory' | 'file';
+    type: "archive" | "directory" | "file";
     full_path: string;
     hash: string;
     is_album: boolean;
+}
+
+export interface EditorField {
+    name: string;
+    value: string;
+}
+
+export interface CountryOption {
+    code: string;
+    name: string;
+}
+
+export interface ChecklistItem {
+    key: string;
+    label: string;
+    filled: boolean;
+    note?: string;
+}
+
+export interface ArtistMatch {
+    name: string;
+    mbid: string;
+    sort_name?: string;
+    disambiguation?: string;
+    type?: string;
+    begin_date?: string;
+    country?: string;
+    score?: number;
 }
 
 export interface AlbumSource {
@@ -333,3 +429,4 @@ export interface AlbumInfo extends MusicInfo {
     catalognum: null | string;
     albumdisambig: null | string;
 }
+

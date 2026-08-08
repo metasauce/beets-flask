@@ -133,6 +133,9 @@ function UserSelection({ session }: { session: SerializedSessionState }) {
     });
 
     const selectedCandidate = useMemo(() => {
+        if (!currentTask) {
+            return undefined;
+        }
         const candidate = [
             currentTask.asis_candidate,
             ...currentTask.candidates,
@@ -146,6 +149,19 @@ function UserSelection({ session }: { session: SerializedSessionState }) {
         selectCandidates,
         duplicateActions
     );
+
+    // Sessions can be served with no tasks (e.g. a preview that is still
+    // running or found no files). Guard against rendering the stepper, which
+    // would crash on `currentTask` being undefined.
+    if (!currentTask) {
+        return (
+            <CardHeader
+                icon={<TagIcon />}
+                title="No tasks to process"
+                subtitle="This session has no tasks. A preview may still be running, or no files were found to import."
+            />
+        );
+    }
 
     return (
         <Box

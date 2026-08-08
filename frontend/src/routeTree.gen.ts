@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VersionRouteImport } from './routes/version'
 import { Route as TerminalIndexRouteImport } from './routes/terminal/index'
 import { Route as SessiondraftIndexRouteImport } from './routes/sessiondraft/index'
+import { Route as MusicbrainzIndexRouteImport } from './routes/musicbrainz/index'
 import { Route as InboxIndexRouteImport } from './routes/inbox/index'
 import { Route as DebugIndexRouteImport } from './routes/debug/index'
 import { Route as FrontpageIndexRouteImport } from './routes/_frontpage/index'
@@ -54,6 +55,11 @@ const TerminalIndexRoute = TerminalIndexRouteImport.update({
 const SessiondraftIndexRoute = SessiondraftIndexRouteImport.update({
   id: '/sessiondraft/',
   path: '/sessiondraft/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MusicbrainzIndexRoute = MusicbrainzIndexRouteImport.update({
+  id: '/musicbrainz/',
+  path: '/musicbrainz/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InboxIndexRoute = InboxIndexRouteImport.update({
@@ -219,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/': typeof FrontpageIndexRoute
   '/debug': typeof DebugIndexRoute
   '/inbox': typeof InboxIndexRoute
+  '/musicbrainz': typeof MusicbrainzIndexRoute
   '/sessiondraft': typeof SessiondraftIndexRoute
   '/terminal': typeof TerminalIndexRoute
   '/library/browse/artists': typeof LibraryBrowseArtistsRouteRouteWithChildren
@@ -252,6 +259,7 @@ export interface FileRoutesByTo {
   '/': typeof FrontpageIndexRoute
   '/debug': typeof DebugIndexRoute
   '/inbox': typeof InboxIndexRoute
+  '/musicbrainz': typeof MusicbrainzIndexRoute
   '/sessiondraft': typeof SessiondraftIndexRoute
   '/terminal': typeof TerminalIndexRoute
   '/debug/design/buttons': typeof DebugDesignButtonsRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/_frontpage/': typeof FrontpageIndexRoute
   '/debug/': typeof DebugIndexRoute
   '/inbox/': typeof InboxIndexRoute
+  '/musicbrainz/': typeof MusicbrainzIndexRoute
   '/sessiondraft/': typeof SessiondraftIndexRoute
   '/terminal/': typeof TerminalIndexRoute
   '/library/browse/artists': typeof LibraryBrowseArtistsRouteRouteWithChildren
@@ -318,6 +327,7 @@ export interface FileRouteTypes {
     | '/'
     | '/debug'
     | '/inbox'
+    | '/musicbrainz'
     | '/sessiondraft'
     | '/terminal'
     | '/library/browse/artists'
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/'
     | '/debug'
     | '/inbox'
+    | '/musicbrainz'
     | '/sessiondraft'
     | '/terminal'
     | '/debug/design/buttons'
@@ -381,6 +392,7 @@ export interface FileRouteTypes {
     | '/_frontpage/'
     | '/debug/'
     | '/inbox/'
+    | '/musicbrainz/'
     | '/sessiondraft/'
     | '/terminal/'
     | '/library/browse/artists'
@@ -415,6 +427,7 @@ export interface RootRouteChildren {
   FrontpageIndexRoute: typeof FrontpageIndexRoute
   DebugIndexRoute: typeof DebugIndexRoute
   InboxIndexRoute: typeof InboxIndexRoute
+  MusicbrainzIndexRoute: typeof MusicbrainzIndexRoute
   SessiondraftIndexRoute: typeof SessiondraftIndexRoute
   TerminalIndexRoute: typeof TerminalIndexRoute
   LibraryBrowseArtistsRouteRoute: typeof LibraryBrowseArtistsRouteRouteWithChildren
@@ -451,6 +464,13 @@ declare module '@tanstack/react-router' {
       path: '/sessiondraft'
       fullPath: '/sessiondraft'
       preLoaderRoute: typeof SessiondraftIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/musicbrainz/': {
+      id: '/musicbrainz/'
+      path: '/musicbrainz'
+      fullPath: '/musicbrainz'
+      preLoaderRoute: typeof MusicbrainzIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inbox/': {
@@ -720,6 +740,7 @@ const rootRouteChildren: RootRouteChildren = {
   FrontpageIndexRoute: FrontpageIndexRoute,
   DebugIndexRoute: DebugIndexRoute,
   InboxIndexRoute: InboxIndexRoute,
+  MusicbrainzIndexRoute: MusicbrainzIndexRoute,
   SessiondraftIndexRoute: SessiondraftIndexRoute,
   TerminalIndexRoute: TerminalIndexRoute,
   LibraryBrowseArtistsRouteRoute: LibraryBrowseArtistsRouteRouteWithChildren,

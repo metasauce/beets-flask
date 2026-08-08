@@ -8,6 +8,20 @@
 gui:
     num_preview_workers: 4
 
+    musicbrainz:
+        # Url of the MusicBrainz release editor. Use a custom url if you run
+        # your own MusicBrainz instance or a test server.
+        editor_url: "https://musicbrainz.org/release/add"
+        # Base url of the MusicBrainz web service, used to check whether
+        # artists already exist before opening the release editor.
+        ws_url: "https://musicbrainz.org"
+        # Look up artists in MusicBrainz before opening the release editor.
+        # Disable if you have no internet access to ws_url.
+        check_artists: yes
+        # User-Agent sent to the MusicBrainz web service. MusicBrainz asks
+        # clients to identify themselves.
+        user_agent: "beets-flask (music assistant)"
+
     library:
         readonly: no
         artist_separators: [",", ";", "&"]
