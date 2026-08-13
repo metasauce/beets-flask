@@ -38,19 +38,22 @@ import {
     Typography,
     useTheme,
 } from '@mui/material';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
-import { Album, albumsInfiniteQueryOptions, artUrl } from '@/api/library';
+import { artUrl } from '@/api/library';
 import {
-    albumExistsQueryOptions,
+    InboxAlbum,
+    inboxAlbumExistsQueryOptions,
+    musicbrainzInboxAlbumsQueryOptions,
     musicbrainzStatusQueryOptions,
-    prepareReleaseQueryOptions,
+    prepareInboxReleaseQueryOptions,
 } from '@/api/musicbrainz';
-import { AlbumGridCard } from '@/components/common/browser/albums';
+import { MatchChip } from '@/components/common/chips';
 import { PageWrapper } from '@/components/common/page';
 import { trackLengthRep } from '@/components/common/units/time';
 import { CardHeader } from '@/components/frontpage/statsCard';
+import { ExternalCoverArt } from '@/components/library/coverArt';
 import {
     ArtistMatch,
     CountryOption,
@@ -129,37 +132,30 @@ function Header() {
     );
 }
 
-/** Select an album from the library and show the prepared release */
+/** Select an inbox album and show the prepared release */
 function AlbumSelector() {
-    const [selected, setSelected] = useState<Album<false, true> | null>(null);
+    const [selected, setSelected] = useState<InboxAlbum | null>(null);
     const [showAll, setShowAll] = useState(false);
 
-    const queryAlbums = useInfiniteQuery(
-        albumsInfiniteQueryOptions({ query: '' })
-    );
+    const queryAlbums = useQuery(musicbrainzInboxAlbumsQueryOptions());
 
-    const albums = useMemo(
-        () => queryAlbums.data?.albums ?? [],
-        [queryAlbums.data]
-    );
+    const albums = useMemo(() => queryAlbums.data ?? [], [queryAlbums.data]);
 
     return (
         <Stack sx={{ width: '100%' }} gap={2}>
             <AlbumList
                 albums={albums}
-                total={queryAlbums.data?.total ?? 0}
-                selectedId={selected?.id}
+                selectedPath={selected?.folder_path}
                 onSelect={setSelected}
                 isPending={queryAlbums.isPending}
                 isError={queryAlbums.isError}
                 showAll={showAll}
                 onToggleShowAll={() => setShowAll((prev) => !prev)}
-                hasMore={queryAlbums.hasNextPage}
-                isFetchingMore={queryAlbums.isFetchingNextPage}
-                onLoadMore={() => void queryAlbums.fetchNextPage()}
             />
 
-            {selected ? <PreparedView albumId={selected.id} /> : null}
+            {selected ? (
+                <PreparedView folderPath={selected.folder_path} />
+            ) : null}
         </Stack>
     );
 }
@@ -167,35 +163,28 @@ function AlbumSelector() {
 /** Album picker styled like the library browse albums view */
 function AlbumList({
     albums,
-    total,
-    selectedId,
+    selectedPath,
     onSelect,
     isPending,
     isError,
     showAll,
     onToggleShowAll,
-    hasMore,
-    isFetchingMore,
-    onLoadMore,
 }: {
-    albums: Album<false, true>[];
-    total: number;
-    selectedId?: number;
-    onSelect: (album: Album<false, true>) => void;
+    albums: InboxAlbum[];
+    selectedPath?: string;
+    onSelect: (album: InboxAlbum) => void;
     isPending: boolean;
     isError: boolean;
     showAll: boolean;
     onToggleShowAll: () => void;
-    hasMore: boolean;
-    isFetchingMore: boolean;
-    onLoadMore: () => void;
 }) {
     const visibleAlbums = showAll ? albums : albums.slice(0, 6);
     return (
         <Card sx={{ padding: 2, width: '100%', overflow: 'unset' }}>
             <CardHeader icon={<Disc3Icon size={36} />} size="large">
                 <Typography variant="body1" color="text.secondary">
-                    Albums{total > 0 ? ` (${total})` : ''}
+                    Inbox albums
+                    {albums.length > 0 ? ` (${albums.length})` : ''}
                 </Typography>
             </CardHeader>
             <CardContent
@@ -219,13 +208,14 @@ function AlbumList({
                 ) : isError ? (
                     <Box sx={{ p: 2 }}>
                         <Typography color="error">
-                            Failed to load the album list.
+                            Failed to load the inbox album list.
                         </Typography>
                     </Box>
                 ) : albums.length === 0 ? (
                     <Box sx={{ p: 2 }}>
                         <Typography color="text.secondary">
-                            No albums found.
+                            No albums in the inbox. Add a folder with music to
+                            the inbox to prepare it for MusicBrainz.
                         </Typography>
                     </Box>
                 ) : (
@@ -248,10 +238,12 @@ function AlbumList({
                             }}
                         >
                             {visibleAlbums.map((album) => (
-                                <AlbumExistsCard
-                                    key={album.id}
+                                <InboxAlbumCard
+                                    key={album.folder_path}
                                     album={album}
-                                    selected={album.id === selectedId}
+                                    selected={
+                                        album.folder_path === selectedPath
+                                    }
                                     onSelect={onSelect}
                                 />
                             ))}
@@ -270,21 +262,6 @@ function AlbumList({
                                 },
                             })}
                         >
-                            {showAll && hasMore && (
-                                <Button
-                                    variant="outlined"
-                                    size="large"
-                                    onClick={onLoadMore}
-                                    disabled={isFetchingMore}
-                                    sx={{
-                                        fontWeight: 600,
-                                    }}
-                                >
-                                    {isFetchingMore
-                                        ? 'Loading…'
-                                        : 'Load more albums'}
-                                </Button>
-                            )}
                             <Button
                                 variant={showAll ? 'outlined' : 'contained'}
                                 endIcon={
@@ -306,39 +283,159 @@ function AlbumList({
     );
 }
 
-/** Album card that checks MusicBrainz when the stored MBID is missing.
+/** Folder name of an inbox album, used as a fallback title */
+function folderName(folderPath: string): string {
+    return folderPath.split('/').filter(Boolean).at(-1) ?? folderPath;
+}
+
+/** Album card with the match percentage of its import session.
  *
- * Albums imported through beets carry ``mb_albumid``. Albums submitted via
- * the release editor do not, so the server looks the release up by barcode
- * before showing the badge.
+ * The match percentage and MBID come from the most recent import session of
+ * the folder. When the session had no match, the server checks MusicBrainz
+ * by barcode so the "On MB" badge is still accurate.
  */
-function AlbumExistsCard({
+function InboxAlbumCard({
     album,
     selected,
     onSelect,
 }: {
-    album: Album<false, true>;
+    album: InboxAlbum;
     selected: boolean;
-    onSelect: (album: Album<false, true>) => void;
+    onSelect: (album: InboxAlbum) => void;
 }) {
     const { data } = useQuery(
-        albumExistsQueryOptions(album.id, !album.mb_albumid)
+        inboxAlbumExistsQueryOptions(album.folder_path, !album.has_match)
     );
-    const mbid = album.mb_albumid ?? data?.mbid ?? undefined;
+    const mbid = album.match_mbid ?? data?.mbid ?? undefined;
+    const matchPercentage = album.has_match
+        ? album.match_percentage
+        : undefined;
+
     return (
-        <AlbumGridCard
-            album={album}
-            mbid={mbid}
-            selected={selected}
-            onSelect={onSelect}
-        />
+        <Box
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelect(album)}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onSelect(album);
+                }
+            }}
+        >
+            <Box
+                sx={{
+                    padding: 0.75,
+                    border: '2px solid',
+                    borderColor: selected ? 'primary.main' : 'primary.muted',
+                    width: '100%',
+                    color: 'primary.muted',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 1,
+                    height: '100%',
+                    borderRadius: 1,
+                    boxSizing: 'border-box',
+                }}
+            >
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                    <ExternalCoverArt
+                        data_url={`file://${album.folder_path}`}
+                        sx={{ height: '92px', width: '92px', flexShrink: 0 }}
+                    />
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 0.5,
+                            minWidth: 0,
+                            flex: 1,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 0.75,
+                                flexWrap: 'wrap',
+                            }}
+                        >
+                            <Typography
+                                variant="h6"
+                                sx={{
+                                    fontWeight: 600,
+                                    overflowWrap: 'anywhere',
+                                    lineHeight: 1.2,
+                                    minWidth: 0,
+                                }}
+                            >
+                                {album.name ?? folderName(album.folder_path)}
+                            </Typography>
+                            {mbid && (
+                                <Box
+                                    sx={{
+                                        flexShrink: 0,
+                                        fontSize: 9,
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.4px',
+                                        backgroundColor: 'primary.main',
+                                        color: 'primary.contrastText',
+                                        px: 0.75,
+                                        py: 0.25,
+                                        borderRadius: '8px',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    On MB
+                                </Box>
+                            )}
+                        </Box>
+                        <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ overflowWrap: 'anywhere' }}
+                        >
+                            {album.albumartist ?? 'Unknown artist'}
+                            {album.year ? ` · ${album.year}` : ''}
+                        </Typography>
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            {album.folder_path}
+                        </Typography>
+                        {typeof matchPercentage === 'number' && (
+                            <Box
+                                sx={{
+                                    alignSelf: 'flex-start',
+                                    zIndex: 0,
+                                }}
+                            >
+                                <MatchChip
+                                    source="mb"
+                                    distance={1 - matchPercentage / 100}
+                                />
+                            </Box>
+                        )}
+                    </Box>
+                </Box>
+            </Box>
+        </Box>
     );
 }
 
-/** Show the prepared data for the given album */
-function PreparedView({ albumId }: { albumId: number }) {
+/** Show the prepared data for the given inbox album */
+function PreparedView({ folderPath }: { folderPath: string }) {
     const { data, isPending, isError, error } = useQuery(
-        prepareReleaseQueryOptions(albumId)
+        prepareInboxReleaseQueryOptions(folderPath)
     );
 
     if (isPending) {
@@ -360,7 +457,7 @@ function PreparedView({ albumId }: { albumId: number }) {
         );
     }
 
-    return <ReleaseDetails key={albumId} prepared={data} />;
+    return <ReleaseDetails key={folderPath} prepared={data} />;
 }
 
 function ReleaseDetails({ prepared }: { prepared: PreparedRelease }) {
@@ -498,21 +595,24 @@ async function imageExtensionFromBlob(blob: Blob): Promise<string> {
 
 /** Fetch the local cover art and trigger a real download of it */
 async function downloadCoverArt(prepared: PreparedRelease) {
-    const response = await fetch(artUrl('album', prepared.album_id));
+    const url = prepared.folder_path
+        ? `/art?url=${encodeURIComponent(`file://${prepared.folder_path}`)}`
+        : artUrl('album', prepared.album_id);
+    const response = await fetch(url);
     if (!response.ok) {
         console.error('Failed to download cover art', response.status);
         return;
     }
     const blob = await response.blob();
     const extension = await imageExtensionFromBlob(blob);
-    const url = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
-    anchor.href = url;
+    anchor.href = objectUrl;
     anchor.download = `${prepared.release.albumartist} - ${prepared.release.album}.${extension}`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(objectUrl);
 }
 
 /** Human-readable label for an artist search match */

@@ -15,6 +15,8 @@ from urllib.parse import urlparse
 
 from beets.library import Album, Item
 
+from beets_flask.importer.states import TaskState
+
 from .mb import ArtistMatch, search_artist
 
 #: Album keys (and a human readable label) that map to the release editor.
@@ -469,6 +471,9 @@ class PreparedRelease(TypedDict):
     album_id: int
     #: Url of the MusicBrainz release editor (e.g. https://musicbrainz.org/release/add).
     editor_url: str
+    #: Path of the inbox folder this release was prepared from, when it is not
+    #: part of the beets library.
+    folder_path: NotRequired[str]
     release: ReleaseData
     tracks: list[PreparedTrack]
     #: Artists that appear in the release (album artist first, then track artists).
@@ -495,6 +500,32 @@ def _clean(value) -> object | None:
     if isinstance(value, (int, float)) and value == 0:
         return None
     return value
+
+
+def _album_from_task(task: TaskState) -> Album:
+    """Create a synthetic beets Album from an import task.
+
+    The task's current metadata (read from the music files on disk) and its
+    items are used, so that albums from the inbox can be prepared without
+    being part of the beets library. As there is no library database, the
+    items are attached to the album by setting a callable attribute, which
+    beets only does when loading the album from the library.
+    """
+    metadata = {
+        k: v for k, v in task.current_metadata.items() if v not in (None, "")
+    }
+    album = Album(None, **metadata)
+    object.__setattr__(album, "items", lambda: list(task.items))
+    return album
+
+
+def _match_mbid(match) -> str | None:
+    """MBID of a match, parsed from the MusicBrainz release url it was found at."""
+    url = getattr(getattr(match, "info", None), "data_url", None)
+    if not url:
+        return None
+    found = re.search(r"/release/([0-9a-fA-F-]{36})", str(url))
+    return found.group(1) if found else None
 
 
 def _media(album: Album) -> str | None:

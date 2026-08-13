@@ -4,6 +4,7 @@ import {
     MergeIcon,
     SearchIcon,
     Trash2Icon,
+    Wand2,
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -218,6 +219,7 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
         search_ids: [],
         search_artist: null,
         search_album: null,
+        search_year: null,
     });
 
     /** Mutation for the search
@@ -275,6 +277,7 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                                 search_ids: [],
                                 search_artist: '',
                                 search_album: '',
+                                search_year: '',
                             });
                         } catch (e) {
                             // dont close the dialog
@@ -289,22 +292,52 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                             gap: 1.5,
                         }}
                     >
-                        <SearchField
-                            sx={{ width: '100%' }}
-                            id="input-search-id"
-                            label="Seach by Id"
-                            placeholder=""
-                            autoFocus
-                            helperText="Identifier or URL to search for, can be musicbrainz id, spotify url, etc. depending on your configuration."
-                            onChange={(e) => {
-                                setSearch({
-                                    ...search,
-                                    search_ids: e.target.value
-                                        .split(',')
-                                        .map((id) => id.trim()),
-                                });
+                        <Box
+                            sx={{
+                                width: '100%',
+                                display: 'flex',
+                                flexDirection: 'row',
+                                gap: 1,
                             }}
-                        />
+                        >
+                            <SearchField
+                                sx={{ flex: 1 }}
+                                id="input-search-id"
+                                label="Search by Id"
+                                placeholder=""
+                                autoFocus
+                                helperText="Identifier or URL to search for, can be musicbrainz id, spotify url, etc. depending on your configuration."
+                                onChange={(e) => {
+                                    setSearch({
+                                        ...search,
+                                        search_ids: e.target.value
+                                            .split(',')
+                                            .map((id) => id.trim()),
+                                    });
+                                }}
+                            />
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                onClick={() => {
+                                    const metadata = task.current_metadata;
+                                    setSearch({
+                                        search_ids: metadata.mb_albumid
+                                            ? [metadata.mb_albumid]
+                                            : [],
+                                        search_artist: metadata.artist,
+                                        search_album: metadata.album,
+                                        search_year: metadata.year,
+                                    });
+                                }}
+                                startIcon={
+                                    <Wand2 size={theme.iconSize.sm} />
+                                }
+                                sx={{ alignSelf: 'center' }}
+                            >
+                                Auto-fill
+                            </Button>
+                        </Box>
                         <Box>
                             <Box
                                 sx={{
@@ -317,7 +350,7 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                                 <SearchField
                                     sx={{ width: '100%' }}
                                     id="input-search-artist"
-                                    label="Seach by artist"
+                                    label="Search by artist"
                                     placeholder="Artist"
                                     value={search.search_artist || ''}
                                     onChange={(e) => {
@@ -329,7 +362,7 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                                 />
                                 <SearchField
                                     sx={{ width: '100%' }}
-                                    id="input-search-artist"
+                                    id="input-search-album"
                                     label="and album"
                                     placeholder="Album"
                                     value={search.search_album || ''}
@@ -337,6 +370,19 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                                         setSearch({
                                             ...search,
                                             search_album: e.target.value,
+                                        });
+                                    }}
+                                />
+                                <SearchField
+                                    sx={{ width: '100%' }}
+                                    id="input-search-year"
+                                    label="and year"
+                                    placeholder="Year"
+                                    value={search.search_year || ''}
+                                    onChange={(e) => {
+                                        setSearch({
+                                            ...search,
+                                            search_year: e.target.value,
                                         });
                                     }}
                                 />
@@ -348,8 +394,8 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                                     fontSize: theme.typography.caption.fontSize,
                                 })}
                             >
-                                Search by artist and album name to find more
-                                candidates. Might take a while.
+                                Search by artist, album and year name to find
+                                more candidates. Might take a while.
                             </FormHelperText>
                         </Box>
                         <Box

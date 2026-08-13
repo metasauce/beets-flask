@@ -27,6 +27,7 @@ export interface Search {
     search_ids: Array<string>;
     search_artist: null | string;
     search_album: null | string;
+    search_year: null | string;
 }
 
 export interface ReleaseFlags {
@@ -59,6 +60,7 @@ export interface ReleaseData {
 export interface PreparedRelease {
     album_id: number;
     editor_url: string;
+    folder_path?: string;
     release: ReleaseData;
     tracks: Array<PreparedTrack>;
     artists: Array<PreparedArtist>;

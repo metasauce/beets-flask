@@ -1,5 +1,12 @@
+import shutil
+from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import quote
+
 import pytest
 
+from beets_flask.config import get_config
+from beets_flask.config.beets_config import refresh_config
 from tests.conftest import beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
@@ -213,3 +220,217 @@ class TestMusicbrainzEndpoint(IsolatedBeetsLibraryMixin):
         """Test that an unknown album returns 404."""
         response = await client.get("/api_v1/musicbrainz/album_exists/999999")
         assert response.status_code == 404, "Response status code is not 404"
+
+
+class TestMusicbrainzInboxEndpoint:
+    """Inbox-based MusicBrainz preparation endpoints.
+
+    The inbox endpoints work on folders (album folders with music files on
+    disk) instead of the beets library, using the match of their most recent
+    import session when one exists.
+    """
+
+    _inbox: Path | None = None
+    _album: Path | None = None
+
+    @pytest.fixture(autouse=True, scope="class")
+    def inbox(self, tmpdir_factory):
+        """Configure an inbox folder that contains one real album."""
+        inbox_path = Path(tmpdir_factory.mktemp("inbox"))
+        album_dir = inbox_path / "Antidote"
+        album_dir.mkdir()
+        source = (
+            Path(__file__).parents[3]
+            / "data"
+            / "audio"
+            / "Annix"
+            / "Antidote"
+            / "01 Antidote.mp3"
+        )
+        shutil.copy(source, album_dir / "01 Antidote.mp3")
+
+        config = get_config()
+        config["gui"]["inbox"]["folders"] = {
+            "inbox1": {"path": str(inbox_path), "autotag": "preview"}
+        }
+
+        self._inbox = inbox_path
+        self._album = album_dir
+        yield inbox_path
+        refresh_config()
+
+    def _album_segment(self) -> str:
+        # Slashes are percent-encoded so the path fits a single URL segment.
+        return quote(str(self._album), safe="")
+
+    async def test_albums_lists_inbox_folder(self, client):
+        """The albums endpoint lists inbox folders with no match info."""
+        response = await client.get("/api_v1/musicbrainz/albums")
+        data = await response.get_json()
+        assert response.status_code == 200
+
+        album = next((a for a in data if a["folder_path"] == str(self._album)), None)
+        assert album is not None
+        assert album["type"] == "directory"
+        assert album["has_session"] is False
+        assert album["has_match"] is False
+        assert album["name"] is None
+        assert album["match_percentage"] is None
+
+    async def test_albums_with_session_match(self, client, monkeypatch):
+        """The albums endpoint surfaces the session's match percentage."""
+        best = SimpleNamespace(
+            distance=SimpleNamespace(distance=0.0889),
+            match=SimpleNamespace(
+                info=SimpleNamespace(
+                    data_url=f"https://musicbrainz.org/release/{MBID_A}"
+                )
+            ),
+            album="Antidote",
+            artist="Annix",
+        )
+        task = SimpleNamespace(
+            current_metadata={
+                "album": "Antidote",
+                "albumartist": "Annix",
+                "year": "2021",
+            },
+            best_candidate_state=best,
+        )
+        monkeypatch.setattr(
+            "beets_flask.server.routes.musicbrainz.resources._folder_task",
+            lambda folder: task,
+        )
+
+        response = await client.get("/api_v1/musicbrainz/albums")
+        data = await response.get_json()
+        assert response.status_code == 200
+
+        album = next((a for a in data if a["folder_path"] == str(self._album)), None)
+        assert album is not None
+        assert album["has_session"] is True
+        assert album["has_match"] is True
+        assert album["match_percentage"] == 91.1
+        assert album["match_mbid"] == MBID_A
+
+    async def test_prepare_folder(self, client):
+        """The folder can be prepared from the tags of its music files."""
+        response = await client.get(
+            f"/api_v1/musicbrainz/prepare/{self._album_segment()}"
+        )
+        data = await response.get_json()
+        assert response.status_code == 200
+        assert data["folder_path"] == str(self._album)
+        assert data["album_id"] == 0  # not stored in the beets library
+        assert data["release"]["album"] == "Antidote"
+        assert data["release"]["year"] == 2021
+        assert len(data["tracks"]) == 1
+        assert data["tracks"][0]["title"] == "Antidote"
+
+    async def test_prepare_folder_unknown(self, client):
+        """A path that is not an album folder returns 404."""
+        response = await client.get(
+            f"/api_v1/musicbrainz/prepare/{quote(str(self._inbox), safe='')}"
+        )
+        assert response.status_code == 404
+
+    async def test_prepare_folder_unquotes_path(self, client):
+        """Percent-encoded paths (slashes as %2F) are decoded server side."""
+        encoded = quote(str(self._album), safe="")
+        response = await client.get(f"/api_v1/musicbrainz/prepare/{encoded}")
+        assert response.status_code == 200
+        data = await response.get_json()
+        assert data["folder_path"] == str(self._album)
+
+    async def test_album_exists_inbox_no_match(self, client, monkeypatch):
+        """Without a session the barcode is read from the files, not hit."""
+        called = []
+
+        def fake_search(barcode):
+            called.append(barcode)
+            return []
+
+        monkeypatch.setattr(
+            "beets_flask.server.routes.musicbrainz.resources.search_release_by_barcode",
+            fake_search,
+        )
+
+        response = await client.get(
+            f"/api_v1/musicbrainz/album_exists/{self._album_segment()}"
+        )
+        data = await response.get_json()
+        assert response.status_code == 200
+        assert data == {
+            "folder_path": str(self._album),
+            "exists": False,
+            "mbid": None,
+        }
+        # The test file has no barcode tag, so no lookup happens.
+        assert called == []
+
+    async def test_album_exists_inbox_session_match(self, client, monkeypatch):
+        """A close session match reports the album as present."""
+        best = SimpleNamespace(
+            distance=SimpleNamespace(distance=0.0),
+            match=SimpleNamespace(
+                info=SimpleNamespace(
+                    data_url=f"https://musicbrainz.org/release/{MBID_A}"
+                )
+            ),
+        )
+        task = SimpleNamespace(
+            current_metadata={"barcode": BARCODE},
+            best_candidate_state=best,
+        )
+        monkeypatch.setattr(
+            "beets_flask.server.routes.musicbrainz.resources._folder_task",
+            lambda folder: task,
+        )
+
+        response = await client.get(
+            f"/api_v1/musicbrainz/album_exists/{self._album_segment()}"
+        )
+        data = await response.get_json()
+        assert response.status_code == 200
+        assert data == {
+            "folder_path": str(self._album),
+            "exists": True,
+            "mbid": MBID_A,
+        }
+
+    async def test_album_exists_inbox_barcode_lookup(self, client, monkeypatch):
+        """Without a close match the release is looked up by barcode."""
+        best = SimpleNamespace(
+            distance=SimpleNamespace(distance=0.9),
+            match=SimpleNamespace(info=SimpleNamespace(data_url=None)),
+        )
+        task = SimpleNamespace(
+            current_metadata={"barcode": BARCODE},
+            best_candidate_state=best,
+        )
+        seen = {}
+
+        def fake_search(barcode):
+            seen["barcode"] = barcode
+            return [{"mbid": MBID_A, "title": "The Album", "score": 100}]
+
+        monkeypatch.setattr(
+            "beets_flask.server.routes.musicbrainz.resources._folder_task",
+            lambda folder: task,
+        )
+        monkeypatch.setattr(
+            "beets_flask.server.routes.musicbrainz.resources.search_release_by_barcode",
+            fake_search,
+        )
+
+        response = await client.get(
+            f"/api_v1/musicbrainz/album_exists/{self._album_segment()}"
+        )
+        data = await response.get_json()
+        assert response.status_code == 200
+        assert data == {
+            "folder_path": str(self._album),
+            "exists": True,
+            "mbid": MBID_A,
+        }
+        assert seen["barcode"] == BARCODE

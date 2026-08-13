@@ -1,5 +1,20 @@
+# Workaround for Python 3.14 (PEP 649): class annotations are resolved lazily
+# and no longer live in ``cls.__dict__``, so py2ts cannot see them. Resolve
+# the hints ourselves and filter by ``cls.__annotations__`` instead.
+from py2ts import generate as py2ts_generate  # noqa: E402
 from py2ts.builder import TSBuilder
 from py2ts.config import CONFIG
+
+
+def _get_type_hints_no_inheritance(cls):
+    from typing import get_type_hints
+
+    all_hints = get_type_hints(cls, include_extras=True)
+    cls_annotations = getattr(cls, "__annotations__", {}) or {}
+    return {k: v for k, v in all_hints.items() if k in cls_annotations}
+
+
+py2ts_generate._get_type_hints_no_inheritance = _get_type_hints_no_inheritance
 
 from beets_flask.disk import Archive, File, FileSystemItem, Folder
 from beets_flask.importer.session import CandidateChoiceFallback
