@@ -26,6 +26,7 @@
 -   Web-Terminal
 -   Monitor multiple inboxes
 -   Library view and search
+-   Prepare albums for the [MusicBrainz release editor](https://musicbrainz.org/release/add), with one-click prefill of the release form
 
 <!-- end features -->
 

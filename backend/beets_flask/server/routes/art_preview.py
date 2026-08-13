@@ -100,10 +100,11 @@ async def get_folder_art(url: str):
         return jsonify({"error": "No audio files found in folder."}), 404
 
     # Redirect to file art endpoint /file/<filepath>/art
+    # filepath must be hex-encoded (see artwork.file_art).
     return redirect(
         url_for(
             "backend.library.artwork.file_art",
-            filepath=quote_plus(path + "/" + files[0]),
+            filepath=(path + "/" + files[0]).encode("utf-8").hex(),
         ),
         code=302,
     )
