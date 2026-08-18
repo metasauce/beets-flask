@@ -50,6 +50,7 @@ dev = [
     { include-group = "typed" },
     "ruff>=0.6.5",
     "pre-commit>=3.8.0",
+    "pytest-aiohttp>=1.1.1",
 ]
 
 # Can be install with e.g. `pip install -e .[dev]`

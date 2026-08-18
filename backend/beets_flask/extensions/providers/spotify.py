@@ -20,6 +20,7 @@ class SpotifyArtSource(ArtSource):
 
     name: ClassVar[str] = "spotify"
     priority: ClassVar[int] = 10
+    oembed_base: ClassVar[str] = "https://embed.spotify.com/oembed"
 
     def matches(self, url: str) -> bool:
         return url.startswith("https://open.spotify.com/")
@@ -29,7 +30,7 @@ class SpotifyArtSource(ArtSource):
     ) -> ArtResult | None:
         try:
             async with session.get(
-                f"https://embed.spotify.com/oembed?url={quote_plus(url)}"
+                f"{self.oembed_base}?url={quote_plus(url)}"
             ) as response:
                 if response.status != 200:
                     log.error(f"Error fetching Spotify art: {response.status}")
