@@ -1,11 +1,16 @@
 """Unit tests for the art extension interface and its providers."""
 
+import shutil
+from pathlib import Path
+
 import aiohttp
 import pytest
 from aiohttp import web
+from mediafile import Image, MediaFile
 
 from beets_flask.extensions.art import ArtResult, ArtSource
 from beets_flask.extensions.providers import ART_SOURCES
+from beets_flask.extensions.providers.file import FileArtSource
 from beets_flask.extensions.providers.musicbrainz import MusicbrainzArtSource
 from beets_flask.extensions.providers.spotify import SpotifyArtSource
 
@@ -159,5 +164,54 @@ class TestMusicbrainzArtSourceGetArt:
                 "https://musicbrainz.org/artist/1cf2ae06-bb5e-4256-af6c-e40d406abba5",
                 session,
             )
+
+        assert result is None
+
+
+class TestFileArtSourceGetArt:
+    audio_dir = Path(__file__).resolve().parents[2] / "data" / "audio"
+
+    @pytest.mark.asyncio
+    async def test_returns_embedded_art(self, tmp_path):
+        cover = (self.audio_dir / "cover.png").read_bytes()
+        audio = tmp_path / "track.mp3"
+        shutil.copy(self.audio_dir / "test.mp3", audio)
+        mediafile = MediaFile(str(audio))
+        mediafile.images = [Image(data=cover)]
+        mediafile.save()
+
+        async with aiohttp.ClientSession() as session:
+            result = await FileArtSource().get_art(f"file://{tmp_path}", session)
+
+        assert result == ArtResult.from_data(cover, "image/png")
+
+    @pytest.mark.asyncio
+    async def test_returns_none_for_audio_without_embedded_art(self, tmp_path):
+        audio = tmp_path / "track.mp3"
+        shutil.copy(self.audio_dir / "test.mp3", audio)
+        mediafile = MediaFile(str(audio))
+        mediafile.images = []
+        mediafile.save()
+
+        async with aiohttp.ClientSession() as session:
+            result = await FileArtSource().get_art(f"file://{tmp_path}", session)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_for_missing_folder(self, tmp_path):
+        async with aiohttp.ClientSession() as session:
+            result = await FileArtSource().get_art(
+                f"file://{tmp_path / 'does-not-exist'}", session
+            )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_for_folder_without_audio(self, tmp_path):
+        (tmp_path / "notes.txt").write_text("hello")
+
+        async with aiohttp.ClientSession() as session:
+            result = await FileArtSource().get_art(f"file://{tmp_path}", session)
 
         assert result is None
