@@ -300,6 +300,7 @@ docs = [
 test = [
     { name = "fakeredis" },
     { name = "pytest" },
+    { name = "pytest-aiohttp" },
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
@@ -382,6 +383,7 @@ docs = [
 test = [
     { name = "fakeredis" },
     { name = "pytest", specifier = ">=8.2.2" },
+    { name = "pytest-aiohttp", specifier = ">=1.1.1" },
     { name = "pytest-asyncio", specifier = ">=0.23.8" },
     { name = "pytest-benchmark", specifier = ">=5.2.3" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
