@@ -25,6 +25,7 @@ class MusicbrainzArtSource(ArtSource):
 
     name: ClassVar[str] = "musicbrainz"
     priority: ClassVar[int] = 10
+    coverart_base: ClassVar[str] = "https://coverartarchive.org"
 
     def matches(self, url: str) -> bool:
         return _MUSICBRAINZ_RELEASE_PATTERN.search(url) is not None
@@ -39,7 +40,7 @@ class MusicbrainzArtSource(ArtSource):
         release_id = match.group(1)
         return ArtResult.from_urls(
             [
-                f"https://coverartarchive.org/release/{release_id}/front-250",
-                f"https://coverartarchive.org/release/{release_id}/front",
+                f"{self.coverart_base}/release/{release_id}/front-250",
+                f"{self.coverart_base}/release/{release_id}/front",
             ]
         )
