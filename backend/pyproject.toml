@@ -50,7 +50,6 @@ dev = [
     { include-group = "typed" },
     "ruff>=0.6.5",
     "pre-commit>=3.8.0",
-    "pytest-aiohttp>=1.1.1",
 ]
 
 # Can be install with e.g. `pip install -e .[dev]`
@@ -59,6 +58,7 @@ test = [
     "pytest-benchmark>=5.2.3",
     "pytest-asyncio>=0.23.8",
     "pytest-cov>=5.0.0",
+    "pytest-aiohttp>=1.1.1",
     "fakeredis",
 ]
 docs = [
