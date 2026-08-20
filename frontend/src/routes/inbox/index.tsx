@@ -12,7 +12,8 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { Action, useConfig } from '@/api/config';
-import { inboxQueryOptions } from '@/api/inbox';
+import { inboxQueryOptions, walkFolder } from '@/api/inbox';
+import { ensureMinimalSessions, ensureStatuses } from '@/api/session';
 import { MatchChip, StyledChip } from '@/components/common/chips';
 import { Dialog } from '@/components/common/dialogs';
 import {
@@ -31,14 +32,42 @@ import { InboxCard } from '@/components/inbox/cards/inboxCard';
 import { FileUploadProvider } from '@/components/inbox/fileUpload/context';
 import { DropZone } from '@/components/inbox/fileUpload/dropzone';
 import { FolderSelectionProvider } from '@/components/inbox/folderSelectionContext';
-import { Folder } from '@/pythonTypes';
+import { Archive, Folder } from '@/pythonTypes';
 
 /* ---------------------------------- Route --------------------------------- */
 
 export const Route = createFileRoute('/inbox/')({
     component: RouteComponent,
     loader: async ({ context }) => {
-        return await context.queryClient.ensureQueryData(inboxQueryOptions());
+        // Load inboxes
+        const inboxes =
+            await context.queryClient.ensureQueryData(inboxQueryOptions());
+
+        // Filter: all top level folders/archives in inboxes
+        const prefetch_folders: Array<Folder | Archive> = [];
+        for (const inbox of inboxes) {
+            for (const child of walkFolder(inbox, 1)) {
+                if (child.type === 'directory' || child.type === 'archive') {
+                    prefetch_folders.push(child);
+                }
+            }
+        }
+        // Prefetch minimal information for all sessions within the top level inbox
+        // folders. This prevents waterfall loading states
+        await Promise.all([
+            ensureStatuses(
+                prefetch_folders.map((f) => ({
+                    hash: f.hash,
+                    path: f.full_path,
+                }))
+            ),
+            ensureMinimalSessions(
+                prefetch_folders.map((f) => ({
+                    hash: f.hash,
+                    path: f.full_path,
+                }))
+            ),
+        ]);
     },
 });
 
