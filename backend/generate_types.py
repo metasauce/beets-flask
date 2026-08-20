@@ -11,6 +11,7 @@ from beets_flask.invoker import EnqueueKind
 from beets_flask.invoker.enqueue import (
     Search,
 )
+from beets_flask.server.routes.db_models.session import MinimalSession
 from beets_flask.server.routes.inbox import InboxStats
 from beets_flask.server.routes.library.resources import (
     AlbumResponse,
@@ -42,6 +43,9 @@ builder = TSBuilder()
 
 # Session state
 builder.add(SerializedSessionState)
+
+# Best-match chip info per folder
+builder.add(MinimalSession)
 
 # ------------------------------- inbox routes ------------------------------- #
 
