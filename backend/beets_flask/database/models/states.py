@@ -14,24 +14,28 @@ Why not just have State and StateInDb in the same class?
 from __future__ import annotations
 
 import pickle
+from collections.abc import Sequence
 from pathlib import Path
 
 from beets.importer import Action
 from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
+    case,
     select,
 )
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     Mapped,
     Session,
     mapped_column,
     relationship,
 )
+from sqlalchemy.sql.elements import ColumnElement
 
 from beets_flask.database.mapper.base import Context
 from beets_flask.database.models.base import Base
-from beets_flask.database.models.match import Match
+from beets_flask.database.models.match import Distance, Match
 from beets_flask.disk import Archive, Folder
 from beets_flask.importer.progress import Progress
 from beets_flask.importer.states import SessionState
@@ -268,6 +272,60 @@ class SessionStateInDb(Base):
 
             return item
 
+    @classmethod
+    def get_ids_by_hash_and_path(
+        cls,
+        hash_path_pairs: Sequence[tuple[str | None, Path | str | None]],
+        db_session: Session | None = None,
+    ) -> list[str | None]:
+        """Resolve many (hash, path) pairs to session ids in two queries.
+
+        Same lookup semantics as `get_by_hash_and_path`: by hash first
+        (latest revision), then by path (most recently updated session).
+        Returns a sequence of session ids in the same order as the input
+        pairs; unresolved pairs map to None.
+        """
+        from beets_flask.database import db_session_factory
+
+        with db_session_factory(db_session) as db_session:
+            by_hash: dict[str, str] = {}
+            hashes = [h for h, _ in hash_path_pairs if h]
+            if hashes:
+                query = (
+                    select(cls.folder_hash, cls.id)
+                    .where(cls.folder_hash.in_(hashes))
+                    # highest revision first
+                    .order_by(cls.folder_revision.desc())
+                )
+                for folder_hash, session_id in db_session.execute(query).all():
+                    by_hash.setdefault(folder_hash, session_id)
+
+            pending = [
+                (i, str(p))
+                for i, (h, p) in enumerate(hash_path_pairs)
+                if (not h or h not in by_hash) and p
+            ]
+            by_path: dict[str, str] = {}
+            if pending:
+                query = (
+                    select(FolderInDb.full_path, cls.id)
+                    .join(cls.folder)
+                    .where(FolderInDb.full_path.in_([p for _, p in pending]))
+                    # most recently updated first
+                    .order_by(cls.updated_at.desc(), cls.folder_revision.desc())
+                )
+                for full_path, session_id in db_session.execute(query).all():
+                    by_path.setdefault(full_path, session_id)
+
+            result: list[str | None] = [None] * len(hash_path_pairs)
+            for i, (h, p) in enumerate(hash_path_pairs):
+                item = by_hash.get(h) if h else None
+                if item is None and p:
+                    item = by_path.get(str(p))
+                result[i] = item
+
+            return result
+
     @property
     def exception(self) -> SerializedException | None:
         """Returns the exception of the session if it failed."""
@@ -414,6 +472,28 @@ class CandidateStateInDb(Base):
         self.match = match
         self.task = task
         self.duplicate_ids = ";".join(map(str, duplicate_ids))
+
+    @hybrid_property
+    def normalized_distance(self) -> float:
+        """Normalized beets distance of this candidate (0-1, lower is better).
+
+        A max distance of zero (no penalties) counts as a perfect match.
+        """
+        distance = self.match.distance
+        if distance.max_distance == 0:
+            return 0.0
+        return distance.raw_distance / distance.max_distance
+
+    @normalized_distance.inplace.expression
+    def _normalized_distance_expression(cls) -> ColumnElement[float]:
+        """SQL counterpart of `normalized_distance`.
+
+        Requires joins to `Match` and `Distance` in the query.
+        """
+        return case(
+            (Distance.max_distance == 0, 0.0),
+            else_=Distance.raw_distance / Distance.max_distance,
+        )
 
 
 __all__ = ["SessionStateInDb", "TaskStateInDb", "CandidateStateInDb"]
