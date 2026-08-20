@@ -9,6 +9,7 @@ import {
     FolderStatus,
     FolderStatusUpdate,
     JobStatusUpdate,
+    MinimalSession,
     Search,
     SerializedCandidateState,
     SerializedException,
@@ -23,21 +24,18 @@ export const sessionQueryOptions = ({
     folderHash,
     folderPath,
 }: {
-    folderHash?: string;
+    folderHash: string;
     folderPath?: string;
 }) => ({
-    queryKey: ['session', { folderHash, folderPath }],
+    queryKey: ['session', folderHash, 'full'],
+    StaleTime: Infinity,
     queryFn: async () => {
-        const response = await fetch(`/session/by_folder`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                folder_hashes: [folderHash],
-                folder_paths: [folderPath],
-            }),
-        });
+        const params = new URLSearchParams();
+        params.append('folder_hash', folderHash);
+        if (folderPath) {
+            params.append('folder_path', folderPath);
+        }
+        const response = await fetch(`/session/full?${params.toString()}`);
         // make sure we have a folder
         const res = (await response.json()) as
             SerializedSessionState | SerializedException;
@@ -68,10 +66,7 @@ export const sessionQueryOptions = ({
         }
 
         queryClient.setQueryData<SerializedSessionState>(
-            [
-                'session',
-                { folderHash: res.folder_hash, folderPath: res.folder_path },
-            ],
+            ['session', res.folder_hash, 'full'],
             res
         );
 
@@ -81,35 +76,26 @@ export const sessionQueryOptions = ({
 
 /* ------------------------------ Invalidation ------------------------------ */
 
-/** Invalidates all session data which
- * is related to the given folder/session.
+/** Invalidates the cached full session state and minimal chip info for a
+ * given folder hash. Without a hash, invalidates all session data.
  *
- * If a hash is given, this will only invalidate
- * the session with the given hash. Otherwise it will invalidates
- * all sessions with the given path.
+ * Status entries are intentionally excluded: they are updated directly from
+ * socket events (see statusQueryOptions).
  */
-export async function invalidateSession(
-    folderHash?: string,
-    folderPath?: string,
-    strict = false
-): Promise<void> {
-    console.debug('Invalidate session', folderHash, folderPath);
-    await queryClient.invalidateQueries({
-        predicate: (query) => {
-            if (query.queryKey[0] !== 'session') return false;
-            const { folderHash: qHash, folderPath: qPath } = query
-                .queryKey[1] as {
-                folderHash?: string;
-                folderPath?: string;
-            };
-            // If we have a hash, invalidate only this session
-            if (folderHash && strict) {
-                return qHash == folderHash;
-            }
-            // Otherwise invalidate all sessions with the given path
-            return qPath == folderPath || qHash == folderHash;
-        },
-    });
+export async function invalidateSession(folderHash?: string): Promise<void> {
+    console.debug('Invalidate session', folderHash);
+    if (!folderHash) {
+        await queryClient.invalidateQueries({ queryKey: ['session'] });
+        return;
+    }
+    await Promise.all([
+        queryClient.invalidateQueries({
+            queryKey: ['session', folderHash, 'full'],
+        }),
+        queryClient.invalidateQueries({
+            queryKey: ['session', folderHash, 'minimal'],
+        }),
+    ]);
 }
 
 /* -------------------------------- Mutations ------------------------------- */
@@ -206,57 +192,32 @@ export const enqueueMutationOptions: UseMutationOptions<
     },
     // Optimistic update for status, show pending before backend response
     onMutate: async ({ selected }) => {
-        const queryKey = statusQueryOptions.queryKey;
-        await queryClient.cancelQueries({ queryKey });
-
-        queryClient.setQueryData<FolderStatusUpdate[]>(queryKey, (old) => {
-            if (!old) return old;
-            const found = new Set();
-            let nex = structuredClone(old);
-            nex = nex.map((status) => {
-                if (selected.hashes.includes(status.hash)) {
-                    status.status = FolderStatus.PENDING;
-                    status.exc = null;
-                    found.add(status.hash);
-                }
-                return status;
+        for (const [idx, hash] of selected.hashes.entries()) {
+            const queryKey = statusQueryOptions(
+                hash,
+                selected.paths[idx]
+            ).queryKey;
+            await queryClient.cancelQueries({ queryKey });
+            queryClient.setQueryData<FolderStatusUpdate>(queryKey, {
+                path: selected.paths[idx],
+                hash: hash,
+                status: FolderStatus.PENDING,
+                exc: null,
+                event: 'folder_status_update',
             });
-            for (const hash of selected.hashes) {
-                if (!found.has(hash)) {
-                    nex.push({
-                        path: selected.paths[selected.hashes.indexOf(hash)],
-                        hash: hash,
-                        status: FolderStatus.PENDING,
-                        exc: null,
-                        event: 'folder_status_update',
-                    });
-                }
-            }
-            return nex;
-        });
+        }
     },
     // Fetch new session on success
     onSuccess: async (_data, { selected }) => {
         const predicate = (query: Query) => {
             if (query.queryKey[0] == 'artists') return true;
             if (query.queryKey[0] !== 'session') return false;
-            if (!query.queryKey[1]) return false;
-            // Lets just invalidate all session with this path or hash
-            const { folderHash: qHash, folderPath: qPath } = query
-                .queryKey[1] as {
-                folderHash?: string;
-                folderPath?: string;
-            };
-
-            let containsPath = false;
-            let containsHash = false;
-            if (qPath && selected.paths.length > 0) {
-                containsPath = selected.paths.includes(qPath);
-            }
-            if (qHash && selected.hashes.length > 0) {
-                containsHash = selected.hashes.includes(qHash);
-            }
-            return containsPath || containsHash;
+            // Covers 'full' and 'minimal' entries for a folder hash.
+            // 'status' is updated directly via the socket, not refetched here.
+            return (
+                query.queryKey[2] !== 'status' &&
+                selected.hashes.includes(query.queryKey[1] as string)
+            );
         };
 
         const ps = [
@@ -581,4 +542,39 @@ export const minimalSessionQueryOptions = (
 
         return res[folderHash] ?? null;
     },
-};
+});
+
+/**
+ * Fetch minimal chip info for many folders in one request and populate their
+ * canonical cache entries. Skips cached folders; caches null for folders
+ * without a session so they are not refetched.
+ */
+export async function ensureMinimalSessions(
+    folders: Array<{ hash: string; path: string }>
+): Promise<void> {
+    const missing = folders.filter(
+        (folder) =>
+            queryClient.getQueryData<MinimalSession | null>(
+                minimalSessionQueryOptions(folder.hash, folder.path).queryKey
+            ) === undefined
+    );
+
+    if (missing.length === 0) {
+        return;
+    }
+
+    const params = new URLSearchParams();
+    missing.forEach((folder) => {
+        params.append('folder_hash', folder.hash);
+        params.append('folder_path', folder.path);
+    });
+    const response = await fetch(`/session/minimal?${params.toString()}`);
+    const res = (await response.json()) as Record<string, MinimalSession>;
+
+    missing.forEach((folder) => {
+        queryClient.setQueryData<MinimalSession | null>(
+            minimalSessionQueryOptions(folder.hash, folder.path).queryKey,
+            res[folder.hash] ?? null
+        );
+    });
+}

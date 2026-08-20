@@ -38,36 +38,14 @@ export function StatusContextProvider({
 
         function handleFolderStatusUpdate(updateData: FolderStatusUpdate) {
             console.log('FolderStatusUpdate', updateData);
-            // update folder status
-            queryClient.setQueryData<FolderStatusUpdate[]>(
-                statusQueryOptions.queryKey,
-                (prev) => {
-                    if (!prev) return [updateData];
-                    const n = [...prev];
-
-                    // If the folder is already in the list, update it
-                    let folderIndex = n.findIndex((folder) => {
-                        return folder.hash === updateData.hash;
-                    });
-                    if (folderIndex !== -1) {
-                        // Try by path if we did not find it by hash
-                        folderIndex = n.findIndex((folder) => {
-                            return folder.path === updateData.path;
-                        });
-                    }
-
-                    if (folderIndex !== -1) {
-                        n[folderIndex] = updateData;
-                    } else {
-                        n.push(updateData);
-                    }
-                    return n;
-                }
+            // Update the folder's status directly; further data (session state,
+            // duplicates) is refetched via invalidation.
+            queryClient.setQueryData<FolderStatusUpdate>(
+                statusQueryOptions(updateData.hash, updateData.path).queryKey,
+                updateData
             );
 
-            invalidateSession(updateData.hash, updateData.path, false).catch(
-                console.error
-            );
+            invalidateSession(updateData.hash).catch(console.error);
         }
 
         async function handleFileSystemUpdate(updateData: FileSystemUpdate) {
