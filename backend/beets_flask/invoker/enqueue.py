@@ -452,18 +452,24 @@ async def run_preview(
         try:
             await p_session.run_async()
         finally:
-            # Get max revision for this folder hash
-            stmt = select(func.max(SessionStateInDb.folder_revision)).where(
-                SessionStateInDb.folder_hash == hash,
-            )
-            max_rev = db_session.execute(stmt).scalar_one_or_none()
-            new_rev = 0 if max_rev is None else max_rev + 1
+            # A folder without any media files does not produce tasks and thus
+            # no meaningful session. Skip persisting it, otherwise the folder
+            # shows up with a misleading "not started" status.
+            if len(p_session.state.task_states) == 0:
+                log.debug(f"No tasks read from {path}, not persisting preview session.")
+            else:
+                # Get max revision for this folder hash
+                stmt = select(func.max(SessionStateInDb.folder_revision)).where(
+                    SessionStateInDb.folder_hash == hash,
+                )
+                max_rev = db_session.execute(stmt).scalar_one_or_none()
+                new_rev = 0 if max_rev is None else max_rev + 1
 
-            s_state_indb = SessionStateInDb.from_live_state(p_session.state)
-            s_state_indb.folder_revision = new_rev
+                s_state_indb = SessionStateInDb.from_live_state(p_session.state)
+                s_state_indb.folder_revision = new_rev
 
-            db_session.merge(s_state_indb)
-            db_session.commit()
+                db_session.merge(s_state_indb)
+                db_session.commit()
 
     log.info(f"Preview done. {hash=} {path=}")
     return

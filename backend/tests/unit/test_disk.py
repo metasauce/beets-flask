@@ -87,6 +87,8 @@ def s_base(tmpdir_factory):
     # but with the default config, hidden files should be ignored:
     os.makedirs(os.path.join(base, "artist/album_junk"))
     touch(os.path.join(base, "artist/album_junk/.junk.jpg"))
+    # non-hidden junk must not make the folder an album either
+    touch(os.path.join(base, "artist/album_junk/foo.txt"))
 
     # the annoying rogue element (same as nested folders, but with a rogue file)
     os.makedirs(os.path.join(base, "artist/album_rogue/CD1"))
