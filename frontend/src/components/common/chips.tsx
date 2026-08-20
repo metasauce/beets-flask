@@ -217,7 +217,10 @@ export function FolderStatusChip({
     );
     const theme = useTheme();
 
-    if (!folderStatus) {
+    /*
+    Only report folders that have a status; unkown means no session
+    */
+    if (!folderStatus || folderStatus.status == FolderStatus.UNKNOWN) {
         return null;
     }
 
