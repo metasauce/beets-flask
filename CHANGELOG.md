@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New config option `gui.terminal.enabled` (default: true) [#254](https://github.com/metasauce/beets-flask/pull/224)
 - You can now alternatively use `PUID` and `PGID` instead of `GROUP_ID` and `USER_ID` environment variables. Good for [yaml anchors](https://docs.docker.com/reference/compose-file/fragments/). [#260](https://github.com/metasauce/beets-flask/issues/260)
 - Use an external redis server by setting the `REDIS_URL` environment variable. [#277](https://github.com/metasauce/beets-flask/pull/277)
+- Faster loading of the inbox: chip info (best match, duplicates, data source) is now fetched via a new lightweight `/session/minimal` endpoint, batched in a single request instead of loading full session states.
 
 ### Fixed
 
@@ -35,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Container user `beetle` now uses bash terminal by default and activates the uv environment automatically.
 - Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/metasauce/beets-flask/pull/305)
 - Fixed an issue with timestamps shown in the library view [#289](https://github.com/metasauce/beets-flask/issues/289)
+- A failed import no longer leaves a stale error behind after a successful reimport of the same folder.
+- Folders without any import session no longer show a misleading "Unknown"/"Not started" badge.
+- Folders containing only non-music files (e.g. stray uploads like `foo.txt`) are no longer detected as albums and auto-tagged by the watchdog.
+- Session and inbox data is now cached in the frontend and only refetched when it actually changes, instead of on every view.
 
 ### Other (dev)
 
