@@ -14,7 +14,7 @@ import {
     useInboxFolderFrontendConfig,
 } from '@/api/config';
 import { walkFolder } from '@/api/inbox';
-import { sessionQueryOptions } from '@/api/session';
+import { statusQueryOptions } from '@/api/session';
 import { InboxTypeIcon } from '@/components/common/icons';
 import { CardHeader } from '@/components/frontpage/statsCard';
 import {
@@ -24,7 +24,7 @@ import {
     GridWrapper,
     InboxGridHeader,
 } from '@/components/inbox/fileTree';
-import { Archive, Folder, Progress } from '@/pythonTypes';
+import { Archive, Folder, FolderStatus } from '@/pythonTypes';
 
 import { InboxActions } from '../actions/buttons';
 
@@ -58,33 +58,28 @@ export const useInboxCardContext = () => {
 };
 
 /** Given a folder get all subfolders
- * that have been imported (i.e. have a session with `status.progress` equal to `Progress.IMPORT_COMPLETED`).
+ * that have been imported (i.e. have a status of `FolderStatus.IMPORTED`).
+ *
+ * Each subfolder's status is read from its canonical cache entry
+ * (`statusQueryOptions`), which the inbox route loader batch-hydrates via
+ * `ensureStatuses` and the status socket keeps up to date.
  */
 function useImportedFolders(folder: Folder) {
-    const folders = useMemo(() => {
-        const fs = [];
-        for (const f of walkFolder(folder)) {
-            if (f.type === 'file') continue; // skip files
-            if (f.full_path === folder.full_path) continue; // skip the root folder
-            fs.push(f);
-        }
-        return fs;
-    }, [folder]);
+    const folders = useMemo(
+        () =>
+            [...walkFolder(folder)].filter(
+                (f) => f.type !== 'file' && f.full_path !== folder.full_path
+            ),
+        [folder]
+    );
 
-    const sessions = useQueries({
-        queries: folders.map((f) =>
-            sessionQueryOptions({ folderHash: f.hash, folderPath: f.full_path })
-        ),
+    const statuses = useQueries({
+        queries: folders.map((f) => statusQueryOptions(f.hash, f.full_path)),
     });
 
-    const importedFolders = useMemo(() => {
-        return folders.filter((f, i) => {
-            const session = sessions[i];
-            return session.data?.status.progress === Progress.IMPORT_COMPLETED;
-        });
-    }, [folders, sessions]);
-
-    return importedFolders;
+    return folders.filter(
+        (f, i) => statuses[i].data?.status === FolderStatus.IMPORTED
+    );
 }
 
 export function InboxCardProvider({
