@@ -477,12 +477,108 @@ async function waitForJobUpdate({
 }
 
 /* ----------------------------- Session status ----------------------------- */
-export const statusQueryOptions = {
-    queryKey: ['status', 'all'],
-    queryFn: async () => {
-        // fetch initial status
-        // further updates will be handled by the socket
-        const response = await fetch('/session/status');
-        return (await response.json()) as FolderStatusUpdate[];
+
+/** Canonical per-folder cache entry for a folder's status.
+ *
+ * Prefer hydrating this via `ensureStatuses` (single batch request);
+ * the queryFn here is the fallback for a lone folder. Stays fresh until
+ * explicitly updated via the status socket.
+ */
+export const statusQueryOptions = (folderHash: string, folderPath: string) => ({
+    queryKey: ['session', folderHash, 'status'],
+    staleTime: Infinity,
+    queryFn: async (): Promise<FolderStatusUpdate | null> => {
+        const params = new URLSearchParams();
+        params.append('folder_hash', folderHash);
+        params.append('folder_path', folderPath);
+        const response = await fetch(`/session/status?${params.toString()}`);
+        const statuses = (await response.json()) as FolderStatusUpdate[];
+        return (
+            statuses.find((status) => status.hash === folderHash) ??
+            statuses.find((status) => status.path === folderPath) ??
+            null
+        );
+    },
+});
+
+/**
+ * Fetch statuses for many folders in a single request and populate each
+ * folder's canonical cache entry. Only folders not cached yet are requested;
+ * folders without a status are cached as null so they are not refetched.
+ */
+export async function ensureStatuses(
+    folders: Array<{ hash: string; path: string }>
+): Promise<void> {
+    const missing = folders.filter(
+        (folder) =>
+            queryClient.getQueryData<FolderStatusUpdate | null>(
+                statusQueryOptions(folder.hash, folder.path).queryKey
+            ) === undefined
+    );
+
+    if (missing.length === 0) {
+        return;
+    }
+
+    const params = new URLSearchParams();
+    missing.forEach((folder) => {
+        params.append('folder_hash', folder.hash);
+        params.append('folder_path', folder.path);
+    });
+    const response = await fetch(`/session/status?${params.toString()}`);
+    const statuses = (await response.json()) as FolderStatusUpdate[];
+    const byHash = new Map<string, FolderStatusUpdate>();
+    const byPath = new Map<string, FolderStatusUpdate>();
+    for (const status of statuses) {
+        if (!byHash.has(status.hash)) {
+            byHash.set(status.hash, status);
+        }
+        if (!byPath.has(status.path)) {
+            byPath.set(status.path, status);
+        }
+    }
+
+    for (const folder of missing) {
+        queryClient.setQueryData<FolderStatusUpdate | null>(
+            statusQueryOptions(folder.hash, folder.path).queryKey,
+            byHash.get(folder.hash) ?? byPath.get(folder.path) ?? null
+        );
+    }
+}
+
+/* -------------------------- Minimal session info -------------------------- */
+
+/** Per-folder cache entry for the best-match chip info.
+ *
+ * Fallback for a single folder; use `ensureMinimalSessionData` for batches.
+ * Stays fresh until invalidated via `invalidateSession`.
+ */
+export const minimalSessionQueryOptions = (
+    folderHash: string,
+    folderPath: string
+) => ({
+    queryKey: ['session', folderHash, 'minimal'],
+    staleTime: Infinity,
+    queryFn: async (): Promise<MinimalSession | null> => {
+        const params = new URLSearchParams();
+        params.append('folder_hash', folderHash);
+        params.append('folder_path', folderPath);
+        const response = await fetch(`/session/minimal?${params.toString()}`);
+        // Returns mapping from given hash to found session
+        // Care! : The MinimalSession does not necessarly have the same folder hash
+        const res = (await response.json()) as Record<string, MinimalSession>;
+
+        for (const folder_hash_org in res) {
+            const session = res[folder_hash_org];
+
+            if (session && session.folder_hash !== folderHash) {
+                queryClient.setQueryData<MinimalSession | null>(
+                    ['session', session.folder_hash, 'minimal'],
+                    session
+                );
+            }
+        }
+
+        return res[folderHash] ?? null;
     },
 };

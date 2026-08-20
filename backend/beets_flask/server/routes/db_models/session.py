@@ -1,16 +1,27 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import TypedDict
 
-from quart import jsonify, request
+from quart import Response, jsonify, request
 from rq.job import Job
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
 
 from beets_flask import invoker
 from beets_flask.database import db_session_factory
 from beets_flask.database.mapper.base import Context
 from beets_flask.database.mapper.states import SessionStateMapper
+from beets_flask.database.models.match import (
+    AlbumInfo,
+    AlbumMatch,
+    Distance,
+    Match,
+    TrackInfo,
+    TrackMatch,
+)
 from beets_flask.database.models.states import (
+    CandidateStateInDb,
     FolderInDb,
     SessionStateInDb,
     TaskStateInDb,
@@ -31,7 +42,37 @@ from beets_flask.server.websocket.status import FolderStatusUpdate, JobStatusUpd
 
 from .base import ModelAPIBlueprint
 
-__all__ = ["SessionAPIBlueprint"]
+__all__ = ["SessionAPIBlueprint", "MinimalChipInfo"]
+
+
+class MinimalBestCandidateInfo(TypedDict):
+    """Minimal best match info.
+
+    Data conciouse representation of the best match for a session, used for chips and minimal session
+    info. This is a subset of the full match state, containing only the most
+    relevant information for quick access.
+    """
+
+    data_source: str
+    distance: float
+    duplicates: list[int]
+
+
+class MinimalSession(TypedDict):
+    """Minimal session info.
+
+    Data conciouse representation of the session, used for chips and minimal session
+    info. This is a subset of the full session state, containing only the most
+    relevant information for quick access.
+    """
+
+    session_id: str
+    # The folder hash for when the session was run. May differ from the
+    # current (live) folder hash if the content changed since then.
+    folder_hash: str
+
+    # Minimal info for the best candidate
+    best_candidate: MinimalBestCandidateInfo
 
 
 class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
@@ -41,26 +82,37 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
     def _register_routes(self) -> None:
         """Register the routes for the blueprint."""
         super()._register_routes()
-        self.blueprint.route("/by_folder", methods=["POST"])(self.get_by_folder)
+        self.blueprint.route("/full", methods=["GET"])(self.get_full)
         self.blueprint.route("/status", methods=["GET"])(self.get_status)
+        self.blueprint.route("/minimal", methods=["GET"])(self.get_minimal)
+
         self.blueprint.route("/enqueue", methods=["POST"])(self.enqueue)
         self.blueprint.route("/add_candidates", methods=["POST"])(self.add_candidates)
 
-    async def get_by_folder(self):
-        """Returns the most recent session state for a given folder hash or path."""
+    async def get_full(self):
+        """Returns the most recent session state for a given folder hash or path.
 
-        params = await request.get_json()
-        folder_hashes, folder_paths = pop_folder_params(params, allow_mismatch=True)
+        Parameters
+        ----------
+        folder_hash : str
+            Live content hash of the folder to check.
+        folder_path : str (optional)
+            Path of the folder to check. Used as a fallback to find sessions for folders
+            whose content changed.
+        """
 
-        if len(folder_hashes) != 1 and len(folder_paths) != 1:
+        folder_hash = request.args.get("folder_hash")
+        folder_path = request.args.get("folder_path")
+
+        if not folder_hash and not folder_path:
             raise InvalidUsageException(
                 "Provide one folder hash OR one folder path", status_code=400
             )
 
         with db_session_factory() as db_session:
             item = self.model.get_by_hash_and_path(
-                hash=folder_hashes[0],
-                path=folder_paths[0],
+                hash=folder_hash,
+                path=folder_path,
                 db_session=db_session,
             )
 
@@ -70,13 +122,139 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                 # frontend console with errors.
                 # we manually handle this in sessionQueryOptions.
                 raise NotFoundException(
-                    f"Item with {folder_hashes=} {folder_paths=} not found",
+                    f"Item with {folder_hash=} {folder_path=} not found",
                     status_code=200,
                 )
 
             mapper = SessionStateMapper(want_to_serialize=True)
             live_state = mapper.from_db(item, Context())
             return jsonify(live_state.serialize())
+
+    async def get_minimal(self) -> Response:
+        """Get minimal chip info for given folder(s).
+
+        Parameters
+        ----------
+        folder_hash : list[str]
+            Live content hashes of the folders to check, as repeated query
+            params.
+        folder_path : list[str]
+            Live paths of the folders to check, as repeated query params. Used as a
+            fallback to find sessions for folders whose content changed.
+
+        Returns
+        -------
+        dict[str, MinimalChipInfo]
+            Keyed by live folder hash: `session_id` and `folder_hash` of the
+            resolved session, `duplicate` (beets id of the duplicate for the
+            best match, or null), `distance` (normalized match distance of
+            the best match) and `data_source`. Folders without a session are
+            omitted.
+        """
+        folder_hashes = request.args.getlist("folder_hash")
+        folder_paths = request.args.getlist("folder_path")
+
+        if len(folder_hashes) == 0:
+            raise InvalidUsageException(
+                "Provide at least one folder hash", status_code=400
+            )
+
+        if len(folder_hashes) != len(folder_paths):
+            raise InvalidUsageException(
+                "Provide the same number of folder hashes and paths", status_code=400
+            )
+
+        with db_session_factory() as db_session:
+            data: dict[str, MinimalSession] = {}
+            session_ids = self.model.get_ids_by_hash_and_path(
+                list(zip(folder_hashes, folder_paths)),
+                db_session,
+            )
+            resolved_ids = [sid for sid in session_ids if sid is not None]
+            if resolved_ids:
+                # Rank candidates within each session by their normalized
+                # distance (CandidateStateInDb.normalized_distance) so only the
+                # best candidate per session is loaded. Select just the scalar
+                # fields we need - no ORM entities, so no tasks or matches are
+                # loaded.
+                #
+                # AlbumMatch/TrackMatch are joined-table subclasses of Match:
+                # aliased(..., flat=True) prevents SQLAlchemy from
+                # auto-generating overlapping-table aliases.
+                album_match = aliased(AlbumMatch, flat=True)
+                track_match = aliased(TrackMatch, flat=True)
+                best_candidate = (
+                    select(
+                        SessionStateInDb.folder_hash,
+                        SessionStateInDb.id.label("session_id"),
+                        CandidateStateInDb.duplicate_ids,
+                        CandidateStateInDb.normalized_distance.label("distance"),
+                        func.coalesce(
+                            AlbumInfo.data["data_source"].as_string(),
+                            TrackInfo.data["data_source"].as_string(),
+                        ).label("data_source"),
+                        func.row_number()
+                        .over(
+                            partition_by=SessionStateInDb.id,
+                            order_by=CandidateStateInDb.normalized_distance,
+                        )
+                        .label("rn"),
+                    )
+                    .join(
+                        TaskStateInDb,
+                        CandidateStateInDb.task_id == TaskStateInDb.id,
+                    )
+                    .join(
+                        SessionStateInDb,
+                        TaskStateInDb.session_id == SessionStateInDb.id,
+                    )
+                    .where(SessionStateInDb.id.in_(resolved_ids))
+                    .join(Match, CandidateStateInDb.match_id == Match.id)
+                    .join(Distance, Match.distance_id == Distance.id)
+                    .outerjoin(album_match, album_match.id == Match.id)
+                    .outerjoin(AlbumInfo, AlbumInfo.id == album_match.info_id)
+                    .outerjoin(track_match, track_match.id == Match.id)
+                    .outerjoin(TrackInfo, TrackInfo.id == track_match.info_id)
+                    .subquery()
+                )
+
+                stmt = select(
+                    best_candidate.c.session_id,
+                    best_candidate.c.folder_hash,
+                    best_candidate.c.duplicate_ids,
+                    best_candidate.c.distance,
+                    best_candidate.c.data_source,
+                ).where(best_candidate.c.rn == 1)
+                rows = db_session.execute(stmt).all()
+
+                rows_by_session = {
+                    session_id: (folder_hash, duplicate_ids, distance, data_source)
+                    for session_id, folder_hash, duplicate_ids, distance, data_source in rows
+                }
+
+                for session_id, folder_hash_org in zip(session_ids, folder_hashes):
+                    if session_id is None:
+                        continue
+                    row = rows_by_session.get(session_id)
+                    if row is None:
+                        continue
+                    folder_hash_sess, duplicate_ids, distance, data_source = row
+                    dup_ids = (
+                        [int(dup_id) for dup_id in duplicate_ids.split(";")]
+                        if duplicate_ids
+                        else []
+                    )
+                    data[folder_hash_org] = MinimalSession(
+                        session_id=session_id,
+                        folder_hash=folder_hash_sess,
+                        best_candidate=MinimalBestCandidateInfo(
+                            duplicates=dup_ids,
+                            distance=distance,
+                            data_source=data_source,
+                        ),
+                    )
+
+            return jsonify(data)
 
     async def enqueue(self):
         """Start a new session for a given folder hash or enqueue a new job for an existing session.
@@ -181,10 +359,18 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
         )
 
     async def get_status(self):
-        """Get all pending tasks."""
+        """Get the current import status for the given folder(s).
 
-        params = await request.get_json()
-        folder_hashes, folder_paths = pop_folder_params(params)
+        Without any params, returns the status of all folders.
+        """
+
+        folder_hashes = request.args.getlist("folder_hash")
+        folder_paths = request.args.getlist("folder_path")
+
+        if len(folder_hashes) != len(folder_paths):
+            raise InvalidUsageException(
+                "Provide the same number of folder hashes and paths", status_code=400
+            )
 
         stats: list[FolderStatusUpdate] = []
 
