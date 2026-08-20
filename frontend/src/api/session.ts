@@ -28,7 +28,7 @@ export const sessionQueryOptions = ({
     folderPath?: string;
 }) => ({
     queryKey: ['session', folderHash, 'full'],
-    StaleTime: Infinity,
+    staleTime: Infinity,
     queryFn: async () => {
         const params = new URLSearchParams();
         params.append('folder_hash', folderHash);
