@@ -12,7 +12,6 @@ from quart import Quart
 
 from ..config.flask_config import ServerConfig, init_server_config
 from ..logger import log
-from .schema import quart_schema
 
 if TYPE_CHECKING:
     from ..config.flask_config import ServerConfig
@@ -45,7 +44,12 @@ def create_app(config: str | ServerConfig | None = None) -> Quart:
 
     register_routes(app)
     register_socketio(app)
-    quart_schema.init_app(app)
+
+    # Quart's default JSON provider sorts object keys alphabetically, which
+    # would reorder the paths and HTTP methods in the generated openapi docs
+    # (e.g. DELETE, GET, PATCH instead of GET, PATCH, DELETE). Keep the
+    # insertion order we define in the schema instead.
+    app.json.sort_keys = False
 
     log.debug("Quart app created!")
 

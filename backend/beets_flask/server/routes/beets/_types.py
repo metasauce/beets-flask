@@ -6,10 +6,9 @@ This is NOT a full JSON:API implementation, but a pragmatic subset:
 - Keeps typing strict and predictable for internal use
 """
 
-from typing import Generic, Literal, NotRequired, TypedDict, TypeVar
+from typing import Annotated, Literal, NotRequired, TypedDict
 
-A = TypeVar("A")
-T = TypeVar("T", bound=str)
+from msgspec import Meta
 
 # ---------------------------------------------------------------------------- #
 #                                 Core Objects                                 #
@@ -17,78 +16,41 @@ T = TypeVar("T", bound=str)
 
 
 class LinkObject(TypedDict, total=False):
-    """Top-level pagination / navigation links.
+    """Pagination links of a response.
 
-    This is a simplified subset of JSON:API links.
-    All fields are optional to allow flexible responses.
+    ``self`` is the URL of the current page, ``next`` the URL of the
+    following page (absent on the last page).
     """
 
-    self: str  # Canonical URL of the current resource/document
-    next: str  # URL for the next page (pagination)
+    self: Annotated[
+        str, Meta(description="Canonical URL of the current resource/document")
+    ]
+    next: Annotated[str, Meta(description="URL for the next page (pagination)")]
 
 
 class MetaObject(TypedDict, total=False):
-    """Optional metadata container.
+    """Additional information about a response.
 
-    Keep this intentionally small and extensible.
+    Currently only ``total``, the total number of results, is provided.
     """
 
-    total: int  # Total number of items available (for pagination)
+    total: Annotated[
+        int, Meta(description="Total number of items available (for pagination)")
+    ]
 
 
-class ResourceIdentifier(TypedDict, Generic[T]):
-    """Minimal reference to a resource (used in relationships)."""
+class ResourceIdentifier(TypedDict):
+    """A reference to a related resource.
 
-    type: T
-    id: str
-
-
-class Resource(TypedDict, Generic[A, T]):
-    """Primary resource object.
-
-    This is the core unit of data returned by the API.
+    Related resources are not embedded in full, but referenced by their
+    ``type`` and ``id``. Pass ``include`` to get the full resources in
+    the ``included`` section of the response.
     """
 
-    type: T  # Resource type (e.g. "items")
-    id: str  # Unique identifier (string per JSON:API)
-    attributes: A  # Domain-specific payload
-
-
-T_I = TypeVar("T_I", bound=str)
-
-
-class RelResource(Resource[A, T], Generic[A, T, T_I]):
-    relationships: list[ResourceIdentifier[T_I]]
-
-
-R = TypeVar("R", bound=Resource)
-
-
-class SingleResourceDocument(TypedDict, Generic[R]):
-    """Response containing a single resource."""
-
-    data: R
-    links: NotRequired[LinkObject]
-    meta: NotRequired[MetaObject]
-
-
-R_I = TypeVar("R_I", bound=Resource)
-
-
-class SingleResourceDocumentWithIncluded(SingleResourceDocument[R], Generic[R, R_I]):
-    included: list[R_I]
-
-
-class MultiResourceDocument(TypedDict, Generic[R]):
-    """Response containing a list of resources."""
-
-    data: list[R]
-    links: NotRequired[LinkObject]
-    meta: NotRequired[MetaObject]
-
-
-class MultiResourceDocumentWithIncluded(MultiResourceDocument[R], Generic[R, R_I]):
-    included: NotRequired[list[R_I]]
+    type: Annotated[
+        str, Meta(description="The type of the referenced resource, e.g. ``item``")
+    ]
+    id: Annotated[str, Meta(description="The id of the referenced resource")]
 
 
 # ---------------------------------------------------------------------------- #
@@ -99,12 +61,45 @@ class MultiResourceDocumentWithIncluded(MultiResourceDocument[R], Generic[R, R_I
 class ItemAttributes(TypedDict, total=False):
     """Item Attributes"""
 
-    title: str | None
+    title: Annotated[str | None, Meta(description="The title of the item")]
 
 
-ItemResource = Resource[ItemAttributes, Literal["item"]]
-SingleItemDocument = SingleResourceDocument[ItemResource]
-MultiItemDocument = MultiResourceDocument[ItemResource]
+class ItemResource(TypedDict):
+    """An item (track) of your music library.
+
+    ``id`` is the item's id in the beets library, ``attributes``
+    contains its metadata, e.g. the title.
+    """
+
+    type: Annotated[Literal["item"], Meta(description="The resource type")]
+    id: Annotated[str, Meta(description="The item's id in the beets library")]
+    attributes: Annotated[
+        ItemAttributes,
+        Meta(description="The item's attributes, e.g. its title"),
+    ]
+
+
+class SingleItemDocument(TypedDict):
+    """The response of a request that returns a single item.
+
+    The item is in ``data``.
+    """
+
+    data: Annotated[ItemResource, Meta(description="The item itself")]
+    links: NotRequired[LinkObject]
+    meta: NotRequired[MetaObject]
+
+
+class MultiItemDocument(TypedDict):
+    """The response of a request that returns multiple items.
+
+    All items are in ``data``.
+    """
+
+    data: Annotated[list[ItemResource], Meta(description="The items themselves")]
+    links: NotRequired[LinkObject]
+    meta: NotRequired[MetaObject]
+
 
 # ---------------------------------------------------------------------------- #
 #                                    Albums                                    #
@@ -114,9 +109,63 @@ MultiItemDocument = MultiResourceDocument[ItemResource]
 class AlbumAttributes(TypedDict, total=False):
     """Album Attributes"""
 
-    title: str
+    title: Annotated[str, Meta(description="The title of the album")]
 
 
-AlbumResource = RelResource[AlbumAttributes, Literal["album"], Literal["item"]]
-SingleAlbumDocument = SingleResourceDocumentWithIncluded[AlbumResource, ItemResource]
-MultiAlbumDocument = MultiResourceDocumentWithIncluded[AlbumResource, ItemResource]
+class AlbumResource(TypedDict):
+    """An album of your music library.
+
+    ``id`` is the album's id in the beets library, ``attributes``
+    contains its metadata, e.g. the title. ``relationships`` references
+    the album's items by ``type`` and ``id``.
+    """
+
+    type: Annotated[Literal["album"], Meta(description="The resource type")]
+    id: Annotated[str, Meta(description="The album's id in the beets library")]
+    attributes: Annotated[
+        AlbumAttributes,
+        Meta(description="The album's attributes, e.g. its title"),
+    ]
+    relationships: Annotated[
+        list[ResourceIdentifier],
+        Meta(description="The album's items, as ``type``/``id`` references"),
+    ]
+
+
+class SingleAlbumDocument(TypedDict):
+    """The response of a request that returns a single album.
+
+    The album is in ``data`` and its items are referenced in
+    ``data.relationships``. Pass ``include=items`` to also embed the
+    items in full in the ``included`` section.
+    """
+
+    data: Annotated[AlbumResource, Meta(description="The album itself")]
+    included: Annotated[
+        list[ItemResource],
+        Meta(
+            description="The album's items, present when ``include=items`` was passed"
+        ),
+    ]
+    links: NotRequired[LinkObject]
+    meta: NotRequired[MetaObject]
+
+
+class MultiAlbumDocument(TypedDict):
+    """The response of a request that returns multiple albums.
+
+    The albums are in ``data``. Pass ``include=items`` to also embed
+    their items in full in the ``included`` section.
+    """
+
+    data: Annotated[list[AlbumResource], Meta(description="The albums themselves")]
+    included: NotRequired[
+        Annotated[
+            list[ItemResource],
+            Meta(
+                description="The albums' items, present when ``include=items`` was passed"
+            ),
+        ]
+    ]
+    links: NotRequired[LinkObject]
+    meta: NotRequired[MetaObject]

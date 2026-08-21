@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 
+from msgspec import Meta
 from quart import Blueprint, g
 from quart_schema import validate_querystring, validate_request, validate_response
 
 from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsAlbum, BeetsItem
-from beets_flask.server.exceptions import InvalidUsageException, NotFoundException
+from beets_flask.server.exceptions import (
+    InvalidUsageException,
+    NotFoundException,
+    NotImplementedException,
+    error_responses,
+)
 
 from ._types import (
     AlbumAttributes,
@@ -42,16 +48,25 @@ def to_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumRes
 
 # ---------------------------------- Single ---------------------------------- #
 class GetQueryParams(TypedDict, total=False):
-    include: Literal["items"]
-    # whether to include related items in the response
+    include: Annotated[
+        Literal["items"],
+        Meta(
+            description="The album's items are included in the ``included`` "
+            "section of the response"
+        ),
+    ]
 
 
 @albums_bp.route("/<int:album_id>", methods=["GET"])
 @validate_querystring(GetQueryParams)
 @validate_response(SingleAlbumDocument)
+@error_responses(InvalidUsageException, NotFoundException)
 async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDocument:
-    """GET album - Retrieve a single beets album by ID"""
-    album = g.lib.get_album(album_id)
+    """Get album
+
+    Retrieve a single album from the beets library by its id.
+    """
+    album: BeetsAlbum = g.lib.get_album(album_id)
     if not album:
         raise NotFoundException(
             f"Album with beets_id:{album_id!r} not found in beets db."
@@ -80,11 +95,16 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
 @validate_querystring(GetQueryParams)
 @validate_request(AlbumAttributes)
 @validate_response(SingleAlbumDocument)
+@error_responses(InvalidUsageException, NotFoundException)
 async def patch_album(
     album_id: int, query_args: GetQueryParams, data: AlbumAttributes
 ) -> SingleAlbumDocument:
-    """PATCH album - Update a single beets album by ID"""
-    album = g.lib.get_album(album_id)
+    """Patch album
+
+    Update the attributes of a single album, e.g. its title. The change
+    is written back to the beets library.
+    """
+    album: BeetsAlbum = g.lib.get_album(album_id)
     if not album:
         raise NotFoundException(
             f"Album with beets_id:{album_id!r} not found in beets db."
@@ -126,59 +146,104 @@ async def patch_album(
 
 
 class BulkGetQueryParams(TypedDict, total=False):
-    cursor: str  # pagination cursor
-    filter_query: str
-    filter_ids: list[int]
-    sort: str  # "+year,-title"
-    limit: int  # page size
-    include: Literal["items"]
+    cursor: Annotated[str, Meta(description="Pagination cursor from the previous page")]
+    filter_query: Annotated[
+        str, Meta(description="Beets query string to filter the albums")
+    ]
+    filter_ids: Annotated[
+        list[int], Meta(description="Only return albums with these ids")
+    ]
+    sort: Annotated[
+        str,
+        Meta(description='Sort order as comma separated list, e.g. "+year,-title"'),
+    ]
+    limit: Annotated[
+        int, Meta(description="Page size, i.e. maximum number of albums to return")
+    ]
+    include: Annotated[
+        Literal["items"],
+        Meta(
+            description="Each album's items are included in the ``included`` "
+            "section of the response"
+        ),
+    ]
 
 
 @albums_bp.route("/", methods=["GET"])
 @validate_querystring(BulkGetQueryParams)
 @validate_response(MultiAlbumDocument)
+@error_responses(InvalidUsageException, NotImplementedException)
 async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
-    """GET albums - Retrieve beets albums
+    """Get albums (bulk)
 
-    Lets you retrieve beets albums.
+    Retrieve beets albums matching the given filters, with pagination.
+
+    Not implemented yet - currently returns 501.
     """
-    raise NotImplementedError
+    raise NotImplementedException
 
 
 class BulkPatchQueryParams(TypedDict, total=False):
-    filter_query: str
-    filter_ids: list[int]
-    sort: str  # "+year,-title"
-    limit: int  # page size
-    include: Literal["items"]
+    filter_query: Annotated[
+        str, Meta(description="Beets query string to filter the albums")
+    ]
+    filter_ids: Annotated[
+        list[int], Meta(description="Only update albums with these ids")
+    ]
+    sort: Annotated[
+        str,
+        Meta(description='Sort order as comma separated list, e.g. "+year,-title"'),
+    ]
+    limit: Annotated[
+        int, Meta(description="Page size, i.e. maximum number of albums to update")
+    ]
+    include: Annotated[
+        Literal["items"],
+        Meta(
+            description="Each album's items are included in the ``included`` "
+            "section of the response"
+        ),
+    ]
 
 
 @albums_bp.route("/", methods=["PATCH"])
 @validate_querystring(BulkPatchQueryParams)
 @validate_request(AlbumAttributes)
 @validate_response(MultiAlbumDocument)
+@error_responses(InvalidUsageException, NotImplementedException)
 async def patch_albums(
     query_args: BulkPatchQueryParams, data: AlbumAttributes
 ) -> MultiAlbumDocument:
-    """PATCH albums - Update beets albums
+    """Patch albums (bulk)
 
-    Lets you update beets albums.
+    Update the attributes of all albums matching the given filters.
+
+    Not implemented yet - currently returns 501.
     """
-    raise NotImplementedError
+    raise NotImplementedException
 
 
 class BulkDeleteQueryParams(TypedDict, total=False):
-    filter_query: str
-    filter_ids: list[int]
-    delete_files: bool
+    filter_query: Annotated[
+        str, Meta(description="Beets query string to filter the albums")
+    ]
+    filter_ids: Annotated[
+        list[int], Meta(description="Only delete albums with these ids")
+    ]
+    delete_files: Annotated[
+        bool, Meta(description="Also delete the album's files from disk")
+    ]
 
 
 @albums_bp.route("/", methods=["DELETE"])
 @validate_querystring(BulkDeleteQueryParams)
+@error_responses(InvalidUsageException, NotImplementedException)
 async def delete_albums(query_args: BulkDeleteQueryParams):
-    """DELETE albums - Delete beets albums
+    """Delete albums (bulk)
 
-    Will delete related items if the are dangling and have no
-    other album assigned.
+    Delete all albums matching the given filters. Will delete related
+    items if they are dangling and have no other album assigned.
+
+    Not implemented yet - currently returns 501.
     """
-    raise NotImplementedError
+    raise NotImplementedException
