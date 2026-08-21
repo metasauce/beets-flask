@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 
 from msgspec import Meta
 from quart import Blueprint, g
-from quart_schema import validate_querystring, validate_request, validate_response
+from quart_schema import validate_request, validate_response
 
 from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsAlbum, BeetsItem
@@ -23,6 +23,8 @@ from ._types import (
     MultiAlbumDocument,
     SingleAlbumDocument,
 )
+from ._validation import validate_querystring
+from .items import to_item_resource
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -47,6 +49,8 @@ def to_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumRes
 
 
 # ---------------------------------- Single ---------------------------------- #
+
+
 class GetQueryParams(TypedDict, total=False):
     include: Annotated[
         Literal["items"],
@@ -60,7 +64,7 @@ class GetQueryParams(TypedDict, total=False):
 @albums_bp.route("/<int:album_id>", methods=["GET"])
 @validate_querystring(GetQueryParams)
 @validate_response(SingleAlbumDocument)
-@error_responses(InvalidUsageException, NotFoundException)
+@error_responses(NotFoundException)
 async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDocument:
     """Get album
 
@@ -74,14 +78,7 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
 
     items = album.items()
     if query_args.get("include") == "items":
-        included: list[ItemResource] = [
-            {
-                "type": "item",
-                "id": str(item.id),
-                "attributes": {"title": item.title},
-            }
-            for item in items
-        ]
+        included: list[ItemResource] = [to_item_resource(item) for item in items]
     else:
         included = []
 
@@ -125,20 +122,53 @@ async def patch_album(
 
     items = album.items()
     if query_args.get("include") == "items":
-        included: list[ItemResource] = [
-            {
-                "type": "item",
-                "id": str(item.id),
-                "attributes": {"title": item.title},
-            }
-            for item in items
-        ]
+        included: list[ItemResource] = [to_item_resource(item) for item in items]
     else:
         included = []
 
     return {
         "data": to_album_resource(album, items),
         "included": included,
+    }
+
+
+class DeleteQueryParams(TypedDict, total=False):
+    delete_files: Annotated[
+        bool,
+        Meta(
+            description="Also delete the album's files from disk",
+            extra_json_schema={"default": False},
+        ),
+    ]
+
+
+@albums_bp.route("/<int:album_id>", methods=["DELETE"])
+@validate_querystring(DeleteQueryParams)
+@validate_response(SingleAlbumDocument)
+@error_responses(InvalidUsageException, NotFoundException)
+async def delete_album(
+    album_id: int, query_args: DeleteQueryParams
+) -> SingleAlbumDocument:
+    """Delete album
+
+    Delete a single album from the beets library, together with all of
+    its items; pass ``delete_files=true`` to also remove their files
+    from disk.
+    """
+    album: BeetsAlbum = g.lib.get_album(album_id)
+    if not album:
+        raise NotFoundException(
+            f"Album with beets_id:{album_id!r} not found in beets db."
+        )
+
+    if get_config().data.gui.library.readonly:
+        raise InvalidUsageException("Library is read-only")
+
+    resource = to_album_resource(album, album.items())
+    album.remove(delete=query_args.get("delete_files", False))
+    return {
+        "data": resource,
+        "included": [],
     }
 
 
@@ -231,7 +261,11 @@ class BulkDeleteQueryParams(TypedDict, total=False):
         list[int], Meta(description="Only delete albums with these ids")
     ]
     delete_files: Annotated[
-        bool, Meta(description="Also delete the album's files from disk")
+        bool,
+        Meta(
+            description="Also delete the album's files from disk",
+            extra_json_schema={"default": False},
+        ),
     ]
 
 
