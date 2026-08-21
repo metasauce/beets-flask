@@ -8,7 +8,7 @@ from quart_schema import validate_querystring, validate_request, validate_respon
 
 from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsAlbum, BeetsItem
-from beets_flask.server.exceptions import NotFoundException
+from beets_flask.server.exceptions import InvalidUsageException, NotFoundException
 
 from ._types import (
     AlbumAttributes,
@@ -53,7 +53,9 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
     """GET album - Retrieve a single beets album by ID"""
     album = g.lib.get_album(album_id)
     if not album:
-        raise NotFoundException(f"Album with beets_id:{id!r} not found in beets db.")
+        raise NotFoundException(
+            f"Album with beets_id:{album_id!r} not found in beets db."
+        )
 
     items = album.items()
     if query_args.get("include") == "items":
@@ -89,7 +91,7 @@ async def patch_album(
         )
 
     if get_config().data.gui.library.readonly:
-        raise ValueError("Library is read-only")
+        raise InvalidUsageException("Library is read-only")
 
     # Translate API attribute names to beets album field names.
     update_data: dict[str, str] = {}
@@ -140,7 +142,7 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
 
     Lets you retrieve beets albums.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
 
 class BulkPatchQueryParams(TypedDict, total=False):
@@ -162,7 +164,7 @@ async def patch_albums(
 
     Lets you update beets albums.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
 
 class BulkDeleteQueryParams(TypedDict, total=False):
@@ -179,4 +181,4 @@ async def delete_albums(query_args: BulkDeleteQueryParams):
     Will delete related items if the are dangling and have no
     other album assigned.
     """
-    raise NotImplemented
+    raise NotImplementedError

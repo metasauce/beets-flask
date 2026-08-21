@@ -70,6 +70,15 @@ class IntegrityException(ApiException):
     status_code: int = 409
 
 
+class NotImplementedException(ApiException):
+    """Feature not implemented yet.
+
+    The endpoint exists, but its functionality is not implemented yet.
+    """
+
+    status_code: int = 501
+
+
 class NotImportedException(ApiException):
     """Not imported error.
 

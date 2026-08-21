@@ -8,7 +8,7 @@ from quart_schema.validation import validate_response
 
 from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsItem
-from beets_flask.server.routes.exception import NotFoundException
+from beets_flask.server.routes.exception import InvalidUsageException, NotFoundException
 
 from ._types import (
     ItemAttributes,
@@ -62,7 +62,7 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
         )
 
     if get_config().data.gui.library.readonly:
-        raise ValueError("Library is read-only")
+        raise InvalidUsageException("Library is read-only")
 
     update_data: ItemAttributes = {}
     if "title" in data:
@@ -96,7 +96,7 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
 
     Lets you retrieve beets items.
     """
-    raise NotImplemented
+    raise NotImplementedError
 
 
 class BulkPatchQueryParams(TypedDict, total=False):
@@ -117,7 +117,7 @@ async def patch_items(
 
     Lets you update beets items.
     """
-    return NotImplemented
+    raise NotImplementedError
 
 
 class BulkDeleteQueryParams(TypedDict, total=False):
@@ -130,4 +130,4 @@ class BulkDeleteQueryParams(TypedDict, total=False):
 @validate_querystring(BulkDeleteQueryParams)
 async def delete_items(query_args: BulkDeleteQueryParams):
     """DELETE items - Bulk delete beets items via filter"""
-    raise NotImplemented
+    raise NotImplementedError

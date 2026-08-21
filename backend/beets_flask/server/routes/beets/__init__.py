@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from beets.ui import _open_library
 from quart import Blueprint, g
+from quart_schema import tag_blueprint
 
 from beets_flask.config.beets_config import get_config
 
@@ -20,6 +21,11 @@ if TYPE_CHECKING:
 
 beets_bp = Blueprint("beets", __name__, url_prefix="/beets")
 
+# Group the operations into separate sections in the api docs (swagger)
+tag_blueprint(items_bp, ["items"])
+tag_blueprint(albums_bp, ["albums"])
+
+# Register the items and albums blueprints under the beets blueprint
 beets_bp.register_blueprint(items_bp)
 beets_bp.register_blueprint(albums_bp)
 
