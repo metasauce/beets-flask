@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 albums_bp = Blueprint("albums", __name__, url_prefix="/albums")
 
 
-def get_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumResource:
+def to_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumResource:
     return {
         "type": "album",
         "id": str(album.id),
@@ -69,7 +69,7 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
         included = []
 
     return {
-        "data": get_album_resource(album, items),
+        "data": to_album_resource(album, items),
         "included": included,
     }
 
@@ -115,7 +115,7 @@ async def patch_album(
         included = []
 
     return {
-        "data": get_album_resource(album, items),
+        "data": to_album_resource(album, items),
         "included": included,
     }
 
