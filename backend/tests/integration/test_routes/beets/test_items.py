@@ -579,3 +579,41 @@ class TestCursorNormalizeSort:
         """A sort sign without a field is rejected."""
         with pytest.raises(ValueError):
             Cursor.normalize_sort("+")
+
+
+class TestGetItemsSqlLimit(IsolatedBeetsLibraryMixin):
+    """Regression test: pagination must not load all matching items."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    def items(self, setup_beetslib):  # type: ignore
+        """Create 100 items to prove the page query is limited."""
+        for i in range(100):
+            self.beets_lib.add(beets_lib_item(title=f"Sql Item {i:03d}"))
+
+    async def test_get_items_sql_is_limited(self, client: Client):
+        """The page query carries a ``LIMIT``, so only a page is fetched."""
+        from beets.dbcore.db import Transaction
+
+        statements = []
+        original_query = Transaction.query
+
+        def spy(self, statement, subvals=()):
+            statements.append(str(statement))
+            return original_query(self, statement, subvals)
+
+        Transaction.query = spy
+        try:
+            response = await client.get("/api_v1/beets/items/?limit=10")
+            data = await response.get_json()
+        finally:
+            Transaction.query = original_query
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert len(data["data"]) == 10
+        assert data["meta"]["total"] == 100
+
+        page_selects = [s for s in statements if "ORDER BY" in s]
+        assert page_selects, "No page query was executed"
+        assert "LIMIT 11" in page_selects[0], (
+            f"No LIMIT in SQL: {page_selects[0][:200]}"
+        )
