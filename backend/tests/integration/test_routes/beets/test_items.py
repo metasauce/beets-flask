@@ -6,10 +6,11 @@ Covers the implemented endpoints of ``beets_flask/server/routes/beets/items.py``
 - ``PATCH /api_v1/beets/items/<item_id>``
 - ``DELETE /api_v1/beets/items/<item_id>``
 
-The bulk endpoints (``GET/PATCH/DELETE /api_v1/beets/items/``) are not
-implemented yet and are only tested to return 501.
+The bulk ``PATCH`` and ``DELETE`` endpoints (``/api_v1/beets/items/``) are
+not implemented yet and are only tested to return 501.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from beets.library import Item
 from quart.typing import TestClientProtocol as Client
 
 from beets_flask.config import get_config
+from beets_flask.server.routes.beets._cursor import Cursor, PaginatedQuery
 from tests.conftest import beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
@@ -285,13 +287,263 @@ class TestDeleteItemFile(IsolatedBeetsLibraryMixin):
         assert path.exists(), "File was deleted although delete_file=false"
 
 
+# ---------------------------------- Bulk Get -------------------------------- #
+
+
+class TestGetItems(IsolatedBeetsLibraryMixin):
+    """Tests for ``GET /api_v1/beets/items/`` (bulk)."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    def items(self, setup_beetslib):  # type: ignore
+        """Create 25 items with distinct titles and five artists."""
+        for i in range(25):
+            self.beets_lib.add(
+                beets_lib_item(title=f"Bulk Item {i:02d}", artist=f"Artist{i % 5}")
+            )
+
+    async def test_get_items_pagination(self, client: Client):
+        """Iterate all pages via the ``links.next`` cursor."""
+        next_url = "/api_v1/beets/items/?limit=10"
+        titles = []
+        pages = 0
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 25
+            assert "self" in data["links"]
+            titles.extend(i["attributes"]["title"] for i in data["data"])
+            pages += 1
+            next_url = data["links"].get("next")
+
+        assert pages == 3, "Expected three pages of ten items"
+        assert len(titles) == 25, "Not all items were returned"
+        assert len(set(titles)) == 25, "Items were returned more than once"
+
+    async def test_get_items_default_limit(self, client: Client):
+        """Without ``limit``, the default page size applies."""
+        response = await client.get("/api_v1/beets/items/")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert len(data["data"]) == 25
+        assert "next" not in data.get("links", {}), "Unexpected next page"
+
+    async def test_get_items_sort(self, client: Client):
+        """Sort by title ascending and descending."""
+        response = await client.get("/api_v1/beets/items/?sort=title&limit=100")
+        data = await response.get_json()
+        titles = [i["attributes"]["title"] for i in data["data"]]
+        assert titles == sorted(titles), "Items are not sorted ascending"
+
+        response = await client.get("/api_v1/beets/items/?sort=-title&limit=100")
+        data = await response.get_json()
+        titles = [i["attributes"]["title"] for i in data["data"]]
+        assert titles == sorted(titles, reverse=True), "Items are not sorted descending"
+
+    async def test_get_items_descending_pagination(self, client: Client):
+        """Iterate all pages sorted descending via the cursor."""
+        next_url = "/api_v1/beets/items/?sort=-title&limit=5"
+        titles = []
+        pages = 0
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 25
+            titles.extend(i["attributes"]["title"] for i in data["data"])
+            pages += 1
+            next_url = data["links"].get("next")
+
+        assert pages == 5, "Expected five pages of five items"
+        assert titles == sorted(titles, reverse=True), "Items are not sorted descending"
+        assert len(titles) == 25, "Not all items were returned"
+
+    async def test_get_items_filter_query(self, client: Client):
+        """Filter by a beets query string."""
+        response = await client.get("/api_v1/beets/items/?filter_query=artist:Artist2")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        expected = {f"Bulk Item {i:02d}" for i in range(25) if i % 5 == 2}
+        titles = {i["attributes"]["title"] for i in data["data"]}
+        assert titles == expected, "Filtered items do not match the query"
+        assert data["meta"]["total"] == 5
+
+    async def test_get_items_filter_ids(self, client: Client):
+        """Filter by explicit ids."""
+        ids = [str(i.id) for i in list(self.beets_lib.items())[:2]]
+        response = await client.get(
+            "/api_v1/beets/items/?filter_ids=" + "&filter_ids=".join(ids)
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert {i["id"] for i in data["data"]} == set(ids)
+        assert data["meta"]["total"] == 2
+
+    async def test_get_items_empty(self, client: Client):
+        """A filter without matches returns an empty page."""
+        response = await client.get(
+            "/api_v1/beets/items/?filter_query=title:Nonexistent"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["data"] == []
+        assert data["meta"]["total"] == 0
+        assert "next" not in data.get("links", {})
+
+    async def test_get_items_invalid_cursor(self, client: Client):
+        """An invalid cursor token -> 400."""
+        response = await client.get("/api_v1/beets/items/?cursor=bogus")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_items_invalid_sort_field(self, client: Client):
+        """Sorting by a disallowed field -> 400."""
+        response = await client.get("/api_v1/beets/items/?sort=+bogus")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_items_limit_too_high(self, client: Client):
+        """A limit above the maximum -> 400."""
+        response = await client.get("/api_v1/beets/items/?limit=100000")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_items_empty_sort(self, client: Client):
+        """An empty ``sort`` value -> 400."""
+        response = await client.get("/api_v1/beets/items/?sort=&limit=100")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_items_sort_without_field(self, client: Client):
+        """A ``sort`` without a field -> 400."""
+        response = await client.get("/api_v1/beets/items/?sort=,&limit=100")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_items_sort_sign_without_field(self, client: Client):
+        """A sort sign without a field -> 400."""
+        response = await client.get("/api_v1/beets/items/?sort=%2B")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_items_cursor_with_crafted_sort(self, client: Client):
+        """A cursor token with a crafted sort field -> 400."""
+        token = json.dumps({"s": "+bogus", "v": "x", "i": 1}).encode().hex()
+        response = await client.get(f"/api_v1/beets/items/?cursor={token}")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_items_numeric_cursor_value(self, client: Client):
+        """A cursor with a numeric sort value is coerced to a string."""
+        token = json.dumps({"s": "+title", "v": 123, "i": 1}).encode().hex()
+        response = await client.get(f"/api_v1/beets/items/?cursor={token}&limit=100")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert len(data["data"]) == 25
+
+    async def test_get_items_cursor_with_sort_rejected(self, client: Client):
+        """``cursor`` combined with ``sort`` -> 400."""
+        token = Cursor.initial("+title").to_string()
+        response = await client.get(f"/api_v1/beets/items/?cursor={token}&sort=title")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_items_cursor_with_filter_rejected(self, client: Client):
+        """``cursor`` combined with filters -> 400."""
+        token = Cursor.initial("+title").to_string()
+        for params in ("filter_query=artist:Artist2", "filter_ids=1&filter_ids=2"):
+            response = await client.get(f"/api_v1/beets/items/?cursor={token}&{params}")
+            data = await response.get_json()
+            assert response.status_code == 400, f"{params} should be rejected"
+            assert data["type"] == "InvalidUsageException"
+
+    async def test_get_items_filtered_pagination(self, client: Client):
+        """Filters survive pagination via the self-contained cursor."""
+        next_url = "/api_v1/beets/items/?filter_query=artist:Artist2&limit=2"
+        titles = []
+        pages = 0
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 5
+            titles.extend(i["attributes"]["title"] for i in data["data"])
+            pages += 1
+            next_url = data["links"].get("next")
+            if next_url:
+                # The cursor is self-contained: no filter params in the link
+                for param in ("filter_query", "filter_ids", "sort"):
+                    assert f"{param}=" not in next_url, f"{param} in next link"
+
+        expected = {f"Bulk Item {i:02d}" for i in range(25) if i % 5 == 2}
+        assert pages == 3, "Expected three pages of two items"
+        assert set(titles) == expected, "Filtered items do not match the query"
+        assert len(titles) == 5, "Items were returned more than once"
+
+    async def test_get_items_filtered_pagination_by_ids(self, client: Client):
+        """Id filters survive pagination via the self-contained cursor."""
+        ids = [str(i.id) for i in list(self.beets_lib.items())[:3]]
+        next_url = "/api_v1/beets/items/?limit=2&filter_ids=" + "&filter_ids=".join(ids)
+        found = []
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 3
+            found.extend(i["id"] for i in data["data"])
+            next_url = data["links"].get("next")
+
+        assert set(found) == set(ids), "Id filtered pagination lost items"
+        assert len(found) == 3
+
+    async def test_get_items_next_link_strips_sort(self, client: Client):
+        """The ``links.next`` of a sorted page carries no ``sort`` and stays sorted."""
+        response = await client.get("/api_v1/beets/items/?sort=title&limit=5")
+        data = await response.get_json()
+        assert response.status_code == 200, "Response status code is not 200"
+        first_titles = [i["attributes"]["title"] for i in data["data"]]
+        assert first_titles == sorted(first_titles)
+
+        next_url = data["links"]["next"]
+        assert "sort=" not in next_url, "Next link must not carry the sort parameter"
+
+        response = await client.get(next_url)
+        data = await response.get_json()
+        assert response.status_code == 200, "Response status code is not 200"
+        second_titles = [i["attributes"]["title"] for i in data["data"]]
+        assert second_titles == sorted(second_titles)
+        # The second page continues the same order after the first page
+        assert all(t1 < t2 for t1 in first_titles for t2 in second_titles)
+
+
 # -------------------------------- Not implemented ------------------------------- #
 
 
 class TestBulkItemsNotImplemented(IsolatedBeetsLibraryMixin):
     """Tests for the not-yet-implemented bulk items endpoints."""
 
-    @pytest.mark.parametrize("method", ["get", "patch", "delete"])
+    @pytest.mark.parametrize("method", ["patch", "delete"])
     async def test_bulk_items_not_implemented(self, client: Client, method: str):
         """The bulk items endpoints are not implemented yet -> 501."""
         response = await getattr(client, method)("/api_v1/beets/items/", json={})
@@ -299,3 +551,31 @@ class TestBulkItemsNotImplemented(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 501, "Response status code is not 501"
         assert data["type"] == "NotImplementedException"
+
+
+class TestPaginatedQuery:
+    """Direct unit tests for the PaginatedQuery helper."""
+
+    def test_match(self):
+        """The SQL clause filters, so match() accepts everything."""
+        query = PaginatedQuery(Cursor.initial("+title"), 10, "items")
+        assert query.match(None)
+
+
+class TestCursorNormalizeSort:
+    """Direct unit tests for the cursor sort edge cases."""
+
+    def test_empty_sort(self):
+        """An empty sort falls back to the default."""
+        assert Cursor.normalize_sort("") == "-added"
+        assert Cursor.normalize_sort(" ") == "-added"
+
+    def test_sort_without_field(self):
+        """A sort without a field falls back to the default."""
+        assert Cursor.normalize_sort(",") == "-added"
+        assert Cursor.normalize_sort(" , -title") == "-added"
+
+    def test_sign_without_field(self):
+        """A sort sign without a field is rejected."""
+        with pytest.raises(ValueError):
+            Cursor.normalize_sort("+")

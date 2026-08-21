@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
+from urllib.parse import urlencode
 
 from msgspec import Meta
-from quart import Blueprint, g
+from quart import Blueprint, g, request
 from quart_schema import validate_request
 from quart_schema.validation import validate_response
 
@@ -12,9 +13,11 @@ from beets_flask.importer.types import BeetsItem
 from beets_flask.server.exceptions import NotImplementedException, error_responses
 from beets_flask.server.routes.exception import InvalidUsageException, NotFoundException
 
+from ._cursor import Cursor, PaginatedQuery
 from ._types import (
     ItemAttributes,
     ItemResource,
+    LinkObject,
     MultiItemDocument,
     SingleItemDocument,
 )
@@ -25,6 +28,33 @@ if TYPE_CHECKING:
     from . import g
 
 items_bp = Blueprint("items", __name__, url_prefix="/items")
+
+#: Default page size of the bulk endpoints.
+DEFAULT_LIMIT = 100
+
+#: Maximum allowed page size of the bulk endpoints.
+MAX_LIMIT = 1000
+
+#: The bare sortable field names of the bulk endpoints.
+SORTABLE_FIELDS = (
+    "added",
+    "year",
+    "title",
+    "artist",
+    "albumartist",
+    "album",
+    "track",
+    "disc",
+    "length",
+    "bitrate",
+)
+
+#: All allowed ``sort`` values: a sortable field, optionally prefixed
+#: with "+" (ascending) or "-" (descending). The prefixes are generated
+#: programmatically from :data:`SORTABLE_FIELDS`.
+SortableField: TypeAlias = Literal[  # type: ignore[valid-type]
+    *(entry for field in SORTABLE_FIELDS for entry in (field, f"+{field}", f"-{field}"))
+]  # mypy does not support PEP 646 star-unpacking in Literal yet
 
 
 def to_item_resource(item: BeetsItem) -> ItemResource:
@@ -141,8 +171,11 @@ class BulkGetQueryParams(TypedDict, total=False):
         list[str], Meta(description="Only return items with these ids")
     ]
     sort: Annotated[
-        str,
-        Meta(description='Sort order as comma separated list, e.g. "+year,-title"'),
+        SortableField,
+        Meta(
+            description='Sort by a field, optionally prefixed with "+" '
+            '(ascending) or "-" (descending), e.g. "+title"'
+        ),
     ]
     limit: Annotated[
         int, Meta(description="Page size, i.e. maximum number of items to return")
@@ -152,15 +185,68 @@ class BulkGetQueryParams(TypedDict, total=False):
 @items_bp.route("/", methods=["GET"])
 @validate_querystring(BulkGetQueryParams)
 @validate_response(MultiItemDocument)
-@error_responses(InvalidUsageException, NotImplementedException)
+@error_responses(InvalidUsageException)
 async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
     """Get items (bulk)
 
     Retrieve beets items matching the given filters, with pagination.
 
-    Not implemented yet - currently returns 501.
+    The result is sorted by ``sort`` (default ``-added``) and paginated
+    with a keyset cursor. The cursor is self-contained: it encodes the
+    sort and the filters, so pass ``sort``, ``filter_query`` and
+    ``filter_ids`` for the first page and only the ``cursor`` (plus
+    ``limit``) for the following pages.
+
+    The function first builds the cursor - either a fresh one from the
+    given sort and filters, or the encoded cursor of a following page -
+    and then fetches the page using that cursor.
     """
-    raise NotImplementedException
+    # Construct cursor either from args or from the encoded cursor string.
+    # The cursor is self-contained
+    if "cursor" in query_args and any(
+        query_args.get(p) for p in ("sort", "filter_query", "filter_ids")
+    ):
+        raise InvalidUsageException("cursor cannot be combined with sort or filters")
+
+    try:
+        if cursor_token := query_args.get("cursor"):
+            # Re-validate the sort: the token is client-supplied and
+            # bypasses the sort enum above.
+            cursor = Cursor.from_string(cursor_token)
+            cursor.validate_sort_allowed(SORTABLE_FIELDS)
+        else:
+            cursor = Cursor.initial(
+                query_args.get("sort"),
+                filter_query=query_args.get("filter_query"),
+                filter_ids=query_args.get("filter_ids"),
+            )
+    except ValueError as exc:
+        raise InvalidUsageException(str(exc)) from exc
+
+    # Limit is independent from cursor
+    limit = query_args.get("limit") or DEFAULT_LIMIT
+    if limit > MAX_LIMIT:
+        raise InvalidUsageException(f"limit must not exceed {MAX_LIMIT}")
+
+    query = PaginatedQuery(cursor, limit + 1, "items")
+    rows = list(g.lib.items(query, query))
+    has_next = len(rows) > limit
+    items = rows[:limit]
+
+    # Create pagination links. The "next" link is only present if there
+    # are more items to fetch.
+    links: LinkObject = {"self": request.url}
+    if has_next:
+        cursor_token = cursor.next_from_entity(items[-1]).to_string()
+        links["next"] = (
+            request.base_url + "?" + urlencode({"cursor": cursor_token, "limit": limit})
+        )
+
+    return {
+        "data": [to_item_resource(item) for item in items],
+        "links": links,
+        "meta": {"total": query.total(g.lib)},
+    }
 
 
 class BulkPatchQueryParams(TypedDict, total=False):
@@ -171,8 +257,11 @@ class BulkPatchQueryParams(TypedDict, total=False):
         list[str], Meta(description="Only update items with these ids")
     ]
     sort: Annotated[
-        str,
-        Meta(description='Sort order as comma separated list, e.g. "+year,-title"'),
+        SortableField,
+        Meta(
+            description='Sort by a field, optionally prefixed with "+" '
+            '(ascending) or "-" (descending), e.g. "+title"'
+        ),
     ]
     limit: Annotated[
         int, Meta(description="Page size, i.e. maximum number of items to update")
