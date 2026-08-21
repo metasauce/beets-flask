@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Annotated, TypedDict
 
 from msgspec import Meta
 from quart import Blueprint, g
-from quart_schema import validate_querystring, validate_request
+from quart_schema import validate_request
 from quart_schema.validation import validate_response
 
 from beets_flask.config import get_config
@@ -18,6 +18,7 @@ from ._types import (
     MultiItemDocument,
     SingleItemDocument,
 )
+from ._validation import validate_querystring
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -85,6 +86,46 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
 
     return {
         "data": to_item_resource(item),
+    }
+
+
+class DeleteQueryParams(TypedDict, total=False):
+    delete_file: Annotated[
+        bool,
+        Meta(
+            description="Also delete the item's file from disk",
+            extra_json_schema={"default": False},
+        ),
+    ]
+
+
+@items_bp.route("/<int:item_id>", methods=["DELETE"])
+@validate_querystring(DeleteQueryParams)
+@validate_response(SingleItemDocument)
+@error_responses(InvalidUsageException, NotFoundException)
+async def delete_item(
+    item_id: int, query_args: DeleteQueryParams
+) -> SingleItemDocument:
+    """Delete item
+
+    Delete a single item from the beets library. The item is removed
+    from the library database; pass ``delete_file=true`` to also remove
+    its file from disk. If the item was the last one of its album, the
+    album is removed as well.
+    """
+    item: BeetsItem = g.lib.get_item(item_id)
+    if not item:
+        raise NotFoundException(
+            f"Item with beets_id:{item_id!r} not found in beets db."
+        )
+
+    if get_config().data.gui.library.readonly:
+        raise InvalidUsageException("Library is read-only")
+
+    resource = to_item_resource(item)
+    item.remove(delete=query_args.get("delete_file", False))
+    return {
+        "data": resource,
     }
 
 
@@ -163,7 +204,11 @@ class BulkDeleteQueryParams(TypedDict, total=False):
         list[str], Meta(description="Only delete items with these ids")
     ]
     delete_file: Annotated[
-        bool, Meta(description="Also delete the item's file from disk")
+        bool,
+        Meta(
+            description="Also delete the item's file from disk",
+            extra_json_schema={"default": False},
+        ),
     ]
 
 
