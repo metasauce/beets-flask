@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, get_type_hints
+from typing import Any, get_origin, get_type_hints
 
 from quart import current_app, request
 from quart_schema.conversion import model_load
@@ -29,8 +29,14 @@ def validate_querystring(model_class: type[Model]) -> Callable:
 
     def decorator(func: Callable) -> Callable:
         setattr(func, QUART_SCHEMA_QUERYSTRING_ATTRIBUTE, model_class)
-        bool_fields = {
-            name for name, type_ in get_type_hints(model_class).items() if type_ is bool
+        hints = get_type_hints(model_class)
+        bool_fields = {name for name, type_ in hints.items() if type_ is bool}
+        # List-typed fields (e.g. ``filter_ids``) arrive as a single value
+        # for ``?filter_ids=1`` and as multiple values for
+        # ``?filter_ids=1&filter_ids=2``. Always pass a list so msgspec
+        # accepts both forms.
+        list_fields = {
+            name for name, type_ in hints.items() if get_origin(type_) is list
         }
 
         @wraps(func)
@@ -38,7 +44,7 @@ def validate_querystring(model_class: type[Model]) -> Callable:
             request_args: dict[str, Any] = {
                 key: (
                     request.args.getlist(key)
-                    if len(request.args.getlist(key)) > 1
+                    if len(request.args.getlist(key)) > 1 or key in list_fields
                     else request.args[key]
                 )
                 for key in request.args

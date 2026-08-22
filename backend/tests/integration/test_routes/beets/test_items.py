@@ -400,6 +400,17 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
         assert {i["id"] for i in data["data"]} == set(ids)
         assert data["meta"]["total"] == 2
 
+    async def test_get_items_filter_ids_single(self, client: Client):
+        """A single ``filter_ids`` value is accepted."""
+        item = list(self.beets_lib.items())[0]
+
+        response = await client.get(f"/api_v1/beets/items/?filter_ids={item.id}")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert data["data"][0]["id"] == str(item.id)
+
     async def test_get_items_empty(self, client: Client):
         """A filter without matches returns an empty page."""
         response = await client.get(

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
+from urllib.parse import urlencode
 
 from beets.dbcore.query import AndQuery, InQuery, Query
 from beets.library import parse_query_string
 from msgspec import Meta
-from quart import Blueprint, g
+from quart import Blueprint, g, request
 from quart_schema import validate_request, validate_response
 
 from beets_flask.config import get_config
@@ -14,20 +15,21 @@ from beets_flask.importer.types import BeetsAlbum, BeetsItem
 from beets_flask.server.exceptions import (
     InvalidUsageException,
     NotFoundException,
-    NotImplementedException,
     error_responses,
 )
 
+from ._cursor import Cursor, PaginatedQuery
 from ._types import (
     AlbumAttributes,
     AlbumResource,
     BulkResult,
     ItemResource,
+    LinkObject,
     MultiAlbumDocument,
     SingleAlbumDocument,
 )
 from ._validation import validate_querystring
-from .items import to_item_resource
+from .items import DEFAULT_LIMIT, MAX_LIMIT, to_item_resource
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -49,6 +51,37 @@ def to_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumRes
             for item in items
         ],
     }
+
+
+#: The bare sortable field names of the bulk endpoints.
+ALBUM_SORTABLE_FIELDS = (
+    "added",
+    "year",
+    "album",
+    "albumartist",
+    "disctotal",
+)
+
+#: All allowed ``sort`` values: a sortable field, optionally prefixed
+#: with "+" (ascending) or "-" (descending). The prefixes are generated
+#: programmatically from :data:`ALBUM_SORTABLE_FIELDS`.
+AlbumSortableField: TypeAlias = Literal[  # type: ignore[valid-type]
+    *(
+        entry
+        for field in ALBUM_SORTABLE_FIELDS
+        for entry in (field, f"+{field}", f"-{field}")
+    )
+]  # mypy does not support PEP 646 star-unpacking in Literal yet
+
+#: Description of the ``sort`` query parameter of the bulk endpoints.
+#: Computed at module level (not inside an annotation) because f-strings
+#: inside ``Annotated`` are not constant-folded and break under
+#: ``from __future__ import annotations``.
+ALBUM_SORT_PARAM_DESCRIPTION = (
+    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
+    '(descending), e.g. "+year". Allowed fields: '
+    f'{", ".join(ALBUM_SORTABLE_FIELDS)}. Default: "-added".'
+)
 
 
 # ---------------------------------- Single ---------------------------------- #
@@ -179,25 +212,65 @@ async def delete_album(
 
 
 class BulkGetQueryParams(TypedDict, total=False):
-    cursor: Annotated[str, Meta(description="Pagination cursor from the previous page")]
+    cursor: Annotated[
+        str,
+        Meta(
+            description=(
+                "Pagination cursor from the ``links.next`` of a previous "
+                "response. The cursor is self-contained: it encodes the sort "
+                "and the filters of the original request, so the following "
+                "pages only need the cursor (plus an optional ``limit``). "
+                "Cannot be combined with ``sort``, ``filter_query`` or "
+                "``filter_ids``."
+            )
+        ),
+    ]
     filter_query: Annotated[
-        str, Meta(description="Beets query string to filter the albums")
+        str,
+        Meta(
+            description=(
+                "Beets query string to filter the albums, e.g. ``artist:Tool``. "
+                "Combined with ``filter_ids`` using AND."
+            ),
+            examples=["artist:Tool"],
+        ),
     ]
     filter_ids: Annotated[
-        list[int], Meta(description="Only return albums with these ids")
+        list[int],
+        Meta(
+            description=(
+                "Only return albums with these ids. Repeat the parameter for "
+                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
+                "with ``filter_query`` using AND."
+            )
+        ),
     ]
     sort: Annotated[
-        str,
-        Meta(description='Sort order as comma separated list, e.g. "+year,-title"'),
+        AlbumSortableField,
+        Meta(
+            description=ALBUM_SORT_PARAM_DESCRIPTION,
+            examples=["+year"],
+            extra_json_schema={"default": "-added"},
+        ),
     ]
     limit: Annotated[
-        int, Meta(description="Page size, i.e. maximum number of albums to return")
+        int,
+        Meta(
+            description=(
+                "Page size, i.e. maximum number of albums to return. Defaults "
+                "to 100; the maximum is 1000."
+            ),
+            extra_json_schema={"default": 100},
+        ),
     ]
     include: Annotated[
         Literal["items"],
         Meta(
-            description="Each album's items are included in the ``included`` "
-            "section of the response"
+            description=(
+                "Each album's items are included in the ``included`` section "
+                "of the response. The ``links.next`` URL keeps the parameter, "
+                "so pagination continues to include them."
+            )
         ),
     ]
 
@@ -205,15 +278,103 @@ class BulkGetQueryParams(TypedDict, total=False):
 @albums_bp.route("/", methods=["GET"])
 @validate_querystring(BulkGetQueryParams)
 @validate_response(MultiAlbumDocument)
-@error_responses(InvalidUsageException, NotImplementedException)
+@error_responses(InvalidUsageException)
 async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
     """Get albums (bulk)
 
     Retrieve beets albums matching the given filters, with pagination.
 
-    Not implemented yet - currently returns 501.
+    **Filters**
+
+    - ``filter_query``: a beets query string, e.g. ``artist:Tool``
+    - ``filter_ids``: repeatable, explicit album ids
+
+    The filters are combined with AND; without any filter, all albums
+    match.
+
+    **Pagination**
+
+    The result is sorted by ``sort`` (default ``-added``) and paginated
+    with a keyset cursor. Request the first page with ``sort`` and the
+    filters; the ``links.next`` of the response carries a self-contained
+    cursor that encodes the sort and the filters, so the following pages
+    only need that cursor (plus an optional ``limit``). The cursor cannot
+    be combined with ``sort`` or the filters.
+
+    ``meta.total`` is the total number of matching albums, independent
+    of the page size.
+
+    **Items**
+
+    Pass ``include=items`` to embed each album's items in the
+    ``included`` section of the response. The parameter is carried over
+    by the ``links.next`` URL, so pagination keeps including them.
+
+    For example, the 50 most recently added albums by Tool:
+    ``GET /api_v1/beets/albums/?filter_query=albumartist:Tool&limit=50``
     """
-    raise NotImplementedException
+    # Construct cursor either from args or from the encoded cursor string.
+    # The cursor is self-contained
+    if "cursor" in query_args and any(
+        query_args.get(p) for p in ("sort", "filter_query", "filter_ids")
+    ):
+        raise InvalidUsageException("cursor cannot be combined with sort or filters")
+
+    try:
+        if cursor_token := query_args.get("cursor"):
+            # Re-validate the sort: the token is client-supplied and
+            # bypasses the sort enum above.
+            cursor = Cursor.from_string(cursor_token)
+            cursor.validate_sort_allowed(ALBUM_SORTABLE_FIELDS)
+        else:
+            cursor = Cursor.initial(
+                query_args.get("sort"),
+                filter_query=query_args.get("filter_query"),
+                # The cursor stores ids as strings; see Cursor.from_string.
+                filter_ids=(
+                    [str(i) for i in query_args["filter_ids"]]
+                    if query_args.get("filter_ids") is not None
+                    else None
+                ),
+            )
+    except ValueError as exc:
+        raise InvalidUsageException(str(exc)) from exc
+
+    # Limit is independent from cursor
+    limit = query_args.get("limit") or DEFAULT_LIMIT
+    if limit > MAX_LIMIT:
+        raise InvalidUsageException(f"limit must not exceed {MAX_LIMIT}")
+
+    query = PaginatedQuery(cursor, limit + 1, "albums")
+    rows = list(g.lib.albums(query, query))
+    has_next = len(rows) > limit
+    albums = rows[:limit]
+
+    # Create pagination links. The "next" link is only present if there
+    # are more albums to fetch.
+    include_items = query_args.get("include") == "items"
+    links: LinkObject = {"self": request.url}
+    if has_next:
+        cursor_token = cursor.next_from_entity(albums[-1]).to_string()
+        next_params: dict[str, str | int] = {"cursor": cursor_token, "limit": limit}
+        if include_items:
+            next_params["include"] = "items"
+        links["next"] = request.base_url + "?" + urlencode(next_params)
+
+    data: list[AlbumResource] = []
+    included: list[ItemResource] = []
+    for album in albums:
+        items = album.items()
+        data.append(to_album_resource(album, items))
+        if include_items:
+            included.extend(to_item_resource(item) for item in items)
+
+    return {
+        "data": data,
+        "included": included,
+        "links": links,
+        "meta": {"total": query.total(g.lib)},
+    }
 
 
 class BulkPatchQueryParams(TypedDict, total=False):

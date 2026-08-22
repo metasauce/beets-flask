@@ -5,13 +5,12 @@ Covers the implemented endpoints of ``beets_flask/server/routes/beets/albums.py`
 - ``GET /api_v1/beets/albums/<album_id>``
 - ``PATCH /api_v1/beets/albums/<album_id>``
 - ``DELETE /api_v1/beets/albums/<album_id>``
+- ``GET /api_v1/beets/albums/`` (bulk)
 - ``PATCH /api_v1/beets/albums/`` (bulk)
 - ``DELETE /api_v1/beets/albums/`` (bulk)
-
-The bulk ``GET`` endpoint (``GET /api_v1/beets/albums/``) is not
-implemented yet and is only tested to return 501.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -20,6 +19,7 @@ from beets.library import Album
 from quart.typing import TestClientProtocol as Client
 
 from beets_flask.config import get_config
+from beets_flask.server.routes.beets._cursor import Cursor
 from tests.conftest import beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
@@ -388,6 +388,322 @@ class TestDeleteAlbumFiles(IsolatedBeetsLibraryMixin):
         assert path.exists(), "Files were deleted although delete_files=false"
 
 
+# ---------------------------------- Bulk Get --------------------------------- #
+
+
+class TestGetAlbums(IsolatedBeetsLibraryMixin):
+    """Tests for ``GET /api_v1/beets/albums/`` (bulk)."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    def albums(self, setup_beetslib):  # type: ignore
+        """Create 25 albums with distinct titles and five artists."""
+        for i in range(25):
+            self.beets_lib.add(
+                beets_lib_album(
+                    album=f"Bulk Album {i:02d}", albumartist=f"Artist{i % 5}"
+                )
+            )
+
+    async def test_get_albums_pagination(self, client: Client):
+        """Iterate all pages via the ``links.next`` cursor."""
+        next_url = "/api_v1/beets/albums/?limit=10"
+        titles = []
+        pages = 0
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 25
+            assert "self" in data["links"]
+            titles.extend(i["attributes"]["title"] for i in data["data"])
+            pages += 1
+            next_url = data["links"].get("next")
+
+        assert pages == 3, "Expected three pages of ten albums"
+        assert len(titles) == 25, "Not all albums were returned"
+        assert len(set(titles)) == 25, "Albums were returned more than once"
+
+    async def test_get_albums_default_limit(self, client: Client):
+        """Without ``limit``, the default page size applies."""
+        response = await client.get("/api_v1/beets/albums/")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert len(data["data"]) == 25
+        assert "next" not in data.get("links", {}), "Unexpected next page"
+
+    async def test_get_albums_sort(self, client: Client):
+        """Sort by album title ascending and descending."""
+        response = await client.get("/api_v1/beets/albums/?sort=album&limit=100")
+        data = await response.get_json()
+        titles = [i["attributes"]["title"] for i in data["data"]]
+        assert titles == sorted(titles), "Albums are not sorted ascending"
+
+        response = await client.get("/api_v1/beets/albums/?sort=-album&limit=100")
+        data = await response.get_json()
+        titles = [i["attributes"]["title"] for i in data["data"]]
+        assert titles == sorted(titles, reverse=True), (
+            "Albums are not sorted descending"
+        )
+
+    async def test_get_albums_descending_pagination(self, client: Client):
+        """Iterate all pages sorted descending via the cursor."""
+        next_url = "/api_v1/beets/albums/?sort=-album&limit=5"
+        titles = []
+        pages = 0
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 25
+            titles.extend(i["attributes"]["title"] for i in data["data"])
+            pages += 1
+            next_url = data["links"].get("next")
+
+        assert pages == 5, "Expected five pages of five albums"
+        assert titles == sorted(titles, reverse=True), (
+            "Albums are not sorted descending"
+        )
+        assert len(titles) == 25, "Not all albums were returned"
+
+    async def test_get_albums_filter_query(self, client: Client):
+        """Filter by a beets query string."""
+        response = await client.get(
+            "/api_v1/beets/albums/?filter_query=albumartist:Artist2"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        expected = {f"Bulk Album {i:02d}" for i in range(25) if i % 5 == 2}
+        titles = {i["attributes"]["title"] for i in data["data"]}
+        assert titles == expected, "Filtered albums do not match the query"
+        assert data["meta"]["total"] == 5
+
+    async def test_get_albums_filter_ids(self, client: Client):
+        """Filter by explicit ids."""
+        ids = [str(a.id) for a in list(self.beets_lib.albums())[:2]]
+        response = await client.get(
+            "/api_v1/beets/albums/?filter_ids=" + "&filter_ids=".join(ids)
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert {i["id"] for i in data["data"]} == set(ids)
+        assert data["meta"]["total"] == 2
+
+    async def test_get_albums_filter_ids_single(self, client: Client):
+        """A single ``filter_ids`` value is accepted."""
+        album = list(self.beets_lib.albums())[0]
+
+        response = await client.get(f"/api_v1/beets/albums/?filter_ids={album.id}")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert data["data"][0]["id"] == str(album.id)
+
+    async def test_get_albums_empty(self, client: Client):
+        """A filter without matches returns an empty page."""
+        response = await client.get(
+            "/api_v1/beets/albums/?filter_query=album:Nonexistent"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["data"] == []
+        assert data["meta"]["total"] == 0
+        assert "next" not in data.get("links", {})
+
+    async def test_get_albums_invalid_cursor(self, client: Client):
+        """An invalid cursor token -> 400."""
+        response = await client.get("/api_v1/beets/albums/?cursor=bogus")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_albums_invalid_sort_field(self, client: Client):
+        """Sorting by a disallowed field -> 400."""
+        response = await client.get("/api_v1/beets/albums/?sort=+bogus")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_albums_limit_too_high(self, client: Client):
+        """A limit above the maximum -> 400."""
+        response = await client.get("/api_v1/beets/albums/?limit=100000")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_albums_empty_sort(self, client: Client):
+        """An empty ``sort`` value -> 400."""
+        response = await client.get("/api_v1/beets/albums/?sort=&limit=100")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_albums_sort_without_field(self, client: Client):
+        """A ``sort`` without a field -> 400."""
+        response = await client.get("/api_v1/beets/albums/?sort=,&limit=100")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_albums_sort_sign_without_field(self, client: Client):
+        """A sort sign without a field -> 400."""
+        response = await client.get("/api_v1/beets/albums/?sort=%2B")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_albums_cursor_with_crafted_sort(self, client: Client):
+        """A cursor token with a crafted sort field -> 400."""
+        token = json.dumps({"s": "+bogus", "v": "x", "i": 1}).encode().hex()
+        response = await client.get(f"/api_v1/beets/albums/?cursor={token}")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_albums_cursor_with_sort_rejected(self, client: Client):
+        """``cursor`` combined with ``sort`` -> 400."""
+        token = Cursor.initial("+album").to_string()
+        response = await client.get(f"/api_v1/beets/albums/?cursor={token}&sort=album")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_albums_cursor_with_filter_rejected(self, client: Client):
+        """``cursor`` combined with filters -> 400."""
+        token = Cursor.initial("+album").to_string()
+        for params in ("filter_query=albumartist:Artist2", "filter_ids=1&filter_ids=2"):
+            response = await client.get(
+                f"/api_v1/beets/albums/?cursor={token}&{params}"
+            )
+            data = await response.get_json()
+            assert response.status_code == 400, f"{params} should be rejected"
+            assert data["type"] == "InvalidUsageException"
+
+    async def test_get_albums_filtered_pagination(self, client: Client):
+        """Filters survive pagination via the self-contained cursor."""
+        next_url = "/api_v1/beets/albums/?filter_query=albumartist:Artist2&limit=2"
+        titles = []
+        pages = 0
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 5
+            titles.extend(i["attributes"]["title"] for i in data["data"])
+            pages += 1
+            next_url = data["links"].get("next")
+            if next_url:
+                # The cursor is self-contained: no filter params in the link
+                for param in ("filter_query", "filter_ids", "sort"):
+                    assert f"{param}=" not in next_url, f"{param} in next link"
+
+        expected = {f"Bulk Album {i:02d}" for i in range(25) if i % 5 == 2}
+        assert pages == 3, "Expected three pages of two albums"
+        assert set(titles) == expected, "Filtered albums do not match the query"
+        assert len(titles) == 5, "Albums were returned more than once"
+
+    async def test_get_albums_filtered_pagination_by_ids(self, client: Client):
+        """Id filters survive pagination via the self-contained cursor."""
+        ids = [str(a.id) for a in list(self.beets_lib.albums())[:3]]
+        next_url = "/api_v1/beets/albums/?limit=2&filter_ids=" + "&filter_ids=".join(
+            ids
+        )
+        found = []
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert data["meta"]["total"] == 3
+            found.extend(i["id"] for i in data["data"])
+            next_url = data["links"].get("next")
+
+        assert set(found) == set(ids), "Id filtered pagination lost albums"
+        assert len(found) == 3
+
+    async def test_get_albums_next_link_strips_sort(self, client: Client):
+        """The ``links.next`` of a sorted page carries no ``sort`` and stays sorted."""
+        response = await client.get("/api_v1/beets/albums/?sort=album&limit=5")
+        data = await response.get_json()
+        assert response.status_code == 200, "Response status code is not 200"
+        first_titles = [i["attributes"]["title"] for i in data["data"]]
+        assert first_titles == sorted(first_titles)
+
+        next_url = data["links"]["next"]
+        assert "sort=" not in next_url, "Next link must not carry the sort parameter"
+
+        response = await client.get(next_url)
+        data = await response.get_json()
+        assert response.status_code == 200, "Response status code is not 200"
+        second_titles = [i["attributes"]["title"] for i in data["data"]]
+        assert second_titles == sorted(second_titles)
+        # The second page continues the same order after the first page
+        assert all(t1 < t2 for t1 in first_titles for t2 in second_titles)
+
+    async def test_get_albums_include_items(self, client: Client):
+        """``include=items`` embeds the albums' items in ``included``."""
+        a = beets_lib_album(album="Inc Album A", albumartist="IncArtist")
+        self.beets_lib.add(a)
+        self.beets_lib.add(beets_lib_item(album_id=a.id, title="T1"))
+        self.beets_lib.add(beets_lib_item(album_id=a.id, title="T2"))
+        b = beets_lib_album(album="Inc Album B", albumartist="IncArtist")
+        self.beets_lib.add(b)
+        self.beets_lib.add(beets_lib_item(album_id=b.id, title="T3"))
+
+        response = await client.get(
+            "/api_v1/beets/albums/?filter_query=albumartist:IncArtist"
+            "&include=items&limit=10"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert len(data["data"]) == 2
+        included = {i["id"] for i in data["included"]}
+        expected = {
+            str(i.id)
+            for album in self.beets_lib.albums("albumartist:IncArtist")
+            for i in album.items()
+        }
+        assert included == expected, "Included items do not match the albums' items"
+
+    async def test_get_albums_include_items_pagination(self, client: Client):
+        """The next page link keeps ``include=items``."""
+        for i in range(15):
+            a = beets_lib_album(album=f"Inc Page {i:02d}", albumartist="IncPageArtist")
+            self.beets_lib.add(a)
+            self.beets_lib.add(beets_lib_item(album_id=a.id, title=f"T{i}"))
+
+        next_url = (
+            "/api_v1/beets/albums/?filter_query=albumartist:IncPageArtist"
+            "&include=items&limit=10"
+        )
+        pages = 0
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, "Response status code is not 200"
+            assert len(data["data"]) == len(data["included"]), (
+                "Each album must contribute exactly one item"
+            )
+            pages += 1
+            next_url = data["links"].get("next")
+            if next_url:
+                assert "include=items" in next_url, "Next link must keep include"
+
+        assert pages == 2, "Expected two pages of ten and five albums"
+
+
 # -------------------------------- Bulk Delete ------------------------------- #
 
 
@@ -733,18 +1049,3 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
         assert response.status_code == 200, "Response status code is not 200"
         assert data["meta"]["total"] == 1
         assert MediaFile(str(path)).album == "File Renamed", "File tag not updated"
-
-
-# -------------------------------- Not implemented ------------------------------- #
-
-
-class TestBulkAlbumsNotImplemented(IsolatedBeetsLibraryMixin):
-    """Tests for the not-yet-implemented bulk albums endpoints."""
-
-    async def test_bulk_albums_get_not_implemented(self, client: Client):
-        """The bulk GET endpoint is not implemented yet -> 501."""
-        response = await client.get("/api_v1/beets/albums/", json={})
-        data = await response.get_json()
-
-        assert response.status_code == 501, "Response status code is not 501"
-        assert data["type"] == "NotImplementedException"
