@@ -5,9 +5,9 @@ Covers the implemented endpoints of ``beets_flask/server/routes/beets/items.py``
 - ``GET /api_v1/beets/items/<item_id>``
 - ``PATCH /api_v1/beets/items/<item_id>``
 - ``DELETE /api_v1/beets/items/<item_id>``
-
-The bulk ``PATCH`` and ``DELETE`` endpoints (``/api_v1/beets/items/``) are
-not implemented yet and are only tested to return 501.
+- ``GET /api_v1/beets/items/`` (bulk)
+- ``PATCH /api_v1/beets/items/`` (bulk)
+- ``DELETE /api_v1/beets/items/`` (bulk)
 """
 
 import json
@@ -125,6 +125,24 @@ class TestPatchItem(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 404, "Response status code is not 404"
         assert data["type"] == "NotFoundException"
+
+    async def test_patch_item_null_clears_field(self, client: Client):
+        """PATCH with an explicit ``null`` clears the title."""
+        item = self.beets_lib.get_item(self._items["a"].id)
+        assert item is not None
+        new_title = "Cleared Title"
+        self.beets_lib.get_item(item.id).update({"title": new_title})
+        self.beets_lib.get_item(item.id).store()
+
+        response = await client.patch(_item_url(item.id), json={"title": None})
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["data"]["attributes"]["title"] == ""
+
+        stored = self.beets_lib.get_item(item.id)
+        assert stored is not None
+        assert stored.title == "", "Title was not cleared"
 
     async def test_patch_item_empty_body_is_noop(self, client: Client):
         """PATCH with an empty body must not change anything."""
@@ -537,20 +555,197 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
         assert all(t1 < t2 for t1 in first_titles for t2 in second_titles)
 
 
-# -------------------------------- Not implemented ------------------------------- #
+# -------------------------------- Bulk Delete ------------------------------- #
 
 
-class TestBulkItemsNotImplemented(IsolatedBeetsLibraryMixin):
-    """Tests for the not-yet-implemented bulk items endpoints."""
+class TestDeleteItems(IsolatedBeetsLibraryMixin):
+    """Tests for ``DELETE /api_v1/beets/items/`` (bulk)."""
 
-    @pytest.mark.parametrize("method", ["patch", "delete"])
-    async def test_bulk_items_not_implemented(self, client: Client, method: str):
-        """The bulk items endpoints are not implemented yet -> 501."""
-        response = await getattr(client, method)("/api_v1/beets/items/", json={})
+    _audio_src = (
+        Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3"
+    )
+
+    def _add_item(self, title: str, artist: str, file_name: str | None = None) -> Item:
+        """Add an item to the library, optionally with a dedicated audio file.
+
+        Each test creates the items it needs, so the tests are independent
+        of each other and of their execution order.
+        """
+        import shutil
+
+        item = beets_lib_item(title=title, artist=artist)
+        self.beets_lib.add(item)
+        if file_name is not None:
+            path = _item_file(file_name)
+            shutil.copy(self._audio_src, path)
+            item.path = str(path).encode()
+            item.store()
+        return item
+
+    def _ids_of(self, artist: str) -> set[int]:
+        """The ids of all items by the given artist."""
+        return {i.id for i in self.beets_lib.items(f"artist:{artist}")}
+
+    async def test_delete_items_filter_query(self, client: Client):
+        """DELETE removes only the items matching the filter."""
+        group_a = [self._add_item(f"Bulk Delete {i}", "GroupA") for i in range(3)]
+        group_b = [self._add_item(f"Bulk Delete {i}", "GroupB") for i in range(3)]
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_query=artist:GroupA"
+        )
         data = await response.get_json()
 
-        assert response.status_code == 501, "Response status code is not 501"
-        assert data["type"] == "NotImplementedException"
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 3
+        assert self._ids_of("GroupA") == set(), "GroupA items were not deleted"
+        assert self._ids_of("GroupB") == {i.id for i in group_b}, (
+            "Items of the other group were deleted"
+        )
+        assert all(self.beets_lib.get_item(i.id) is None for i in group_a)
+
+    async def test_delete_items_filter_ids(self, client: Client):
+        """DELETE removes only the items with the given ids."""
+        items = [self._add_item(f"Id Item {i}", "IdArtist") for i in range(3)]
+        ids = [items[0].id, items[1].id]
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_ids=" + "&filter_ids=".join(map(str, ids))
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert all(self.beets_lib.get_item(i) is None for i in ids), (
+            "Items with the given ids remain"
+        )
+        assert self.beets_lib.get_item(items[2].id) is not None, (
+            "Item without a matching id was deleted"
+        )
+
+    async def test_delete_items_no_filter(self, client: Client):
+        """DELETE without a filter removes all items."""
+        for i in range(3):
+            self._add_item(f"All Item {i}", "AllArtist")
+        expected = len(list(self.beets_lib.items()))
+
+        response = await client.delete("/api_v1/beets/items/")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == expected
+        assert list(self.beets_lib.items()) == [], "Library is not empty"
+
+    async def test_delete_items_no_match(self, client: Client):
+        """A filter without matches deletes nothing and reports zero."""
+        item = self._add_item("Kept Item", "KeptArtist")
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_query=title:Nonexistent"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 0
+        assert self.beets_lib.get_item(item.id) is not None, "Item was deleted"
+
+    async def test_delete_items_readonly(self, client: Client):
+        """DELETE must fail and not modify the library when it is read-only."""
+        item = self._add_item("Readonly Item", "ReadonlyArtist")
+
+        config = get_config()
+        config.data.gui.library.readonly = True
+        try:
+            response = await client.delete(
+                "/api_v1/beets/items/?filter_query=artist:ReadonlyArtist"
+            )
+        finally:
+            config.data.gui.library.readonly = False
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self.beets_lib.get_item(item.id) is not None, (
+            "Item was removed even though the library is read-only"
+        )
+
+    async def test_delete_items_keeps_files_by_default(self, client: Client):
+        """DELETE without ``delete_file`` keeps the files on disk."""
+        items = [
+            self._add_item(f"Keep File {i}", "KeepArtist", f"bulk_delete_keep_{i}.mp3")
+            for i in range(2)
+        ]
+        paths = [_item_file(f"bulk_delete_keep_{i}.mp3") for i in range(2)]
+        assert all(p.exists() for p in paths)
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_query=artist:KeepArtist"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert all(p.exists() for p in paths), "Files were deleted without delete_file"
+        assert all(self.beets_lib.get_item(i.id) is None for i in items)
+
+    async def test_delete_items_with_delete_file(self, client: Client):
+        """DELETE with ``delete_file=true`` also removes the files from disk."""
+        items = [
+            self._add_item(
+                f"Remove File {i}", "RemoveArtist", f"bulk_delete_rm_{i}.mp3"
+            )
+            for i in range(2)
+        ]
+        paths = [_item_file(f"bulk_delete_rm_{i}.mp3") for i in range(2)]
+        assert all(p.exists() for p in paths)
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_query=artist:RemoveArtist&delete_file=true"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert all(not p.exists() for p in paths), "Files were not deleted"
+        assert all(self.beets_lib.get_item(i.id) is None for i in items)
+
+    async def test_delete_items_delete_file_false(self, client: Client):
+        """DELETE with an explicit ``delete_file=false`` keeps the files."""
+        item = self._add_item("False Item", "FalseArtist", "bulk_delete_false.mp3")
+        path = _item_file("bulk_delete_false.mp3")
+        assert path.exists()
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_query=artist:FalseArtist&delete_file=false"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert path.exists(), "File was deleted although delete_file=false"
+        assert self.beets_lib.get_item(item.id) is None
+
+    async def test_delete_items_last_item_removes_album(self, client: Client):
+        """Deleting the last items of an album removes the album as well."""
+        a = beets_lib_item(
+            title="Album Item A", artist="AlbumArtist", album="The Album"
+        )
+        b = beets_lib_item(
+            title="Album Item B", artist="AlbumArtist", album="The Album"
+        )
+        album = self.beets_lib.add_album([a, b])
+        assert album.id is not None
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_query=artist:AlbumArtist"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert self.beets_lib.get_album(album.id) is None, "Album was not removed"
+        assert self.beets_lib.get_item(a.id) is None
+        assert self.beets_lib.get_item(b.id) is None
 
 
 class TestPaginatedQuery:
@@ -617,3 +812,147 @@ class TestGetItemsSqlLimit(IsolatedBeetsLibraryMixin):
         assert "LIMIT 11" in page_selects[0], (
             f"No LIMIT in SQL: {page_selects[0][:200]}"
         )
+
+
+class TestPatchItems(IsolatedBeetsLibraryMixin):
+    """Tests for ``PATCH /api_v1/beets/items/`` (bulk)."""
+
+    _items: dict[str, Item] = {}
+
+    @pytest.fixture(scope="class", autouse=True)
+    def items(self, setup_beetslib):  # type: ignore
+        """Create items with dedicated audio files, grouped by artist."""
+        import shutil
+
+        audio_src = (
+            Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3"
+        )
+        for i in range(6):
+            group = "GroupA" if i < 3 else "GroupB"
+            item = beets_lib_item(title=f"Bulk Patch {i}", artist=group)
+            self.beets_lib.add(item)
+            path = _item_file(f"bulk_patch_{i}.mp3")
+            shutil.copy(audio_src, path)
+            item.path = str(path).encode()
+            item.store()
+            self._items[i] = item
+
+    def _titles_of(self, artist: str) -> set[str]:
+        """The titles of all items by the given artist."""
+        return {i.title for i in self.beets_lib.items(f"artist:{artist}")}
+
+    async def test_patch_items_readonly(self, client: Client):
+        """PATCH must fail when the library is read-only."""
+        config = get_config()
+        config.data.gui.library.readonly = True
+        try:
+            response = await client.patch(
+                "/api_v1/beets/items/?filter_query=artist:GroupA",
+                json={"title": "Should Not Apply"},
+            )
+        finally:
+            config.data.gui.library.readonly = False
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self._titles_of("GroupA") == {
+            "Bulk Patch 0",
+            "Bulk Patch 1",
+            "Bulk Patch 2",
+        }
+
+    async def test_patch_items_filter_query(self, client: Client):
+        """PATCH applies the body to all items matching the filter."""
+        response = await client.patch(
+            "/api_v1/beets/items/?filter_query=artist:GroupA",
+            json={"title": "Renamed"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 3
+        assert self._titles_of("GroupA") == {"Renamed"}
+        # items of the other group are untouched
+        assert self._titles_of("GroupB") == {
+            "Bulk Patch 3",
+            "Bulk Patch 4",
+            "Bulk Patch 5",
+        }
+
+    async def test_patch_items_filter_ids(self, client: Client):
+        """PATCH applies the body to the items with the given ids."""
+        response = await client.patch(
+            "/api_v1/beets/items/?filter_ids=3&filter_ids=4",
+            json={"title": "Id Renamed"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert self.beets_lib.get_item(3).title == "Id Renamed"
+        assert self.beets_lib.get_item(4).title == "Id Renamed"
+
+    async def test_patch_items_null_clears_field(self, client: Client):
+        """PATCH with an explicit ``null`` clears the field."""
+        response = await client.patch(
+            "/api_v1/beets/items/?filter_query=artist:GroupB",
+            json={"title": None},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 3
+        assert self._titles_of("GroupB") == {""}
+
+    async def test_patch_items_empty_body(self, client: Client):
+        """PATCH with an empty body is a no-op, but reports the matched count."""
+        before = self._titles_of("GroupA")
+
+        response = await client.patch(
+            "/api_v1/beets/items/?filter_query=artist:GroupA", json={}
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 3
+        assert self._titles_of("GroupA") == before, "Empty body changed items"
+
+    async def test_patch_items_writes_file_tags(self, client: Client):
+        """PATCH writes the new title into the files' tags, like the single patch."""
+        import shutil
+
+        from mediafile import MediaFile
+
+        item = beets_lib_item(title="File Tag Item", artist="FileTagArtist")
+        self.beets_lib.add(item)
+        path = _item_file("bulk_patch_filetag.mp3")
+        shutil.copy(
+            Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3",
+            path,
+        )
+        item.path = str(path).encode()
+        item.store()
+
+        response = await client.patch(
+            "/api_v1/beets/items/?filter_query=artist:FileTagArtist",
+            json={"title": "File Renamed"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert MediaFile(str(path)).title == "File Renamed", "File tag not updated"
+
+    async def test_patch_items_no_filter(self, client: Client):
+        """PATCH without a filter applies the body to all items."""
+        total = len(list(self.beets_lib.items()))
+
+        response = await client.patch(
+            "/api_v1/beets/items/", json={"title": "All Renamed"}
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == total
+        assert {i.title for i in self.beets_lib.items()} == {"All Renamed"}

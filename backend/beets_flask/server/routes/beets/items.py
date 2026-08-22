@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
 from urllib.parse import urlencode
 
+from beets.dbcore.query import AndQuery, InQuery, Query
+from beets.library import parse_query_string
 from msgspec import Meta
 from quart import Blueprint, g, request
 from quart_schema import validate_request
@@ -10,11 +12,12 @@ from quart_schema.validation import validate_response
 
 from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsItem
-from beets_flask.server.exceptions import NotImplementedException, error_responses
+from beets_flask.server.exceptions import error_responses
 from beets_flask.server.routes.exception import InvalidUsageException, NotFoundException
 
 from ._cursor import Cursor, PaginatedQuery
 from ._types import (
+    BulkResult,
     ItemAttributes,
     ItemResource,
     LinkObject,
@@ -256,33 +259,49 @@ class BulkPatchQueryParams(TypedDict, total=False):
     filter_ids: Annotated[
         list[str], Meta(description="Only update items with these ids")
     ]
-    sort: Annotated[
-        SortableField,
-        Meta(
-            description='Sort by a field, optionally prefixed with "+" '
-            '(ascending) or "-" (descending), e.g. "+title"'
-        ),
-    ]
-    limit: Annotated[
-        int, Meta(description="Page size, i.e. maximum number of items to update")
-    ]
 
 
 @items_bp.route("/", methods=["PATCH"])
 @validate_querystring(BulkPatchQueryParams)
 @validate_request(ItemAttributes)
-@validate_response(MultiItemDocument)
-@error_responses(InvalidUsageException, NotImplementedException)
+@validate_response(BulkResult)
+@error_responses(InvalidUsageException)
 async def patch_items(
     query_args: BulkPatchQueryParams, data: ItemAttributes
-) -> MultiItemDocument:
+) -> BulkResult:
     """Patch items (bulk)
 
-    Update the attributes of all items matching the given filters.
+    Update the attributes of all items matching the given filters. The
+    change is applied to the beets library and written to the files'
+    tags, like the single item patch. Attributes that are not present
+    in the body are left unchanged; an explicit ``null`` clears the
+    field.
 
-    Not implemented yet - currently returns 501.
+    Returns 400 if the library is configured as read-only.
     """
-    raise NotImplementedException
+    if get_config().data.gui.library.readonly:
+        raise InvalidUsageException("Library is read-only")
+
+    # The filters: the beets query string and/or explicit ids
+    filters: list[Query] = []
+    if filter_query := query_args.get("filter_query"):
+        filters.append(parse_query_string(filter_query, BeetsItem)[0])
+    if filter_ids := query_args.get("filter_ids"):
+        filters.append(InQuery("id", filter_ids))
+    query = AndQuery(filters) if filters else None
+
+    # Update every matching item in a single transaction: the database
+    # writes are committed together. If an update fails midway, the
+    # already-written files stay consistent with the committed database
+    # state, and the error propagates.
+    total = 0
+    with g.lib.transaction():
+        for item in g.lib.items(query):
+            item.update(data)
+            item.try_sync(True, False)
+            total += 1
+
+    return {"meta": {"total": total}}
 
 
 class BulkDeleteQueryParams(TypedDict, total=False):
@@ -303,12 +322,39 @@ class BulkDeleteQueryParams(TypedDict, total=False):
 
 @items_bp.route("/", methods=["DELETE"])
 @validate_querystring(BulkDeleteQueryParams)
-@error_responses(InvalidUsageException, NotImplementedException)
-async def delete_items(query_args: BulkDeleteQueryParams):
+@validate_response(BulkResult)
+@error_responses(InvalidUsageException)
+async def delete_items(query_args: BulkDeleteQueryParams) -> BulkResult:
     """Delete items (bulk)
 
-    Delete all items matching the given filters.
+    Delete all items matching the given filters. The items are removed
+    from the library database; pass ``delete_file=true`` to also remove
+    their files from disk. If an item was the last one of its album,
+    the album is removed as well (and with ``delete_file=true`` its
+    art file, too).
 
-    Not implemented yet - currently returns 501.
+    Returns 400 if the library is configured as read-only.
     """
-    raise NotImplementedException
+    if get_config().data.gui.library.readonly:
+        raise InvalidUsageException("Library is read-only")
+
+    # The filters: the beets query string and/or explicit ids
+    filters: list[Query] = []
+    if filter_query := query_args.get("filter_query"):
+        filters.append(parse_query_string(filter_query, BeetsItem)[0])
+    if filter_ids := query_args.get("filter_ids"):
+        filters.append(InQuery("id", filter_ids))
+    query = AndQuery(filters) if filters else None
+
+    # Delete every matching item in a single transaction: the database
+    # writes are committed together. If a deletion fails midway, the
+    # already-deleted files stay consistent with the committed database
+    # state, and the error propagates.
+    delete = query_args.get("delete_file", False)
+    total = 0
+    with g.lib.transaction():
+        for item in g.lib.items(query):
+            item.remove(delete=delete)
+            total += 1
+
+    return {"meta": {"total": total}}

@@ -101,6 +101,15 @@ class MultiItemDocument(TypedDict):
     meta: NotRequired[MetaObject]
 
 
+class BulkResult(TypedDict):
+    """The result of a bulk operation (e.g. update or delete).
+
+    ``meta.total`` is the number of items the operation was applied to.
+    """
+
+    meta: MetaObject
+
+
 # ---------------------------------------------------------------------------- #
 #                                    Albums                                    #
 # ---------------------------------------------------------------------------- #
