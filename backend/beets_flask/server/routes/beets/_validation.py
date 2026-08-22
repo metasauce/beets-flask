@@ -14,7 +14,7 @@ from quart_schema.validation import (
     QuerystringValidationError,
 )
 
-#: String values that count as boolean true when parsing query parameters.
+# String values that count as boolean true when parsing query parameters.
 _TRUE_VALUES = {"true", "1", "yes", "on"}
 
 

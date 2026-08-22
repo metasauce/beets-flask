@@ -59,7 +59,11 @@ class ResourceIdentifier(TypedDict):
 
 
 class ItemAttributes(TypedDict, total=False):
-    """Item Attributes"""
+    """The attributes of an item to update.
+
+    Attributes that are not present in the body are left unchanged; an
+    explicit ``null`` clears the field.
+    """
 
     title: Annotated[str | None, Meta(description="The title of the item")]
 

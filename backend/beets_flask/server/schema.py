@@ -40,10 +40,10 @@ class BlueprintOnlyOpenAPIProvider(OpenAPIProvider):
     speced version.
     """
 
-    #: Preferred order of HTTP methods within a path in the docs.
+    # Preferred order of HTTP methods within a path in the docs.
     _METHOD_ORDER = {"GET": 0, "POST": 1, "PUT": 2, "PATCH": 3, "DELETE": 4}
 
-    #: Descriptions for the path parameters of our endpoints.
+    # Descriptions for the path parameters of our endpoints.
     _PATH_PARAM_DESCRIPTIONS = {
         "album_id": "The id of the album in the beets library",
         "item_id": "The id of the item in the beets library",

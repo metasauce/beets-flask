@@ -32,13 +32,13 @@ if TYPE_CHECKING:
 
 items_bp = Blueprint("items", __name__, url_prefix="/items")
 
-#: Default page size of the bulk endpoints.
+# Default page size of the bulk endpoints.
 DEFAULT_LIMIT = 100
 
-#: Maximum allowed page size of the bulk endpoints.
+# Maximum allowed page size of the bulk endpoints.
 MAX_LIMIT = 1000
 
-#: The bare sortable field names of the bulk endpoints.
+# The bare sortable field names of the bulk endpoints.
 SORTABLE_FIELDS = (
     "added",
     "year",
@@ -52,12 +52,22 @@ SORTABLE_FIELDS = (
     "bitrate",
 )
 
-#: All allowed ``sort`` values: a sortable field, optionally prefixed
-#: with "+" (ascending) or "-" (descending). The prefixes are generated
-#: programmatically from :data:`SORTABLE_FIELDS`.
+# All allowed ``sort`` values: a sortable field, optionally prefixed
+# with "+" (ascending) or "-" (descending). The prefixes are generated
+# programmatically from :data:`SORTABLE_FIELDS`.
 SortableField: TypeAlias = Literal[  # type: ignore[valid-type]
     *(entry for field in SORTABLE_FIELDS for entry in (field, f"+{field}", f"-{field}"))
 ]  # mypy does not support PEP 646 star-unpacking in Literal yet
+
+# Description of the ``sort`` query parameter of the bulk endpoints.
+# Computed at module level (not inside an annotation) because f-strings
+# inside ``Annotated`` are not constant-folded and break under
+# ``from __future__ import annotations``.
+SORT_PARAM_DESCRIPTION = (
+    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
+    '(descending), e.g. "+title". Allowed fields: '
+    f'{", ".join(SORTABLE_FIELDS)}. Default: "-added".'
+)
 
 
 def to_item_resource(item: BeetsItem) -> ItemResource:
@@ -99,6 +109,10 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
 
     Update the attributes of a single item, e.g. its title. The change
     is written back to the beets library and to disk (if applicable).
+    Attributes that are not present in the body are left unchanged; an
+    explicit ``null`` clears the field.
+
+    Returns 400 if the library is configured as read-only.
     """
     item: BeetsItem = g.lib.get_item(item_id)
     if not item:
@@ -145,6 +159,8 @@ async def delete_item(
     from the library database; pass ``delete_file=true`` to also remove
     its file from disk. If the item was the last one of its album, the
     album is removed as well.
+
+    Returns 400 if the library is configured as read-only.
     """
     item: BeetsItem = g.lib.get_item(item_id)
     if not item:
@@ -166,22 +182,56 @@ async def delete_item(
 
 
 class BulkGetQueryParams(TypedDict, total=False):
-    cursor: Annotated[str, Meta(description="Pagination cursor from the previous page")]
+    cursor: Annotated[
+        str,
+        Meta(
+            description=(
+                "Pagination cursor from the ``links.next`` of a previous "
+                "response. The cursor is self-contained: it encodes the sort "
+                "and the filters of the original request, so the following "
+                "pages only need the cursor (plus an optional ``limit``). "
+                "Cannot be combined with ``sort``, ``filter_query`` or "
+                "``filter_ids``."
+            )
+        ),
+    ]
     filter_query: Annotated[
-        str, Meta(description="Beets query string to filter the items")
+        str,
+        Meta(
+            description=(
+                "Beets query string to filter the items, e.g. ``artist:Tool``. "
+                "Combined with ``filter_ids`` using AND."
+            ),
+            examples=["artist:Tool"],
+        ),
     ]
     filter_ids: Annotated[
-        list[str], Meta(description="Only return items with these ids")
+        list[str],
+        Meta(
+            description=(
+                "Only return items with these ids. Repeat the parameter for "
+                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
+                "with ``filter_query`` using AND."
+            )
+        ),
     ]
     sort: Annotated[
         SortableField,
         Meta(
-            description='Sort by a field, optionally prefixed with "+" '
-            '(ascending) or "-" (descending), e.g. "+title"'
+            description=SORT_PARAM_DESCRIPTION,
+            examples=["+title"],
+            extra_json_schema={"default": "-added"},
         ),
     ]
     limit: Annotated[
-        int, Meta(description="Page size, i.e. maximum number of items to return")
+        int,
+        Meta(
+            description=(
+                "Page size, i.e. maximum number of items to return. Defaults "
+                "to 100; the maximum is 1000."
+            ),
+            extra_json_schema={"default": 100},
+        ),
     ]
 
 
@@ -194,15 +244,28 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
 
     Retrieve beets items matching the given filters, with pagination.
 
-    The result is sorted by ``sort`` (default ``-added``) and paginated
-    with a keyset cursor. The cursor is self-contained: it encodes the
-    sort and the filters, so pass ``sort``, ``filter_query`` and
-    ``filter_ids`` for the first page and only the ``cursor`` (plus
-    ``limit``) for the following pages.
+    **Filters**
 
-    The function first builds the cursor - either a fresh one from the
-    given sort and filters, or the encoded cursor of a following page -
-    and then fetches the page using that cursor.
+    - ``filter_query``: a beets query string, e.g. ``artist:Tool``
+    - ``filter_ids``: repeatable, explicit item ids
+
+    The filters are combined with AND; without any filter, all items
+    match.
+
+    **Pagination**
+
+    The result is sorted by ``sort`` (default ``-added``) and paginated
+    with a keyset cursor. Request the first page with ``sort`` and the
+    filters; the ``links.next`` of the response carries a self-contained
+    cursor that encodes the sort and the filters, so the following pages
+    only need that cursor (plus an optional ``limit``). The cursor cannot
+    be combined with ``sort`` or the filters.
+
+    ``meta.total`` is the total number of matching items, independent of
+    the page size.
+
+    For example, the 50 most recently added tracks by Tool:
+    ``GET /api_v1/beets/items/?filter_query=artist:Tool&limit=50``
     """
     # Construct cursor either from args or from the encoded cursor string.
     # The cursor is self-contained
@@ -254,10 +317,24 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
 
 class BulkPatchQueryParams(TypedDict, total=False):
     filter_query: Annotated[
-        str, Meta(description="Beets query string to filter the items")
+        str,
+        Meta(
+            description=(
+                "Beets query string to filter the items, e.g. ``artist:Tool``. "
+                "Combined with ``filter_ids`` using AND."
+            ),
+            examples=["artist:Tool"],
+        ),
     ]
     filter_ids: Annotated[
-        list[str], Meta(description="Only update items with these ids")
+        list[str],
+        Meta(
+            description=(
+                "Only update items with these ids. Repeat the parameter for "
+                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
+                "with ``filter_query`` using AND."
+            )
+        ),
     ]
 
 
@@ -276,6 +353,10 @@ async def patch_items(
     tags, like the single item patch. Attributes that are not present
     in the body are left unchanged; an explicit ``null`` clears the
     field.
+
+    The ``filter_query`` and ``filter_ids`` parameters are combined
+    with AND; without any filter, all items match. All updates run in
+    a single transaction and are committed together.
 
     Returns 400 if the library is configured as read-only.
     """
@@ -306,10 +387,24 @@ async def patch_items(
 
 class BulkDeleteQueryParams(TypedDict, total=False):
     filter_query: Annotated[
-        str, Meta(description="Beets query string to filter the items")
+        str,
+        Meta(
+            description=(
+                "Beets query string to filter the items, e.g. ``artist:Tool``. "
+                "Combined with ``filter_ids`` using AND."
+            ),
+            examples=["artist:Tool"],
+        ),
     ]
     filter_ids: Annotated[
-        list[str], Meta(description="Only delete items with these ids")
+        list[str],
+        Meta(
+            description=(
+                "Only delete items with these ids. Repeat the parameter for "
+                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
+                "with ``filter_query`` using AND."
+            )
+        ),
     ]
     delete_file: Annotated[
         bool,
@@ -332,6 +427,10 @@ async def delete_items(query_args: BulkDeleteQueryParams) -> BulkResult:
     their files from disk. If an item was the last one of its album,
     the album is removed as well (and with ``delete_file=true`` its
     art file, too).
+
+    The ``filter_query`` and ``filter_ids`` parameters are combined
+    with AND; without any filter, all items match. All deletions run in
+    a single transaction and are committed together.
 
     Returns 400 if the library is configured as read-only.
     """

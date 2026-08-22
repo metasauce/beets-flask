@@ -45,8 +45,8 @@ from beets.library import parse_query_string
 
 from beets_flask.importer.types import BeetsAlbum, BeetsItem, BeetsLibrary
 
-#: The model class of each paginated table, used to parse the filter
-#: query string with the correct field set.
+# The model class of each paginated table, used to parse the filter
+# query string with the correct field set.
 _TABLE_MODELS = {"items": BeetsItem, "albums": BeetsAlbum}
 
 
