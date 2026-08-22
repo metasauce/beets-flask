@@ -5,9 +5,10 @@ Covers the implemented endpoints of ``beets_flask/server/routes/beets/albums.py`
 - ``GET /api_v1/beets/albums/<album_id>``
 - ``PATCH /api_v1/beets/albums/<album_id>``
 - ``DELETE /api_v1/beets/albums/<album_id>``
+- ``DELETE /api_v1/beets/albums/`` (bulk)
 
-The bulk endpoints (``GET/PATCH/DELETE /api_v1/beets/albums/``) are not
-implemented yet and are only tested to return 501.
+The bulk ``GET`` and ``PATCH`` endpoints (``GET/PATCH /api_v1/beets/albums/``)
+are not implemented yet and are only tested to return 501.
 """
 
 import os
@@ -386,15 +387,204 @@ class TestDeleteAlbumFiles(IsolatedBeetsLibraryMixin):
         assert path.exists(), "Files were deleted although delete_files=false"
 
 
+# -------------------------------- Bulk Delete ------------------------------- #
+
+
+class TestDeleteAlbums(IsolatedBeetsLibraryMixin):
+    """Tests for ``DELETE /api_v1/beets/albums/`` (bulk)."""
+
+    def _add_album(
+        self,
+        album: str,
+        artist: str,
+        n_items: int = 1,
+        file_names: list[str] | None = None,
+    ) -> Album:
+        """Add an album with items, optionally with dedicated audio files.
+
+        Each test creates the albums it needs, so the tests are independent
+        of each other and of their execution order.
+        """
+        a = beets_lib_album(album=album, albumartist=artist, artpath=None)
+        self.beets_lib.add(a)
+        for i in range(n_items):
+            item = beets_lib_item(album_id=a.id, title=f"Track {i}")
+            self.beets_lib.add(item)
+            if file_names and i < len(file_names):
+                path = Path(os.environ["HOME"]) / "audio" / file_names[i]
+                path.write_bytes(b"fake mp3")
+                item.path = str(path).encode()
+                item.store()
+        return a
+
+    async def test_delete_albums_filter_query(self, client: Client):
+        """DELETE removes only the albums matching the filter."""
+        a = self._add_album("Album A", "GroupA")
+        b = self._add_album("Album B", "GroupA")
+        c = self._add_album("Album C", "GroupB")
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_query=albumartist:GroupA"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert self.beets_lib.get_album(a.id) is None, "Album A was not deleted"
+        assert self.beets_lib.get_album(b.id) is None, "Album B was not deleted"
+        assert self.beets_lib.get_album(c.id) is not None, (
+            "Album of the other group was deleted"
+        )
+
+    async def test_delete_albums_filter_ids(self, client: Client):
+        """DELETE removes only the albums with the given ids."""
+        a = self._add_album("Album A", "Artist A")
+        b = self._add_album("Album B", "Artist B")
+        c = self._add_album("Album C", "Artist C")
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_ids="
+            + "&filter_ids=".join(map(str, [a.id, b.id]))
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert self.beets_lib.get_album(a.id) is None, "Album A was not deleted"
+        assert self.beets_lib.get_album(b.id) is None, "Album B was not deleted"
+        assert self.beets_lib.get_album(c.id) is not None, (
+            "Album without a matching id was deleted"
+        )
+
+    async def test_delete_albums_no_filter(self, client: Client):
+        """DELETE without a filter removes all albums."""
+        for i in range(3):
+            self._add_album(f"Album {i}", f"Artist {i}")
+        expected = len(list(self.beets_lib.albums()))
+
+        response = await client.delete("/api_v1/beets/albums/")
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == expected
+        assert list(self.beets_lib.albums()) == [], "Library is not empty"
+
+    async def test_delete_albums_no_match(self, client: Client):
+        """A filter without matches deletes nothing and reports zero."""
+        album = self._add_album("Kept Album", "KeptArtist")
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_query=album:Nonexistent"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 0
+        assert self.beets_lib.get_album(album.id) is not None, "Album was deleted"
+
+    async def test_delete_albums_readonly(self, client: Client):
+        """DELETE must fail and not modify the library when it is read-only."""
+        album = self._add_album("Readonly Album", "ReadonlyArtist")
+
+        config = get_config()
+        config.data.gui.library.readonly = True
+        try:
+            response = await client.delete(
+                "/api_v1/beets/albums/?filter_query=albumartist:ReadonlyArtist"
+            )
+        finally:
+            config.data.gui.library.readonly = False
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self.beets_lib.get_album(album.id) is not None, (
+            "Album was removed even though the library is read-only"
+        )
+
+    async def test_delete_albums_removes_items(self, client: Client):
+        """DELETE removes the album's items from the library as well."""
+        album = self._add_album("Album With Items", "ItemArtist", n_items=2)
+        stored = self.beets_lib.get_album(album.id)
+        assert stored is not None
+        item_ids = [i.id for i in stored.items()]
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_query=albumartist:ItemArtist"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert self.beets_lib.get_album(album.id) is None, "Album was not removed"
+        for item_id in item_ids:
+            assert self.beets_lib.get_item(item_id) is None, (
+                "Album's items were not removed from the library"
+            )
+
+    async def test_delete_albums_keeps_files_by_default(self, client: Client):
+        """DELETE without ``delete_files`` keeps the files on disk."""
+        self._add_album(
+            "Keep Files Album", "KeepArtist", file_names=["album_bulk_keep.mp3"]
+        )
+        path = Path(os.environ["HOME"]) / "audio" / "album_bulk_keep.mp3"
+        assert path.exists()
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_query=albumartist:KeepArtist"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert path.exists(), "Files were deleted without delete_files"
+
+    async def test_delete_albums_with_delete_files(self, client: Client):
+        """DELETE with ``delete_files=true`` also removes the files from disk."""
+        self._add_album(
+            "Remove Files Album", "RemoveArtist", file_names=["album_bulk_rm.mp3"]
+        )
+        path = Path(os.environ["HOME"]) / "audio" / "album_bulk_rm.mp3"
+        assert path.exists()
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_query=albumartist:RemoveArtist"
+            "&delete_files=true"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert not path.exists(), "Files were not deleted although delete_files=true"
+
+    async def test_delete_albums_delete_files_false(self, client: Client):
+        """DELETE with an explicit ``delete_files=false`` keeps the files."""
+        self._add_album(
+            "False Files Album", "FalseArtist", file_names=["album_bulk_false.mp3"]
+        )
+        path = Path(os.environ["HOME"]) / "audio" / "album_bulk_false.mp3"
+        assert path.exists()
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_query=albumartist:FalseArtist"
+            "&delete_files=false"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert path.exists(), "File was deleted although delete_files=false"
+
+
 # -------------------------------- Not implemented ------------------------------- #
 
 
 class TestBulkAlbumsNotImplemented(IsolatedBeetsLibraryMixin):
     """Tests for the not-yet-implemented bulk albums endpoints."""
 
-    @pytest.mark.parametrize("method", ["get", "patch", "delete"])
+    @pytest.mark.parametrize("method", ["get", "patch"])
     async def test_bulk_albums_not_implemented(self, client: Client, method: str):
-        """The bulk albums endpoints are not implemented yet -> 501."""
+        """The bulk GET and PATCH endpoints are not implemented yet -> 501."""
         response = await getattr(client, method)("/api_v1/beets/albums/", json={})
         data = await response.get_json()
 

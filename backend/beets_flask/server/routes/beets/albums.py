@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 
+from beets.dbcore.query import AndQuery, InQuery, Query
+from beets.library import parse_query_string
 from msgspec import Meta
 from quart import Blueprint, g
 from quart_schema import validate_request, validate_response
@@ -19,6 +21,7 @@ from beets_flask.server.exceptions import (
 from ._types import (
     AlbumAttributes,
     AlbumResource,
+    BulkResult,
     ItemResource,
     MultiAlbumDocument,
     SingleAlbumDocument,
@@ -255,10 +258,24 @@ async def patch_albums(
 
 class BulkDeleteQueryParams(TypedDict, total=False):
     filter_query: Annotated[
-        str, Meta(description="Beets query string to filter the albums")
+        str,
+        Meta(
+            description=(
+                "Beets query string to filter the albums, e.g. ``artist:Tool``. "
+                "Combined with ``filter_ids`` using AND."
+            ),
+            examples=["artist:Tool"],
+        ),
     ]
     filter_ids: Annotated[
-        list[int], Meta(description="Only delete albums with these ids")
+        list[int],
+        Meta(
+            description=(
+                "Only delete albums with these ids. Repeat the parameter for "
+                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
+                "with ``filter_query`` using AND."
+            )
+        ),
     ]
     delete_files: Annotated[
         bool,
@@ -271,13 +288,41 @@ class BulkDeleteQueryParams(TypedDict, total=False):
 
 @albums_bp.route("/", methods=["DELETE"])
 @validate_querystring(BulkDeleteQueryParams)
-@error_responses(InvalidUsageException, NotImplementedException)
-async def delete_albums(query_args: BulkDeleteQueryParams):
+@validate_response(BulkResult)
+@error_responses(InvalidUsageException)
+async def delete_albums(query_args: BulkDeleteQueryParams) -> BulkResult:
     """Delete albums (bulk)
 
-    Delete all albums matching the given filters. Will delete related
-    items if they are dangling and have no other album assigned.
+    Delete all albums matching the given filters, together with all of
+    their items; pass ``delete_files=true`` to also remove the items'
+    files from disk.
 
-    Not implemented yet - currently returns 501.
+    The ``filter_query`` and ``filter_ids`` parameters are combined
+    with AND; without any filter, all albums match. All deletions run
+    in a single transaction and are committed together.
+
+    Returns 400 if the library is configured as read-only.
     """
-    raise NotImplementedException
+    if get_config().data.gui.library.readonly:
+        raise InvalidUsageException("Library is read-only")
+
+    # The filters: the beets query string and/or explicit ids
+    filters: list[Query] = []
+    if filter_query := query_args.get("filter_query"):
+        filters.append(parse_query_string(filter_query, BeetsAlbum)[0])
+    if filter_ids := query_args.get("filter_ids"):
+        filters.append(InQuery("id", filter_ids))
+    query = AndQuery(filters) if filters else None
+
+    # Delete every matching album in a single transaction: the database
+    # writes are committed together. If a deletion fails midway, the
+    # already-deleted files stay consistent with the committed database
+    # state, and the error propagates.
+    delete = query_args.get("delete_files", False)
+    total = 0
+    with g.lib.transaction():
+        for album in g.lib.albums(query):
+            album.remove(delete=delete)
+            total += 1
+
+    return {"meta": {"total": total}}
