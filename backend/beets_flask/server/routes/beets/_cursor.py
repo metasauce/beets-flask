@@ -167,7 +167,7 @@ class Cursor:
         default_sort: str = "-added",
         *,
         filter_query: str | None = None,
-        filter_ids: list[str] | None = None,
+        filter_ids: Sequence[int] | None = None,
     ) -> Cursor:
         """Create an unanchored cursor (first page) from an optional sort.
 
@@ -179,15 +179,16 @@ class Cursor:
             Fallback sort key when ``sort`` is missing or empty.
         filter_query : str | None
             Query string the page is fetched with.
-        filter_ids : list[str] | None
-            Explicit ids the page is fetched with.
+        filter_ids : Sequence[int] | None
+            Explicit ids the page is fetched with; stored as strings in
+            the cursor token (see :meth:`to_string`).
         """
         return cls(
             sort=cls.normalize_sort(sort, default=default_sort),
             last_sort_value=None,
             last_id=None,
             filter_query=filter_query,
-            filter_ids=filter_ids,
+            filter_ids=None if filter_ids is None else [str(i) for i in filter_ids],
         )
 
     @property
@@ -358,7 +359,11 @@ class PaginatedQuery(Query, Sort):
                 parse_filter_query(cursor.filter_query, _TABLE_MODELS[table])
             )
         if cursor.filter_ids:
-            filters.append(InQuery("id", cursor.filter_ids))
+            try:
+                # The cursor stores ids as strings; the database stores ints.
+                filters.append(InQuery("id", [int(i) for i in cursor.filter_ids]))
+            except ValueError as exc:
+                raise InvalidUsageException(f"Invalid filter_ids: {exc}") from exc
         if filters:
             self.sub_query = AndQuery(filters)
 

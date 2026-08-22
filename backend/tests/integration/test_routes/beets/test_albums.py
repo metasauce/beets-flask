@@ -521,6 +521,23 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
         assert data["meta"]["total"] == 1
         assert data["data"][0]["id"] == str(album.id)
 
+    async def test_get_albums_invalid_filter_ids(self, client: Client):
+        """A non-numeric ``filter_ids`` value -> 400."""
+        response = await client.get("/api_v1/beets/albums/?filter_ids=abc")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "QuerystringValidationError"
+
+    async def test_get_albums_cursor_with_invalid_filter_ids(self, client: Client):
+        """A cursor token carrying non-numeric filter ids -> 400."""
+        token = json.dumps({"s": "-added", "f": ["abc"]}).encode().hex()
+        response = await client.get(f"/api_v1/beets/albums/?cursor={token}")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
     async def test_get_albums_empty(self, client: Client):
         """A filter without matches returns an empty page."""
         response = await client.get(

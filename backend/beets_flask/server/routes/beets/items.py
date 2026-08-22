@@ -205,7 +205,7 @@ class BulkGetQueryParams(TypedDict, total=False):
         ),
     ]
     filter_ids: Annotated[
-        list[str],
+        list[int],
         Meta(
             description=(
                 "Only return items with these ids. Repeat the parameter for "
@@ -328,7 +328,7 @@ class BulkPatchQueryParams(TypedDict, total=False):
         ),
     ]
     filter_ids: Annotated[
-        list[str],
+        list[int],
         Meta(
             description=(
                 "Only update items with these ids. Repeat the parameter for "
@@ -398,7 +398,7 @@ class BulkDeleteQueryParams(TypedDict, total=False):
         ),
     ]
     filter_ids: Annotated[
-        list[str],
+        list[int],
         Meta(
             description=(
                 "Only delete items with these ids. Repeat the parameter for "

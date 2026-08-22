@@ -17,7 +17,7 @@ from beets_flask.server.exceptions import (
     error_responses,
 )
 
-from ._cursor import Cursor, PaginatedQuery
+from ._cursor import Cursor, PaginatedQuery, parse_filter_query
 from ._types import (
     AlbumAttributes,
     AlbumResource,
@@ -329,12 +329,7 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
             cursor = Cursor.initial(
                 query_args.get("sort"),
                 filter_query=query_args.get("filter_query"),
-                # The cursor stores ids as strings; see Cursor.from_string.
-                filter_ids=(
-                    [str(i) for i in query_args["filter_ids"]]
-                    if query_args.get("filter_ids") is not None
-                    else None
-                ),
+                filter_ids=query_args.get("filter_ids"),
             )
     except ValueError as exc:
         raise InvalidUsageException(str(exc)) from exc
