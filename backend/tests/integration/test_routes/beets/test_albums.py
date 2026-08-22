@@ -5,10 +5,11 @@ Covers the implemented endpoints of ``beets_flask/server/routes/beets/albums.py`
 - ``GET /api_v1/beets/albums/<album_id>``
 - ``PATCH /api_v1/beets/albums/<album_id>``
 - ``DELETE /api_v1/beets/albums/<album_id>``
+- ``PATCH /api_v1/beets/albums/`` (bulk)
 - ``DELETE /api_v1/beets/albums/`` (bulk)
 
-The bulk ``GET`` and ``PATCH`` endpoints (``GET/PATCH /api_v1/beets/albums/``)
-are not implemented yet and are only tested to return 501.
+The bulk ``GET`` endpoint (``GET /api_v1/beets/albums/``) is not
+implemented yet and is only tested to return 501.
 """
 
 import os
@@ -576,16 +577,173 @@ class TestDeleteAlbums(IsolatedBeetsLibraryMixin):
         assert path.exists(), "File was deleted although delete_files=false"
 
 
+# --------------------------------- Bulk Patch -------------------------------- #
+
+
+class TestPatchAlbums(IsolatedBeetsLibraryMixin):
+    """Tests for ``PATCH /api_v1/beets/albums/`` (bulk)."""
+
+    def _add_album(self, album: str, artist: str, n_items: int = 1) -> Album:
+        """Add an album with items.
+
+        Each test creates the albums it needs, so the tests are independent
+        of each other and of their execution order.
+        """
+        a = beets_lib_album(album=album, albumartist=artist, artpath=None)
+        self.beets_lib.add(a)
+        for i in range(n_items):
+            self.beets_lib.add(beets_lib_item(album_id=a.id, title=f"Track {i}"))
+        return a
+
+    def _titles_of(self, artist: str) -> set[str]:
+        """The album titles of all albums by the given artist."""
+        return {a.album for a in self.beets_lib.albums(f"albumartist:{artist}")}
+
+    async def test_patch_albums_filter_query(self, client: Client):
+        """PATCH applies the body to all albums matching the filter."""
+        self._add_album("Album A", "GroupA")
+        self._add_album("Album B", "GroupA")
+        self._add_album("Album C", "GroupB")
+
+        response = await client.patch(
+            "/api_v1/beets/albums/?filter_query=albumartist:GroupA",
+            json={"title": "Renamed"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert self._titles_of("GroupA") == {"Renamed"}, "Albums were not updated"
+        assert self._titles_of("GroupB") == {"Album C"}, "Other group was changed"
+
+    async def test_patch_albums_filter_ids(self, client: Client):
+        """PATCH applies the body to the albums with the given ids."""
+        a = self._add_album("Album A", "Artist A")
+        b = self._add_album("Album B", "Artist B")
+        c = self._add_album("Album C", "Artist C")
+
+        response = await client.patch(
+            "/api_v1/beets/albums/?filter_ids="
+            + "&filter_ids=".join(map(str, [a.id, b.id])),
+            json={"title": "Id Renamed"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert self.beets_lib.get_album(a.id).album == "Id Renamed"
+        assert self.beets_lib.get_album(b.id).album == "Id Renamed"
+        assert self.beets_lib.get_album(c.id).album == "Album C", (
+            "Album without a matching id was changed"
+        )
+
+    async def test_patch_albums_no_filter(self, client: Client):
+        """PATCH without a filter applies the body to all albums."""
+        for i in range(3):
+            self._add_album(f"Album {i}", f"Artist {i}")
+        total = len(list(self.beets_lib.albums()))
+
+        response = await client.patch(
+            "/api_v1/beets/albums/", json={"title": "All Renamed"}
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == total
+        assert {a.album for a in self.beets_lib.albums()} == {"All Renamed"}
+
+    async def test_patch_albums_no_match(self, client: Client):
+        """A filter without matches updates nothing and reports zero."""
+        album = self._add_album("Kept Album", "KeptArtist")
+
+        response = await client.patch(
+            "/api_v1/beets/albums/?filter_query=album:Nonexistent",
+            json={"title": "Should Not Apply"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 0
+        assert self.beets_lib.get_album(album.id).album == "Kept Album", (
+            "Album was changed"
+        )
+
+    async def test_patch_albums_readonly(self, client: Client):
+        """PATCH must fail and not modify the library when it is read-only."""
+        album = self._add_album("Readonly Album", "ReadonlyArtist")
+
+        config = get_config()
+        config.data.gui.library.readonly = True
+        try:
+            response = await client.patch(
+                "/api_v1/beets/albums/?filter_query=albumartist:ReadonlyArtist",
+                json={"title": "Should Not Apply"},
+            )
+        finally:
+            config.data.gui.library.readonly = False
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self.beets_lib.get_album(album.id).album == "Readonly Album", (
+            "Album was updated even though the library is read-only"
+        )
+
+    async def test_patch_albums_empty_body(self, client: Client):
+        """PATCH with an empty body is a no-op, but reports the matched count."""
+        self._add_album("Album A", "EmptyArtist")
+        self._add_album("Album B", "EmptyArtist")
+        before = self._titles_of("EmptyArtist")
+
+        response = await client.patch(
+            "/api_v1/beets/albums/?filter_query=albumartist:EmptyArtist", json={}
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 2
+        assert self._titles_of("EmptyArtist") == before, "Empty body changed albums"
+
+    async def test_patch_albums_writes_file_tags(self, client: Client):
+        """PATCH writes the new album title into the items' file tags."""
+        import shutil
+
+        from mediafile import MediaFile
+
+        album = beets_lib_album(
+            album="File Tag Album", albumartist="FileTagArtist", artpath=None
+        )
+        self.beets_lib.add(album)
+        item = beets_lib_item(album_id=album.id, title="File Tag Item")
+        self.beets_lib.add(item)
+        path = Path(os.environ["HOME"]) / "audio" / "album_patch_filetag.mp3"
+        shutil.copy(
+            Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3",
+            path,
+        )
+        item.path = str(path).encode()
+        item.store()
+
+        response = await client.patch(
+            "/api_v1/beets/albums/?filter_query=albumartist:FileTagArtist",
+            json={"title": "File Renamed"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert MediaFile(str(path)).album == "File Renamed", "File tag not updated"
+
+
 # -------------------------------- Not implemented ------------------------------- #
 
 
 class TestBulkAlbumsNotImplemented(IsolatedBeetsLibraryMixin):
     """Tests for the not-yet-implemented bulk albums endpoints."""
 
-    @pytest.mark.parametrize("method", ["get", "patch"])
-    async def test_bulk_albums_not_implemented(self, client: Client, method: str):
-        """The bulk GET and PATCH endpoints are not implemented yet -> 501."""
-        response = await getattr(client, method)("/api_v1/beets/albums/", json={})
+    async def test_bulk_albums_get_not_implemented(self, client: Client):
+        """The bulk GET endpoint is not implemented yet -> 501."""
+        response = await client.get("/api_v1/beets/albums/", json={})
         data = await response.get_json()
 
         assert response.status_code == 501, "Response status code is not 501"

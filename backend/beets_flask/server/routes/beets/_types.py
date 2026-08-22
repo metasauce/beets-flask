@@ -120,7 +120,10 @@ class BulkResult(TypedDict):
 
 
 class AlbumAttributes(TypedDict, total=False):
-    """Album Attributes"""
+    """The attributes of an album to update.
+
+    Attributes that are not present in the body are left unchanged.
+    """
 
     title: Annotated[str, Meta(description="The title of the album")]
 

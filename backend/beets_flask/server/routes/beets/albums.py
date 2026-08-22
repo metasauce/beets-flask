@@ -218,23 +218,23 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
 
 class BulkPatchQueryParams(TypedDict, total=False):
     filter_query: Annotated[
-        str, Meta(description="Beets query string to filter the albums")
+        str,
+        Meta(
+            description=(
+                "Beets query string to filter the albums, e.g. ``artist:Tool``. "
+                "Combined with ``filter_ids`` using AND."
+            ),
+            examples=["artist:Tool"],
+        ),
     ]
     filter_ids: Annotated[
-        list[int], Meta(description="Only update albums with these ids")
-    ]
-    sort: Annotated[
-        str,
-        Meta(description='Sort order as comma separated list, e.g. "+year,-title"'),
-    ]
-    limit: Annotated[
-        int, Meta(description="Page size, i.e. maximum number of albums to update")
-    ]
-    include: Annotated[
-        Literal["items"],
+        list[int],
         Meta(
-            description="Each album's items are included in the ``included`` "
-            "section of the response"
+            description=(
+                "Only update albums with these ids. Repeat the parameter for "
+                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
+                "with ``filter_query`` using AND."
+            )
         ),
     ]
 
@@ -242,18 +242,52 @@ class BulkPatchQueryParams(TypedDict, total=False):
 @albums_bp.route("/", methods=["PATCH"])
 @validate_querystring(BulkPatchQueryParams)
 @validate_request(AlbumAttributes)
-@validate_response(MultiAlbumDocument)
-@error_responses(InvalidUsageException, NotImplementedException)
+@validate_response(BulkResult)
+@error_responses(InvalidUsageException)
 async def patch_albums(
     query_args: BulkPatchQueryParams, data: AlbumAttributes
-) -> MultiAlbumDocument:
+) -> BulkResult:
     """Patch albums (bulk)
 
-    Update the attributes of all albums matching the given filters.
+    Update the attributes of all albums matching the given filters. The
+    change is applied to the beets library and written to the tags of
+    the albums' items, like the single album patch. Attributes that
+    are not present in the body are left unchanged.
 
-    Not implemented yet - currently returns 501.
+    The ``filter_query`` and ``filter_ids`` parameters are combined
+    with AND; without any filter, all albums match. All updates run in
+    a single transaction and are committed together.
+
+    Returns 400 if the library is configured as read-only.
     """
-    raise NotImplementedException
+    if get_config().data.gui.library.readonly:
+        raise InvalidUsageException("Library is read-only")
+
+    # Translate API attribute names to beets album field names.
+    update_data: dict[str, str] = {}
+    if "title" in data:
+        update_data["album"] = data["title"]
+
+    # The filters: the beets query string and/or explicit ids
+    filters: list[Query] = []
+    if filter_query := query_args.get("filter_query"):
+        filters.append(parse_query_string(filter_query, BeetsAlbum)[0])
+    if filter_ids := query_args.get("filter_ids"):
+        filters.append(InQuery("id", filter_ids))
+    query = AndQuery(filters) if filters else None
+
+    # Update every matching album in a single transaction: the database
+    # writes are committed together. If an update fails midway, the
+    # already-written files stay consistent with the committed database
+    # state, and the error propagates.
+    total = 0
+    with g.lib.transaction():
+        for album in g.lib.albums(query):
+            album.update(update_data)
+            album.try_sync(True, False)
+            total += 1
+
+    return {"meta": {"total": total}}
 
 
 class BulkDeleteQueryParams(TypedDict, total=False):
