@@ -447,6 +447,15 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
         assert response.status_code == 400, "Response status code is not 400"
         assert data["type"] == "InvalidUsageException"
 
+    @pytest.mark.parametrize("limit", ["0", "-1"], ids=["zero", "negative"])
+    async def test_get_items_limit_too_low(self, client: Client, limit: str):
+        """A non-positive limit -> 400."""
+        response = await client.get(f"/api_v1/beets/items/?limit={limit}")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
     async def test_get_items_empty_sort(self, client: Client):
         """An empty ``sort`` value -> 400."""
         response = await client.get("/api_v1/beets/items/?sort=&limit=100")

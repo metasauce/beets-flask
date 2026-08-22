@@ -228,7 +228,7 @@ class BulkGetQueryParams(TypedDict, total=False):
         Meta(
             description=(
                 "Page size, i.e. maximum number of items to return. Defaults "
-                "to 100; the maximum is 1000."
+                "to 100; the minimum is 1, the maximum is 1000."
             ),
             extra_json_schema={"default": 100},
         ),
@@ -290,7 +290,9 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
         raise InvalidUsageException(str(exc)) from exc
 
     # Limit is independent from cursor
-    limit = query_args.get("limit") or DEFAULT_LIMIT
+    limit = query_args.get("limit", DEFAULT_LIMIT)
+    if limit < 1:
+        raise InvalidUsageException("limit must be positive")
     if limit > MAX_LIMIT:
         raise InvalidUsageException(f"limit must not exceed {MAX_LIMIT}")
 

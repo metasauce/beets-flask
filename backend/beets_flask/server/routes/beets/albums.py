@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
 from urllib.parse import urlencode
 
 from beets.dbcore.query import AndQuery, InQuery, Query
-from beets.library import parse_query_string
 from msgspec import Meta
 from quart import Blueprint, g, request
 from quart_schema import validate_request, validate_response
@@ -18,7 +17,7 @@ from beets_flask.server.exceptions import (
     error_responses,
 )
 
-from ._cursor import Cursor, PaginatedQuery
+from ._cursor import Cursor, PaginatedQuery, parse_filter_query
 from ._types import (
     AlbumAttributes,
     AlbumResource,
@@ -258,7 +257,7 @@ class BulkGetQueryParams(TypedDict, total=False):
         Meta(
             description=(
                 "Page size, i.e. maximum number of albums to return. Defaults "
-                "to 100; the maximum is 1000."
+                "to 100; the minimum is 1, the maximum is 1000."
             ),
             extra_json_schema={"default": 100},
         ),
@@ -341,7 +340,9 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
         raise InvalidUsageException(str(exc)) from exc
 
     # Limit is independent from cursor
-    limit = query_args.get("limit") or DEFAULT_LIMIT
+    limit = query_args.get("limit", DEFAULT_LIMIT)
+    if limit < 1:
+        raise InvalidUsageException("limit must be positive")
     if limit > MAX_LIMIT:
         raise InvalidUsageException(f"limit must not exceed {MAX_LIMIT}")
 
