@@ -372,6 +372,9 @@ async def patch_items(
         filters.append(InQuery("id", filter_ids))
     query = AndQuery(filters) if filters else None
 
+    if not data:
+        raise InvalidUsageException("No attributes to update")
+
     # Update every matching item in a single transaction: the database
     # writes are committed together. If an update fails midway, the
     # already-written files stay consistent with the committed database

@@ -975,6 +975,33 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
         assert self.beets_lib.get_item(3).title == "Id Renamed"
         assert self.beets_lib.get_item(4).title == "Id Renamed"
 
+    async def test_patch_items_empty_body_does_not_write_files(self, client: Client):
+        """PATCH with an empty body must not rewrite the items' files."""
+        import shutil
+
+        item = beets_lib_item(title="Noop Item", artist="NoopArtist")
+        self.beets_lib.add(item)
+        path = _item_file("item_noop_filetag.mp3")
+        shutil.copy(
+            Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3",
+            path,
+        )
+        item.path = str(path).encode()
+        item.store()
+
+        mtime_before = path.stat().st_mtime_ns
+
+        response = await client.patch(
+            "/api_v1/beets/items/?filter_query=artist:NoopArtist", json={}
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert path.stat().st_mtime_ns == mtime_before, (
+            "File was rewritten by an empty patch"
+        )
+
     async def test_patch_items_null_clears_field(self, client: Client):
         """PATCH with an explicit ``null`` clears the field."""
         response = await client.patch(

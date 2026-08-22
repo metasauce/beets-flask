@@ -1079,6 +1079,37 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
             "Album was updated even though the library is read-only"
         )
 
+    async def test_patch_albums_empty_body_does_not_write_files(self, client: Client):
+        """PATCH with an empty body must not rewrite the items' files."""
+        import shutil
+
+        album = beets_lib_album(
+            album="Noop File Album", albumartist="NoopFileArtist", artpath=None
+        )
+        self.beets_lib.add(album)
+        item = beets_lib_item(album_id=album.id, title="Noop File Item")
+        self.beets_lib.add(item)
+        path = Path(os.environ["HOME"]) / "audio" / "album_noop_filetag.mp3"
+        shutil.copy(
+            Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3",
+            path,
+        )
+        item.path = str(path).encode()
+        item.store()
+
+        mtime_before = path.stat().st_mtime_ns
+
+        response = await client.patch(
+            "/api_v1/beets/albums/?filter_query=albumartist:NoopFileArtist", json={}
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 200, "Response status code is not 200"
+        assert data["meta"]["total"] == 1
+        assert path.stat().st_mtime_ns == mtime_before, (
+            "File was rewritten by an empty patch"
+        )
+
     async def test_patch_albums_empty_body(self, client: Client):
         """PATCH with an empty body is a no-op, but reports the matched count."""
         self._add_album("Album A", "EmptyArtist")
