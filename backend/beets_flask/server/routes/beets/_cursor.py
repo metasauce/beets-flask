@@ -41,13 +41,30 @@ from typing import Any, Literal
 
 from beets.dbcore.query import AndQuery, InQuery, Query
 from beets.dbcore.sort import Sort
-from beets.library import parse_query_string
+from beets.library import LibModel, parse_query_string
 
 from beets_flask.importer.types import BeetsAlbum, BeetsItem, BeetsLibrary
+from beets_flask.server.exceptions import InvalidUsageException
 
 # The model class of each paginated table, used to parse the filter
 # query string with the correct field set.
 _TABLE_MODELS = {"items": BeetsItem, "albums": BeetsAlbum}
+
+
+def parse_filter_query(query_string: str, model_cls: type[LibModel]) -> Query:
+    """Parse a beets query string into a :class:`Query`.
+
+    Raises
+    ------
+    InvalidUsageException
+        If the query string cannot be parsed, e.g. because a value does
+        not match the type of its field (``year:notanumber``).
+    """
+    try:
+        query, _ = parse_query_string(query_string, model_cls)
+    except ValueError as exc:
+        raise InvalidUsageException(f"Invalid filter_query: {exc}") from exc
+    return query
 
 
 @dataclass(slots=True)
@@ -338,7 +355,7 @@ class PaginatedQuery(Query, Sort):
         filters: list[Query] = []
         if cursor.filter_query:
             filters.append(
-                parse_query_string(cursor.filter_query, _TABLE_MODELS[table])[0]
+                parse_filter_query(cursor.filter_query, _TABLE_MODELS[table])
             )
         if cursor.filter_ids:
             filters.append(InQuery("id", cursor.filter_ids))

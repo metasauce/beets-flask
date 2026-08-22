@@ -17,7 +17,7 @@ from beets_flask.server.exceptions import (
     error_responses,
 )
 
-from ._cursor import Cursor, PaginatedQuery, parse_filter_query
+from ._cursor import Cursor, PaginatedQuery
 from ._types import (
     AlbumAttributes,
     AlbumResource,
@@ -433,7 +433,7 @@ async def patch_albums(
     # The filters: the beets query string and/or explicit ids
     filters: list[Query] = []
     if filter_query := query_args.get("filter_query"):
-        filters.append(parse_query_string(filter_query, BeetsAlbum)[0])
+        filters.append(parse_filter_query(filter_query, BeetsAlbum))
     if filter_ids := query_args.get("filter_ids"):
         filters.append(InQuery("id", filter_ids))
     query = AndQuery(filters) if filters else None
@@ -505,7 +505,7 @@ async def delete_albums(query_args: BulkDeleteQueryParams) -> BulkResult:
     # The filters: the beets query string and/or explicit ids
     filters: list[Query] = []
     if filter_query := query_args.get("filter_query"):
-        filters.append(parse_query_string(filter_query, BeetsAlbum)[0])
+        filters.append(parse_filter_query(filter_query, BeetsAlbum))
     if filter_ids := query_args.get("filter_ids"):
         filters.append(InQuery("id", filter_ids))
     query = AndQuery(filters) if filters else None

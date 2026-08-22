@@ -479,6 +479,25 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
         assert titles == expected, "Filtered albums do not match the query"
         assert data["meta"]["total"] == 5
 
+    async def test_get_albums_invalid_filter_query(self, client: Client):
+        """A filter value that does not match its field type -> 400."""
+        response = await client.get(
+            "/api_v1/beets/albums/?filter_query=year:notanumber"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_albums_cursor_with_invalid_filter(self, client: Client):
+        """A cursor token carrying an unparseable filter query -> 400."""
+        token = json.dumps({"s": "-added", "q": "year:notanumber"}).encode().hex()
+        response = await client.get(f"/api_v1/beets/albums/?cursor={token}")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
     async def test_get_albums_filter_ids(self, client: Client):
         """Filter by explicit ids."""
         ids = [str(a.id) for a in list(self.beets_lib.albums())[:2]]
@@ -762,6 +781,19 @@ class TestDeleteAlbums(IsolatedBeetsLibraryMixin):
             "Album of the other group was deleted"
         )
 
+    async def test_delete_albums_invalid_filter_query(self, client: Client):
+        """DELETE with an unparseable filter query -> 400, nothing deleted."""
+        album = self._add_album("Album A", "InvalidQueryGroup")
+
+        response = await client.delete(
+            "/api_v1/beets/albums/?filter_query=year:notanumber"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self.beets_lib.get_album(album.id) is not None, "Album was deleted"
+
     async def test_delete_albums_filter_ids(self, client: Client):
         """DELETE removes only the albums with the given ids."""
         a = self._add_album("Album A", "Artist A")
@@ -940,6 +972,22 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
         assert data["meta"]["total"] == 2
         assert self._titles_of("GroupA") == {"Renamed"}, "Albums were not updated"
         assert self._titles_of("GroupB") == {"Album C"}, "Other group was changed"
+
+    async def test_patch_albums_invalid_filter_query(self, client: Client):
+        """PATCH with an unparseable filter query -> 400, nothing updated."""
+        self._add_album("Album A", "InvalidQueryGroup")
+
+        response = await client.patch(
+            "/api_v1/beets/albums/?filter_query=year:notanumber",
+            json={"title": "Should Not Apply"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self._titles_of("InvalidQueryGroup") == {"Album A"}, (
+            "Albums were changed"
+        )
 
     async def test_patch_albums_filter_ids(self, client: Client):
         """PATCH applies the body to the albums with the given ids."""

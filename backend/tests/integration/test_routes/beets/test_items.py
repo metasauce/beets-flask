@@ -388,6 +388,23 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
         assert titles == expected, "Filtered items do not match the query"
         assert data["meta"]["total"] == 5
 
+    async def test_get_items_invalid_filter_query(self, client: Client):
+        """A filter value that does not match its field type -> 400."""
+        response = await client.get("/api_v1/beets/items/?filter_query=year:notanumber")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
+    async def test_get_items_cursor_with_invalid_filter(self, client: Client):
+        """A cursor token carrying an unparseable filter query -> 400."""
+        token = json.dumps({"s": "-added", "q": "year:notanumber"}).encode().hex()
+        response = await client.get(f"/api_v1/beets/items/?cursor={token}")
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+
     async def test_get_items_filter_ids(self, client: Client):
         """Filter by explicit ids."""
         ids = [str(i.id) for i in list(self.beets_lib.items())[:2]]
@@ -623,6 +640,19 @@ class TestDeleteItems(IsolatedBeetsLibraryMixin):
             "Items of the other group were deleted"
         )
         assert all(self.beets_lib.get_item(i.id) is None for i in group_a)
+
+    async def test_delete_items_invalid_filter_query(self, client: Client):
+        """DELETE with an unparseable filter query -> 400, nothing deleted."""
+        item = self._add_item("Kept Item", "InvalidQueryGroup")
+
+        response = await client.delete(
+            "/api_v1/beets/items/?filter_query=year:notanumber"
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self.beets_lib.get_item(item.id) is not None, "Item was deleted"
 
     async def test_delete_items_filter_ids(self, client: Client):
         """DELETE removes only the items with the given ids."""
@@ -899,6 +929,21 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
             "Bulk Patch 4",
             "Bulk Patch 5",
         }
+
+    async def test_patch_items_invalid_filter_query(self, client: Client):
+        """PATCH with an unparseable filter query -> 400, nothing updated."""
+        item = beets_lib_item(title="Kept Item", artist="InvalidQueryGroup")
+        self.beets_lib.add(item)
+
+        response = await client.patch(
+            "/api_v1/beets/items/?filter_query=year:notanumber",
+            json={"title": "Should Not Apply"},
+        )
+        data = await response.get_json()
+
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
+        assert self.beets_lib.get_item(item.id).title == "Kept Item"
 
     async def test_patch_items_filter_ids(self, client: Client):
         """PATCH applies the body to the items with the given ids."""
