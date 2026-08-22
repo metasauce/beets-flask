@@ -3,19 +3,27 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
 from urllib.parse import urlencode
 
-from beets.dbcore.query import AndQuery, InQuery, Query
 from msgspec import Meta
 from quart import Blueprint, g, request
-from quart_schema import validate_request
-from quart_schema.validation import validate_response
+from quart_schema import validate_request, validate_response
 
-from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsItem
-from beets_flask.server.exceptions import error_responses
-from beets_flask.server.routes.exception import InvalidUsageException, NotFoundException
+from beets_flask.server.exceptions import (
+    InvalidUsageException,
+    NotFoundException,
+    error_responses,
+)
 
-from ._cursor import Cursor, PaginatedQuery, parse_filter_query
+from ._cursor import (
+    DEFAULT_LIMIT,
+    MAX_LIMIT,
+    PaginatedQuery,
+    build_cursor,
+    build_filter_query,
+)
+from ._helpers import ensure_writable
 from ._types import (
+    BulkFilterParams,
     BulkResult,
     ItemAttributes,
     ItemResource,
@@ -30,12 +38,6 @@ if TYPE_CHECKING:
     from . import g
 
 items_bp = Blueprint("items", __name__, url_prefix="/items")
-
-# Default page size of the bulk endpoints.
-DEFAULT_LIMIT = 100
-
-# Maximum allowed page size of the bulk endpoints.
-MAX_LIMIT = 1000
 
 # The bare sortable field names of the bulk endpoints.
 SORTABLE_FIELDS = (
@@ -119,15 +121,10 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
             f"Item with beets_id:{item_id!r} not found in beets db."
         )
 
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
-    update_data: ItemAttributes = {}
-    if "title" in data:
-        update_data["title"] = data["title"]
-
-    if update_data:
-        item.update(update_data)
+    if data:
+        item.update(data)
         item.try_sync(True, False)
 
     return {
@@ -167,8 +164,7 @@ async def delete_item(
             f"Item with beets_id:{item_id!r} not found in beets db."
         )
 
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
     resource = to_item_resource(item)
     item.remove(delete=query_args.get("delete_file", False))
@@ -180,7 +176,7 @@ async def delete_item(
 # ----------------------------------- Bulk ----------------------------------- #
 
 
-class BulkGetQueryParams(TypedDict, total=False):
+class BulkGetQueryParams(BulkFilterParams, total=False):
     cursor: Annotated[
         str,
         Meta(
@@ -191,26 +187,6 @@ class BulkGetQueryParams(TypedDict, total=False):
                 "pages only need the cursor (plus an optional ``limit``). "
                 "Cannot be combined with ``sort``, ``filter_query`` or "
                 "``filter_ids``."
-            )
-        ),
-    ]
-    filter_query: Annotated[
-        str,
-        Meta(
-            description=(
-                "Beets query string to filter the items, e.g. ``artist:Tool``. "
-                "Combined with ``filter_ids`` using AND."
-            ),
-            examples=["artist:Tool"],
-        ),
-    ]
-    filter_ids: Annotated[
-        list[int],
-        Meta(
-            description=(
-                "Only return items with these ids. Repeat the parameter for "
-                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
-                "with ``filter_query`` using AND."
             )
         ),
     ]
@@ -267,26 +243,7 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
     ``GET /api_v1/beets/items/?filter_query=artist:Tool&limit=50``
     """
     # Construct cursor either from args or from the encoded cursor string.
-    # The cursor is self-contained
-    if "cursor" in query_args and any(
-        query_args.get(p) for p in ("sort", "filter_query", "filter_ids")
-    ):
-        raise InvalidUsageException("cursor cannot be combined with sort or filters")
-
-    try:
-        if cursor_token := query_args.get("cursor"):
-            # Re-validate the sort: the token is client-supplied and
-            # bypasses the sort enum above.
-            cursor = Cursor.from_string(cursor_token)
-            cursor.validate_sort_allowed(SORTABLE_FIELDS)
-        else:
-            cursor = Cursor.initial(
-                query_args.get("sort"),
-                filter_query=query_args.get("filter_query"),
-                filter_ids=query_args.get("filter_ids"),
-            )
-    except ValueError as exc:
-        raise InvalidUsageException(str(exc)) from exc
+    cursor = build_cursor(query_args, SORTABLE_FIELDS)
 
     # Limit is independent from cursor
     limit = query_args.get("limit", DEFAULT_LIMIT)
@@ -316,27 +273,8 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
     }
 
 
-class BulkPatchQueryParams(TypedDict, total=False):
-    filter_query: Annotated[
-        str,
-        Meta(
-            description=(
-                "Beets query string to filter the items, e.g. ``artist:Tool``. "
-                "Combined with ``filter_ids`` using AND."
-            ),
-            examples=["artist:Tool"],
-        ),
-    ]
-    filter_ids: Annotated[
-        list[int],
-        Meta(
-            description=(
-                "Only update items with these ids. Repeat the parameter for "
-                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
-                "with ``filter_query`` using AND."
-            )
-        ),
-    ]
+class BulkPatchQueryParams(BulkFilterParams, total=False):
+    """Query parameters of the bulk PATCH endpoint."""
 
 
 @items_bp.route("/", methods=["PATCH"])
@@ -359,18 +297,14 @@ async def patch_items(
     with AND; without any filter, all items match. All updates run in
     a single transaction and are committed together.
 
-    Returns 400 if the library is configured as read-only.
+    Returns 400 if the library is configured as read-only or the body
+    does not contain any attributes.
     """
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
-    # The filters: the beets query string and/or explicit ids
-    filters: list[Query] = []
-    if filter_query := query_args.get("filter_query"):
-        filters.append(parse_filter_query(filter_query, BeetsItem))
-    if filter_ids := query_args.get("filter_ids"):
-        filters.append(InQuery("id", filter_ids))
-    query = AndQuery(filters) if filters else None
+    query = build_filter_query(
+        query_args.get("filter_query"), query_args.get("filter_ids"), BeetsItem
+    )
 
     if not data:
         raise InvalidUsageException("No attributes to update")
@@ -389,27 +323,7 @@ async def patch_items(
     return {"meta": {"total": total}}
 
 
-class BulkDeleteQueryParams(TypedDict, total=False):
-    filter_query: Annotated[
-        str,
-        Meta(
-            description=(
-                "Beets query string to filter the items, e.g. ``artist:Tool``. "
-                "Combined with ``filter_ids`` using AND."
-            ),
-            examples=["artist:Tool"],
-        ),
-    ]
-    filter_ids: Annotated[
-        list[int],
-        Meta(
-            description=(
-                "Only delete items with these ids. Repeat the parameter for "
-                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
-                "with ``filter_query`` using AND."
-            )
-        ),
-    ]
+class BulkDeleteQueryParams(BulkFilterParams, total=False):
     delete_file: Annotated[
         bool,
         Meta(
@@ -438,16 +352,11 @@ async def delete_items(query_args: BulkDeleteQueryParams) -> BulkResult:
 
     Returns 400 if the library is configured as read-only.
     """
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
-    # The filters: the beets query string and/or explicit ids
-    filters: list[Query] = []
-    if filter_query := query_args.get("filter_query"):
-        filters.append(parse_filter_query(filter_query, BeetsItem))
-    if filter_ids := query_args.get("filter_ids"):
-        filters.append(InQuery("id", filter_ids))
-    query = AndQuery(filters) if filters else None
+    query = build_filter_query(
+        query_args.get("filter_query"), query_args.get("filter_ids"), BeetsItem
+    )
 
     # Delete every matching item in a single transaction: the database
     # writes are committed together. If a deletion fails midway, the

@@ -185,3 +185,38 @@ class MultiAlbumDocument(TypedDict):
     ]
     links: NotRequired[LinkObject]
     meta: NotRequired[MetaObject]
+
+
+# ---------------------------------------------------------------------------- #
+#                             Bulk query parameters                            #
+# ---------------------------------------------------------------------------- #
+
+
+class BulkFilterParams(TypedDict, total=False):
+    """Query parameters shared by the bulk endpoints.
+
+    The beets query string filter and/or the explicit ids filter; the
+    two filters are combined with AND, and without either all entities
+    match.
+    """
+
+    filter_query: Annotated[
+        str,
+        Meta(
+            description=(
+                "Beets query string to filter the results, e.g. "
+                "``artist:Tool``. Combined with ``filter_ids`` using AND."
+            ),
+            examples=["artist:Tool"],
+        ),
+    ]
+    filter_ids: Annotated[
+        list[int],
+        Meta(
+            description=(
+                "Only match entities with these ids. Repeat the parameter "
+                "for multiple ids, e.g. ``filter_ids=1&filter_ids=2``. "
+                "Combined with ``filter_query`` using AND."
+            )
+        ),
+    ]

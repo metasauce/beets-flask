@@ -131,8 +131,10 @@ class TestPatchItem(IsolatedBeetsLibraryMixin):
         item = self.beets_lib.get_item(self._items["a"].id)
         assert item is not None
         new_title = "Cleared Title"
-        self.beets_lib.get_item(item.id).update({"title": new_title})
-        self.beets_lib.get_item(item.id).store()
+        stored = self.beets_lib.get_item(item.id)
+        assert stored is not None
+        stored.update({"title": new_title})
+        stored.store()
 
         response = await client.patch(_item_url(item.id), json={"title": None})
         data = await response.get_json()
@@ -322,7 +324,7 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
     async def test_get_items_pagination(self, client: Client):
         """Iterate all pages via the ``links.next`` cursor."""
         next_url = "/api_v1/beets/items/?limit=10"
-        titles = []
+        titles: list[str] = []
         pages = 0
         while next_url:
             response = await client.get(next_url)
@@ -362,7 +364,7 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
     async def test_get_items_descending_pagination(self, client: Client):
         """Iterate all pages sorted descending via the cursor."""
         next_url = "/api_v1/beets/items/?sort=-title&limit=5"
-        titles = []
+        titles: list[str] = []
         pages = 0
         while next_url:
             response = await client.get(next_url)
@@ -553,7 +555,7 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
     async def test_get_items_filtered_pagination(self, client: Client):
         """Filters survive pagination via the self-contained cursor."""
         next_url = "/api_v1/beets/items/?filter_query=artist:Artist2&limit=2"
-        titles = []
+        titles: list[str] = []
         pages = 0
         while next_url:
             response = await client.get(next_url)
@@ -577,7 +579,7 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
         """Id filters survive pagination via the self-contained cursor."""
         ids = [str(i.id) for i in list(self.beets_lib.items())[:3]]
         next_url = "/api_v1/beets/items/?limit=2&filter_ids=" + "&filter_ids=".join(ids)
-        found = []
+        found: list[str] = []
         while next_url:
             response = await client.get(next_url)
             data = await response.get_json()
@@ -863,12 +865,12 @@ class TestGetItemsSqlLimit(IsolatedBeetsLibraryMixin):
             statements.append(str(statement))
             return original_query(self, statement, subvals)
 
-        Transaction.query = spy
+        Transaction.query = spy  # type: ignore[method-assign]
         try:
             response = await client.get("/api_v1/beets/items/?limit=10")
             data = await response.get_json()
         finally:
-            Transaction.query = original_query
+            Transaction.query = original_query  # type: ignore[method-assign]
 
         assert response.status_code == 200, "Response status code is not 200"
         assert len(data["data"]) == 10
@@ -884,7 +886,7 @@ class TestGetItemsSqlLimit(IsolatedBeetsLibraryMixin):
 class TestPatchItems(IsolatedBeetsLibraryMixin):
     """Tests for ``PATCH /api_v1/beets/items/`` (bulk)."""
 
-    _items: dict[str, Item] = {}
+    _items: dict[int, Item] = {}
 
     @pytest.fixture(scope="class", autouse=True)
     def items(self, setup_beetslib):  # type: ignore
@@ -960,7 +962,8 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 400, "Response status code is not 400"
         assert data["type"] == "InvalidUsageException"
-        assert self.beets_lib.get_item(item.id).title == "Kept Item"
+        stored = self.beets_lib.get_item(item.id)
+        assert stored is not None and stored.title == "Kept Item"
 
     async def test_patch_items_filter_ids(self, client: Client):
         """PATCH applies the body to the items with the given ids."""
@@ -972,35 +975,10 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 200, "Response status code is not 200"
         assert data["meta"]["total"] == 2
-        assert self.beets_lib.get_item(3).title == "Id Renamed"
-        assert self.beets_lib.get_item(4).title == "Id Renamed"
-
-    async def test_patch_items_empty_body_does_not_write_files(self, client: Client):
-        """PATCH with an empty body must not rewrite the items' files."""
-        import shutil
-
-        item = beets_lib_item(title="Noop Item", artist="NoopArtist")
-        self.beets_lib.add(item)
-        path = _item_file("item_noop_filetag.mp3")
-        shutil.copy(
-            Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3",
-            path,
-        )
-        item.path = str(path).encode()
-        item.store()
-
-        mtime_before = path.stat().st_mtime_ns
-
-        response = await client.patch(
-            "/api_v1/beets/items/?filter_query=artist:NoopArtist", json={}
-        )
-        data = await response.get_json()
-
-        assert response.status_code == 200, "Response status code is not 200"
-        assert data["meta"]["total"] == 1
-        assert path.stat().st_mtime_ns == mtime_before, (
-            "File was rewritten by an empty patch"
-        )
+        stored_3 = self.beets_lib.get_item(3)
+        stored_4 = self.beets_lib.get_item(4)
+        assert stored_3 is not None and stored_3.title == "Id Renamed"
+        assert stored_4 is not None and stored_4.title == "Id Renamed"
 
     async def test_patch_items_null_clears_field(self, client: Client):
         """PATCH with an explicit ``null`` clears the field."""
@@ -1015,7 +993,7 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
         assert self._titles_of("GroupB") == {""}
 
     async def test_patch_items_empty_body(self, client: Client):
-        """PATCH with an empty body is a no-op, but reports the matched count."""
+        """PATCH with an empty body -> 400, nothing changed."""
         before = self._titles_of("GroupA")
 
         response = await client.patch(
@@ -1023,8 +1001,8 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
         )
         data = await response.get_json()
 
-        assert response.status_code == 200, "Response status code is not 200"
-        assert data["meta"]["total"] == 3
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
         assert self._titles_of("GroupA") == before, "Empty body changed items"
 
     async def test_patch_items_writes_file_tags(self, client: Client):

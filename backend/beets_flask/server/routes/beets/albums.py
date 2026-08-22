@@ -4,12 +4,10 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
 from urllib.parse import urlencode
 
-from beets.dbcore.query import AndQuery, InQuery, Query
 from msgspec import Meta
 from quart import Blueprint, g, request
 from quart_schema import validate_request, validate_response
 
-from beets_flask.config import get_config
 from beets_flask.importer.types import BeetsAlbum, BeetsItem
 from beets_flask.server.exceptions import (
     InvalidUsageException,
@@ -17,10 +15,18 @@ from beets_flask.server.exceptions import (
     error_responses,
 )
 
-from ._cursor import Cursor, PaginatedQuery, parse_filter_query
+from ._cursor import (
+    DEFAULT_LIMIT,
+    MAX_LIMIT,
+    PaginatedQuery,
+    build_cursor,
+    build_filter_query,
+)
+from ._helpers import ensure_writable
 from ._types import (
     AlbumAttributes,
     AlbumResource,
+    BulkFilterParams,
     BulkResult,
     ItemResource,
     LinkObject,
@@ -28,7 +34,7 @@ from ._types import (
     SingleAlbumDocument,
 )
 from ._validation import validate_querystring
-from .items import DEFAULT_LIMIT, MAX_LIMIT, to_item_resource
+from .items import to_item_resource
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -112,10 +118,11 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
         )
 
     items = album.items()
-    if query_args.get("include") == "items":
-        included: list[ItemResource] = [to_item_resource(item) for item in items]
-    else:
-        included = []
+    included = (
+        [to_item_resource(item) for item in items]
+        if query_args.get("include") == "items"
+        else []
+    )
 
     return {
         "data": to_album_resource(album, items),
@@ -142,8 +149,7 @@ async def patch_album(
             f"Album with beets_id:{album_id!r} not found in beets db."
         )
 
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
     # Translate API attribute names to beets album field names.
     update_data: dict[str, str] = {}
@@ -156,10 +162,11 @@ async def patch_album(
         album.try_sync(True, False)
 
     items = album.items()
-    if query_args.get("include") == "items":
-        included: list[ItemResource] = [to_item_resource(item) for item in items]
-    else:
-        included = []
+    included = (
+        [to_item_resource(item) for item in items]
+        if query_args.get("include") == "items"
+        else []
+    )
 
     return {
         "data": to_album_resource(album, items),
@@ -196,8 +203,7 @@ async def delete_album(
             f"Album with beets_id:{album_id!r} not found in beets db."
         )
 
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
     resource = to_album_resource(album, album.items())
     album.remove(delete=query_args.get("delete_files", False))
@@ -210,7 +216,7 @@ async def delete_album(
 # ----------------------------------- Bulk ----------------------------------- #
 
 
-class BulkGetQueryParams(TypedDict, total=False):
+class BulkGetQueryParams(BulkFilterParams, total=False):
     cursor: Annotated[
         str,
         Meta(
@@ -221,26 +227,6 @@ class BulkGetQueryParams(TypedDict, total=False):
                 "pages only need the cursor (plus an optional ``limit``). "
                 "Cannot be combined with ``sort``, ``filter_query`` or "
                 "``filter_ids``."
-            )
-        ),
-    ]
-    filter_query: Annotated[
-        str,
-        Meta(
-            description=(
-                "Beets query string to filter the albums, e.g. ``artist:Tool``. "
-                "Combined with ``filter_ids`` using AND."
-            ),
-            examples=["artist:Tool"],
-        ),
-    ]
-    filter_ids: Annotated[
-        list[int],
-        Meta(
-            description=(
-                "Only return albums with these ids. Repeat the parameter for "
-                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
-                "with ``filter_query`` using AND."
             )
         ),
     ]
@@ -313,26 +299,7 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
     ``GET /api_v1/beets/albums/?filter_query=albumartist:Tool&limit=50``
     """
     # Construct cursor either from args or from the encoded cursor string.
-    # The cursor is self-contained
-    if "cursor" in query_args and any(
-        query_args.get(p) for p in ("sort", "filter_query", "filter_ids")
-    ):
-        raise InvalidUsageException("cursor cannot be combined with sort or filters")
-
-    try:
-        if cursor_token := query_args.get("cursor"):
-            # Re-validate the sort: the token is client-supplied and
-            # bypasses the sort enum above.
-            cursor = Cursor.from_string(cursor_token)
-            cursor.validate_sort_allowed(ALBUM_SORTABLE_FIELDS)
-        else:
-            cursor = Cursor.initial(
-                query_args.get("sort"),
-                filter_query=query_args.get("filter_query"),
-                filter_ids=query_args.get("filter_ids"),
-            )
-    except ValueError as exc:
-        raise InvalidUsageException(str(exc)) from exc
+    cursor = build_cursor(query_args, ALBUM_SORTABLE_FIELDS)
 
     # Limit is independent from cursor
     limit = query_args.get("limit", DEFAULT_LIMIT)
@@ -373,27 +340,8 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
     }
 
 
-class BulkPatchQueryParams(TypedDict, total=False):
-    filter_query: Annotated[
-        str,
-        Meta(
-            description=(
-                "Beets query string to filter the albums, e.g. ``artist:Tool``. "
-                "Combined with ``filter_ids`` using AND."
-            ),
-            examples=["artist:Tool"],
-        ),
-    ]
-    filter_ids: Annotated[
-        list[int],
-        Meta(
-            description=(
-                "Only update albums with these ids. Repeat the parameter for "
-                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
-                "with ``filter_query`` using AND."
-            )
-        ),
-    ]
+class BulkPatchQueryParams(BulkFilterParams, total=False):
+    """Query parameters of the bulk PATCH endpoint."""
 
 
 @albums_bp.route("/", methods=["PATCH"])
@@ -415,23 +363,19 @@ async def patch_albums(
     with AND; without any filter, all albums match. All updates run in
     a single transaction and are committed together.
 
-    Returns 400 if the library is configured as read-only.
+    Returns 400 if the library is configured as read-only or the body
+    does not contain any attributes.
     """
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
     # Translate API attribute names to beets album field names.
     update_data: dict[str, str] = {}
     if "title" in data:
         update_data["album"] = data["title"]
 
-    # The filters: the beets query string and/or explicit ids
-    filters: list[Query] = []
-    if filter_query := query_args.get("filter_query"):
-        filters.append(parse_filter_query(filter_query, BeetsAlbum))
-    if filter_ids := query_args.get("filter_ids"):
-        filters.append(InQuery("id", filter_ids))
-    query = AndQuery(filters) if filters else None
+    query = build_filter_query(
+        query_args.get("filter_query"), query_args.get("filter_ids"), BeetsAlbum
+    )
 
     if not update_data:
         raise InvalidUsageException("No attributes to update")
@@ -450,27 +394,7 @@ async def patch_albums(
     return {"meta": {"total": total}}
 
 
-class BulkDeleteQueryParams(TypedDict, total=False):
-    filter_query: Annotated[
-        str,
-        Meta(
-            description=(
-                "Beets query string to filter the albums, e.g. ``artist:Tool``. "
-                "Combined with ``filter_ids`` using AND."
-            ),
-            examples=["artist:Tool"],
-        ),
-    ]
-    filter_ids: Annotated[
-        list[int],
-        Meta(
-            description=(
-                "Only delete albums with these ids. Repeat the parameter for "
-                "multiple ids, e.g. ``filter_ids=1&filter_ids=2``. Combined "
-                "with ``filter_query`` using AND."
-            )
-        ),
-    ]
+class BulkDeleteQueryParams(BulkFilterParams, total=False):
     delete_files: Annotated[
         bool,
         Meta(
@@ -497,16 +421,11 @@ async def delete_albums(query_args: BulkDeleteQueryParams) -> BulkResult:
 
     Returns 400 if the library is configured as read-only.
     """
-    if get_config().data.gui.library.readonly:
-        raise InvalidUsageException("Library is read-only")
+    ensure_writable()
 
-    # The filters: the beets query string and/or explicit ids
-    filters: list[Query] = []
-    if filter_query := query_args.get("filter_query"):
-        filters.append(parse_filter_query(filter_query, BeetsAlbum))
-    if filter_ids := query_args.get("filter_ids"):
-        filters.append(InQuery("id", filter_ids))
-    query = AndQuery(filters) if filters else None
+    query = build_filter_query(
+        query_args.get("filter_query"), query_args.get("filter_ids"), BeetsAlbum
+    )
 
     # Delete every matching album in a single transaction: the database
     # writes are committed together. If a deletion fails midway, the

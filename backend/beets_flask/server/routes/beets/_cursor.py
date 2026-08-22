@@ -35,7 +35,7 @@ Typical route usage::
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -49,6 +49,12 @@ from beets_flask.server.exceptions import InvalidUsageException
 # The model class of each paginated table, used to parse the filter
 # query string with the correct field set.
 _TABLE_MODELS = {"items": BeetsItem, "albums": BeetsAlbum}
+
+# Default page size of the bulk endpoints.
+DEFAULT_LIMIT = 100
+
+# Maximum allowed page size of the bulk endpoints.
+MAX_LIMIT = 1000
 
 
 def parse_filter_query(query_string: str, model_cls: type[LibModel]) -> Query:
@@ -65,6 +71,57 @@ def parse_filter_query(query_string: str, model_cls: type[LibModel]) -> Query:
     except ValueError as exc:
         raise InvalidUsageException(f"Invalid filter_query: {exc}") from exc
     return query
+
+
+def build_filter_query(
+    filter_query: str | None,
+    filter_ids: Sequence[int | str] | None,
+    model_cls: type[LibModel],
+) -> Query | None:
+    """Combine a ``filter_query`` string and explicit ids into an AND query.
+
+    Returns ``None`` when neither is given. The ids are converted to
+    ``int`` for the database; the pagination cursor stores them as
+    strings.
+    """
+    filters: list[Query] = []
+    if filter_query:
+        filters.append(parse_filter_query(filter_query, model_cls))
+    if filter_ids:
+        try:
+            filters.append(InQuery("id", [int(i) for i in filter_ids]))
+        except ValueError as exc:
+            raise InvalidUsageException(f"Invalid filter_ids: {exc}") from exc
+    return AndQuery(filters) if filters else None
+
+
+def build_cursor(
+    query_args: Mapping[str, Any], sortable_fields: Iterable[str]
+) -> Cursor:
+    """Construct the pagination cursor from the bulk GET query arguments.
+
+    Either from a self-contained ``cursor`` token (the sort is
+    re-validated against ``sortable_fields``) or from ``sort`` and the
+    filters. Raises ``InvalidUsageException`` when the token is
+    malformed or combined with ``sort``/the filters.
+    """
+    if "cursor" in query_args and any(
+        query_args.get(p) for p in ("sort", "filter_query", "filter_ids")
+    ):
+        raise InvalidUsageException("cursor cannot be combined with sort or filters")
+    try:
+        if cursor_token := query_args.get("cursor"):
+            cursor = Cursor.from_string(cursor_token)
+            cursor.validate_sort_allowed(sortable_fields)
+        else:
+            cursor = Cursor.initial(
+                query_args.get("sort"),
+                filter_query=query_args.get("filter_query"),
+                filter_ids=query_args.get("filter_ids"),
+            )
+    except ValueError as exc:
+        raise InvalidUsageException(str(exc)) from exc
+    return cursor
 
 
 @dataclass(slots=True)
@@ -352,20 +409,9 @@ class PaginatedQuery(Query, Sort):
         self.cursor = cursor
         self.n_items = n_items
         self.table = table
-        self.sub_query: Query | None = None
-        filters: list[Query] = []
-        if cursor.filter_query:
-            filters.append(
-                parse_filter_query(cursor.filter_query, _TABLE_MODELS[table])
-            )
-        if cursor.filter_ids:
-            try:
-                # The cursor stores ids as strings; the database stores ints.
-                filters.append(InQuery("id", [int(i) for i in cursor.filter_ids]))
-            except ValueError as exc:
-                raise InvalidUsageException(f"Invalid filter_ids: {exc}") from exc
-        if filters:
-            self.sub_query = AndQuery(filters)
+        self.sub_query = build_filter_query(
+            cursor.filter_query, cursor.filter_ids, _TABLE_MODELS[table]
+        )
 
     def clause(self) -> tuple[str | None, Sequence[Any]]:
         """The WHERE clause: the filters AND the keyset predicate."""

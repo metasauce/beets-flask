@@ -175,7 +175,9 @@ def error_responses(*error_classes: type[ApiException]) -> Callable[[T], T]:
     def decorator(func: T) -> T:
         for error_class in error_classes:
             func = validate_response(
-                _error_response_model(error_class), status_code=error_class.status_code
+                # The cached wrapper requires Hashable args; class objects are.
+                _error_response_model(error_class),  # type: ignore[arg-type]
+                status_code=error_class.status_code,
             )(func)
         return func
 
@@ -194,7 +196,7 @@ def _error_response_model(error_class: type[ApiException]) -> type[Any]:
     """
     docstring = inspect.getdoc(error_class)
     # The class name is dynamic, so the functional form is required here.
-    model = TypedDict(  # noqa: UP013
+    model = TypedDict(  # type: ignore[misc]  # noqa: UP013
         f"{error_class.__name__}",
         {
             "type": Annotated[

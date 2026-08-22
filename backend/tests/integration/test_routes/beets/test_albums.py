@@ -407,7 +407,7 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
     async def test_get_albums_pagination(self, client: Client):
         """Iterate all pages via the ``links.next`` cursor."""
         next_url = "/api_v1/beets/albums/?limit=10"
-        titles = []
+        titles: list[str] = []
         pages = 0
         while next_url:
             response = await client.get(next_url)
@@ -449,7 +449,7 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
     async def test_get_albums_descending_pagination(self, client: Client):
         """Iterate all pages sorted descending via the cursor."""
         next_url = "/api_v1/beets/albums/?sort=-album&limit=5"
-        titles = []
+        titles: list[str] = []
         pages = 0
         while next_url:
             response = await client.get(next_url)
@@ -639,7 +639,7 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
     async def test_get_albums_filtered_pagination(self, client: Client):
         """Filters survive pagination via the self-contained cursor."""
         next_url = "/api_v1/beets/albums/?filter_query=albumartist:Artist2&limit=2"
-        titles = []
+        titles: list[str] = []
         pages = 0
         while next_url:
             response = await client.get(next_url)
@@ -665,7 +665,7 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
         next_url = "/api_v1/beets/albums/?limit=2&filter_ids=" + "&filter_ids=".join(
             ids
         )
-        found = []
+        found: list[str] = []
         while next_url:
             response = await client.get(next_url)
             data = await response.get_json()
@@ -1021,9 +1021,12 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 200, "Response status code is not 200"
         assert data["meta"]["total"] == 2
-        assert self.beets_lib.get_album(a.id).album == "Id Renamed"
-        assert self.beets_lib.get_album(b.id).album == "Id Renamed"
-        assert self.beets_lib.get_album(c.id).album == "Album C", (
+        stored_a = self.beets_lib.get_album(a.id)
+        stored_b = self.beets_lib.get_album(b.id)
+        stored_c = self.beets_lib.get_album(c.id)
+        assert stored_a is not None and stored_a.album == "Id Renamed"
+        assert stored_b is not None and stored_b.album == "Id Renamed"
+        assert stored_c is not None and stored_c.album == "Album C", (
             "Album without a matching id was changed"
         )
 
@@ -1054,9 +1057,8 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 200, "Response status code is not 200"
         assert data["meta"]["total"] == 0
-        assert self.beets_lib.get_album(album.id).album == "Kept Album", (
-            "Album was changed"
-        )
+        stored = self.beets_lib.get_album(album.id)
+        assert stored is not None and stored.album == "Kept Album", "Album was changed"
 
     async def test_patch_albums_readonly(self, client: Client):
         """PATCH must fail and not modify the library when it is read-only."""
@@ -1075,43 +1077,13 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 400, "Response status code is not 400"
         assert data["type"] == "InvalidUsageException"
-        assert self.beets_lib.get_album(album.id).album == "Readonly Album", (
+        stored = self.beets_lib.get_album(album.id)
+        assert stored is not None and stored.album == "Readonly Album", (
             "Album was updated even though the library is read-only"
         )
 
-    async def test_patch_albums_empty_body_does_not_write_files(self, client: Client):
-        """PATCH with an empty body must not rewrite the items' files."""
-        import shutil
-
-        album = beets_lib_album(
-            album="Noop File Album", albumartist="NoopFileArtist", artpath=None
-        )
-        self.beets_lib.add(album)
-        item = beets_lib_item(album_id=album.id, title="Noop File Item")
-        self.beets_lib.add(item)
-        path = Path(os.environ["HOME"]) / "audio" / "album_noop_filetag.mp3"
-        shutil.copy(
-            Path(__file__).parent.parent.parent.parent / "data" / "audio" / "test.mp3",
-            path,
-        )
-        item.path = str(path).encode()
-        item.store()
-
-        mtime_before = path.stat().st_mtime_ns
-
-        response = await client.patch(
-            "/api_v1/beets/albums/?filter_query=albumartist:NoopFileArtist", json={}
-        )
-        data = await response.get_json()
-
-        assert response.status_code == 200, "Response status code is not 200"
-        assert data["meta"]["total"] == 1
-        assert path.stat().st_mtime_ns == mtime_before, (
-            "File was rewritten by an empty patch"
-        )
-
     async def test_patch_albums_empty_body(self, client: Client):
-        """PATCH with an empty body is a no-op, but reports the matched count."""
+        """PATCH with an empty body -> 400, nothing changed."""
         self._add_album("Album A", "EmptyArtist")
         self._add_album("Album B", "EmptyArtist")
         before = self._titles_of("EmptyArtist")
@@ -1121,8 +1093,8 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
         )
         data = await response.get_json()
 
-        assert response.status_code == 200, "Response status code is not 200"
-        assert data["meta"]["total"] == 2
+        assert response.status_code == 400, "Response status code is not 400"
+        assert data["type"] == "InvalidUsageException"
         assert self._titles_of("EmptyArtist") == before, "Empty body changed albums"
 
     async def test_patch_albums_writes_file_tags(self, client: Client):
