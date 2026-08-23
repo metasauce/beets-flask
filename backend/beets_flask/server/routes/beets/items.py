@@ -13,6 +13,7 @@ from beets_flask.server.exceptions import (
     NotFoundException,
     error_responses,
 )
+from beets_flask.server.utility import ensure_writable
 
 from ._cursor import (
     DEFAULT_LIMIT,
@@ -21,7 +22,6 @@ from ._cursor import (
     build_cursor,
     build_filter_query,
 )
-from ._helpers import ensure_writable
 from ._types import (
     BulkFilterParams,
     BulkResult,
