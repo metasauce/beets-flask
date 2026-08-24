@@ -19,7 +19,7 @@ from beets.library import Item
 from quart.typing import TestClientProtocol as Client
 
 from beets_flask.config import get_config
-from beets_flask.server.routes.beets._cursor import Cursor, PaginatedQuery
+from beets_flask.server.routes_next.beets._cursor import Cursor, PaginatedQuery
 from tests.conftest import beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
@@ -38,7 +38,9 @@ def _assert_item_document(data: dict, item: Item) -> None:
     """Assert the JSON:API-ish shape of a single-item document."""
     assert data["data"]["type"] == "item"
     assert data["data"]["id"] == str(item.id)
-    assert data["data"]["attributes"] == {"title": item.title}
+    attributes = data["data"]["attributes"]
+    assert attributes["title"] == item.title
+    assert attributes.get("artist") == item.artist
 
 
 # ----------------------------------- Get ----------------------------------- #
@@ -217,7 +219,7 @@ class TestDeleteItem(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 200, "Response status code is not 200"
         assert data["data"]["id"] == str(item.id)
-        assert data["data"]["attributes"] == {"title": item.title}
+        assert data["data"]["attributes"]["title"] == item.title
 
         assert self.beets_lib.get_item(item.id) is None, (
             "Item was not removed from the beets library"
@@ -347,7 +349,7 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 200, "Response status code is not 200"
         assert len(data["data"]) == 25
-        assert "next" not in data.get("links", {}), "Unexpected next page"
+        assert data["links"].get("next") is None, "Unexpected next page"
 
     async def test_get_items_sort(self, client: Client):
         """Sort by title ascending and descending."""
@@ -457,7 +459,7 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
         assert response.status_code == 200, "Response status code is not 200"
         assert data["data"] == []
         assert data["meta"]["total"] == 0
-        assert "next" not in data.get("links", {})
+        assert data["links"].get("next") is None
 
     async def test_get_items_invalid_cursor(self, client: Client):
         """An invalid cursor token -> 400."""

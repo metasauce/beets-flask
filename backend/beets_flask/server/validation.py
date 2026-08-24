@@ -1,4 +1,4 @@
-"""Validation helpers for the beets routes."""
+"""Validation helpers for the API routes."""
 
 from __future__ import annotations
 
@@ -19,42 +19,35 @@ _TRUE_VALUES = {"true", "1", "yes", "on"}
 
 
 def validate_querystring(model_class: type[Model]) -> Callable:
-    """Validate the request querystring, coercing boolean fields.
-
-    Like :func:`quart_schema.validation.validate_querystring`, but query
-    parameters arrive as strings, which msgspec refuses to convert to
-    ``bool``. Fields typed as ``bool`` are therefore coerced first, so
-    ``?delete_file=true`` validates against ``delete_file: bool``.
-    """
+    """Validate the request querystring, coercing boolean and list fields."""
 
     def decorator(func: Callable) -> Callable:
         setattr(func, QUART_SCHEMA_QUERYSTRING_ATTRIBUTE, model_class)
+
         hints = get_type_hints(model_class)
         bool_fields = {name for name, type_ in hints.items() if type_ is bool}
-        # List-typed fields (e.g. ``filter_ids``) arrive as a single value
-        # for ``?filter_ids=1`` and as multiple values for
-        # ``?filter_ids=1&filter_ids=2``. Always pass a list so msgspec
-        # accepts both forms.
         list_fields = {
             name for name, type_ in hints.items() if get_origin(type_) is list
         }
 
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            request_args: dict[str, Any] = {
-                key: (
-                    request.args.getlist(key)
-                    if len(request.args.getlist(key)) > 1 or key in list_fields
-                    else request.args[key]
+            request_args: dict[str, Any] = {}
+
+            for key in request.args:
+                values = request.args.getlist(key)
+                value: Any = (
+                    values if len(values) > 1 or key in list_fields else values[0]
                 )
-                for key in request.args
-            }
-            for key in bool_fields & request_args.keys():
-                values = request_args[key]
-                if isinstance(values, list):
-                    request_args[key] = [v.lower() in _TRUE_VALUES for v in values]
-                else:
-                    request_args[key] = values.lower() in _TRUE_VALUES
+
+                if key in bool_fields:
+                    if isinstance(value, list):
+                        value = [v.lower() in _TRUE_VALUES for v in value]
+                    else:
+                        value = value.lower() in _TRUE_VALUES
+
+                request_args[key] = value
+
             model = model_load(
                 request_args,
                 model_class,

@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
 from urllib.parse import urlencode
 
-from msgspec import Meta
+from pydantic import Field
 from quart import Blueprint, g, request
 from quart_schema import validate_request, validate_response
 
@@ -12,10 +12,11 @@ from beets_flask.importer.types import BeetsAlbum, BeetsItem
 from beets_flask.server.exceptions import (
     InvalidUsageException,
     NotFoundException,
-    error_responses,
 )
 from beets_flask.server.utility import ensure_writable
+from beets_flask.server.validation import validate_querystring
 
+from ..jsonapi import LinkObject, MetaObject, ResourceIdentifier, error_responses
 from ._cursor import (
     DEFAULT_LIMIT,
     MAX_LIMIT,
@@ -29,11 +30,9 @@ from ._types import (
     BulkFilterParams,
     BulkResult,
     ItemResource,
-    LinkObject,
     MultiAlbumDocument,
     SingleAlbumDocument,
 )
-from ._validation import validate_querystring
 from .items import to_item_resource
 
 if TYPE_CHECKING:
@@ -43,50 +42,30 @@ if TYPE_CHECKING:
 albums_bp = Blueprint("albums", __name__, url_prefix="/albums")
 
 
+#: Attributes that cannot be set via PATCH: they are derived from the
+#: library state and ignored in PATCH bodies.
+READ_ONLY_ALBUM_ATTRIBUTES = frozenset({"sources"})
+
+
 def to_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumResource:
-    return {
-        "type": "album",
-        "id": str(album.id),
-        "attributes": {"title": album.album},
-        "relationships": [
-            {
-                "type": "item",
-                "id": str(item.id),
-            }
+    attributes = AlbumAttributes(
+        title=album.album,
+        albumartist=album.albumartist,
+        year=album.year,
+    )
+
+    # TODO: allow for source plugin adapter specific extraction
+    # if data_source == "musibrainz:"
+
+    return AlbumResource(
+        type="album",
+        id=str(album.id),
+        attributes=attributes,
+        relationships=[
+            ResourceIdentifier[Literal["item"]](type="item", id=str(item.id))
             for item in items
         ],
-    }
-
-
-#: The bare sortable field names of the bulk endpoints.
-ALBUM_SORTABLE_FIELDS = (
-    "added",
-    "year",
-    "album",
-    "albumartist",
-    "disctotal",
-)
-
-#: All allowed ``sort`` values: a sortable field, optionally prefixed
-#: with "+" (ascending) or "-" (descending). The prefixes are generated
-#: programmatically from :data:`ALBUM_SORTABLE_FIELDS`.
-AlbumSortableField: TypeAlias = Literal[  # type: ignore[valid-type]
-    *(
-        entry
-        for field in ALBUM_SORTABLE_FIELDS
-        for entry in (field, f"+{field}", f"-{field}")
     )
-]  # mypy does not support PEP 646 star-unpacking in Literal yet
-
-#: Description of the ``sort`` query parameter of the bulk endpoints.
-#: Computed at module level (not inside an annotation) because f-strings
-#: inside ``Annotated`` are not constant-folded and break under
-#: ``from __future__ import annotations``.
-ALBUM_SORT_PARAM_DESCRIPTION = (
-    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
-    '(descending), e.g. "+year". Allowed fields: '
-    f'{", ".join(ALBUM_SORTABLE_FIELDS)}. Default: "-added".'
-)
 
 
 # ---------------------------------- Single ---------------------------------- #
@@ -95,7 +74,7 @@ ALBUM_SORT_PARAM_DESCRIPTION = (
 class GetQueryParams(TypedDict, total=False):
     include: Annotated[
         Literal["items"],
-        Meta(
+        Field(
             description="The album's items are included in the ``included`` "
             "section of the response"
         ),
@@ -124,10 +103,7 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
         else []
     )
 
-    return {
-        "data": to_album_resource(album, items),
-        "included": included,
-    }
+    return SingleAlbumDocument(data=to_album_resource(album, items), included=included)
 
 
 @albums_bp.route("/<int:album_id>", methods=["PATCH"])
@@ -151,10 +127,16 @@ async def patch_album(
 
     ensure_writable()
 
-    # Translate API attribute names to beets album field names.
-    update_data: dict[str, str] = {}
-    if "title" in data:
-        update_data["album"] = data["title"]
+    # ``model_fields_set`` are the attributes present in the request body:
+    # absent fields are left unchanged, an explicit ``null`` clears.
+    # Translate API attribute names to beets album field names
+    # (``title`` is the API name for the beets ``album`` field) and
+    # ignore read-only attributes (e.g. ``sources``).
+    update_data: dict[str, object] = {}
+    for key in data.model_fields_set:
+        if key in READ_ONLY_ALBUM_ATTRIBUTES:
+            continue
+        update_data["album" if key == "title" else key] = getattr(data, key)
 
     if update_data:
         # Write back to file
@@ -168,18 +150,15 @@ async def patch_album(
         else []
     )
 
-    return {
-        "data": to_album_resource(album, items),
-        "included": included,
-    }
+    return SingleAlbumDocument(data=to_album_resource(album, items), included=included)
 
 
 class DeleteQueryParams(TypedDict, total=False):
     delete_files: Annotated[
         bool,
-        Meta(
+        Field(
             description="Also delete the album's files from disk",
-            extra_json_schema={"default": False},
+            json_schema_extra={"default": False},
         ),
     ]
 
@@ -207,19 +186,42 @@ async def delete_album(
 
     resource = to_album_resource(album, album.items())
     album.remove(delete=query_args.get("delete_files", False))
-    return {
-        "data": resource,
-        "included": [],
-    }
+    return SingleAlbumDocument(data=resource, included=[])
 
 
 # ----------------------------------- Bulk ----------------------------------- #
 
 
+# The bare sortable field names of the bulk endpoints.
+SORTABLE_FIELDS = (
+    "added",
+    "year",
+    "album",
+    "albumartist",
+    "disctotal",
+)
+
+# All allowed ``sort`` values: a sortable field, optionally prefixed
+# with "+" (ascending) or "-" (descending). The prefixes are generated
+# programmatically from :data:`SORTABLE_FIELDS`.
+SortableField: TypeAlias = Literal[  # type: ignore[valid-type]
+    *(entry for field in SORTABLE_FIELDS for entry in (field, f"+{field}", f"-{field}"))  # type: ignore[misc, valid-type]
+]  # mypy does not support PEP 646 star-unpacking in Literal yet
+
+# Description of the ``sort`` query parameter of the bulk endpoints.
+# Computed at module level (not inside an annotation) because f-strings
+# are not constant-folded and break under``from __future__ import annotations``.
+SORT_PARAM_DESCRIPTION = (
+    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
+    '(descending), e.g. "+year". Allowed fields: '
+    f'{", ".join(SORTABLE_FIELDS)}. Default: "-added".'
+)
+
+
 class BulkGetQueryParams(BulkFilterParams, total=False):
     cursor: Annotated[
         str,
-        Meta(
+        Field(
             description=(
                 "Pagination cursor from the ``links.next`` of a previous "
                 "response. The cursor is self-contained: it encodes the sort "
@@ -231,26 +233,26 @@ class BulkGetQueryParams(BulkFilterParams, total=False):
         ),
     ]
     sort: Annotated[
-        AlbumSortableField,
-        Meta(
-            description=ALBUM_SORT_PARAM_DESCRIPTION,
+        SortableField,
+        Field(
+            description=SORT_PARAM_DESCRIPTION,
             examples=["+year"],
-            extra_json_schema={"default": "-added"},
+            json_schema_extra={"default": "-added"},
         ),
     ]
     limit: Annotated[
         int,
-        Meta(
+        Field(
             description=(
                 "Page size, i.e. maximum number of albums to return. Defaults "
                 "to 100; the minimum is 1, the maximum is 1000."
             ),
-            extra_json_schema={"default": 100},
+            json_schema_extra={"default": 100},
         ),
     ]
     include: Annotated[
         Literal["items"],
-        Meta(
+        Field(
             description=(
                 "Each album's items are included in the ``included`` section "
                 "of the response. The ``links.next`` URL keeps the parameter, "
@@ -299,7 +301,7 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
     ``GET /api_v1/beets/albums/?filter_query=albumartist:Tool&limit=50``
     """
     # Construct cursor either from args or from the encoded cursor string.
-    cursor = build_cursor(query_args, ALBUM_SORTABLE_FIELDS)
+    cursor = build_cursor(query_args, SORTABLE_FIELDS)
 
     # Limit is independent from cursor
     limit = query_args.get("limit", DEFAULT_LIMIT)
@@ -316,13 +318,13 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
     # Create pagination links. The "next" link is only present if there
     # are more albums to fetch.
     include_items = query_args.get("include") == "items"
-    links: LinkObject = {"self": request.url}
+    links = LinkObject(self=request.url)
     if has_next:
         cursor_token = cursor.next_from_entity(albums[-1]).to_string()
         next_params: dict[str, str | int] = {"cursor": cursor_token, "limit": limit}
         if include_items:
             next_params["include"] = "items"
-        links["next"] = request.base_url + "?" + urlencode(next_params)
+        links.next = request.base_url + "?" + urlencode(next_params)
 
     data: list[AlbumResource] = []
     included: list[ItemResource] = []
@@ -332,12 +334,12 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
         if include_items:
             included.extend(to_item_resource(item) for item in items)
 
-    return {
-        "data": data,
-        "included": included,
-        "links": links,
-        "meta": {"total": query.total(g.lib)},
-    }
+    return MultiAlbumDocument(
+        data=data,
+        included=included,
+        links=links,
+        meta=MetaObject(total=query.total(g.lib)),
+    )
 
 
 class BulkPatchQueryParams(BulkFilterParams, total=False):
@@ -368,10 +370,16 @@ async def patch_albums(
     """
     ensure_writable()
 
-    # Translate API attribute names to beets album field names.
-    update_data: dict[str, str] = {}
-    if "title" in data:
-        update_data["album"] = data["title"]
+    # ``model_fields_set`` are the attributes present in the request body:
+    # absent fields are left unchanged, an explicit ``null`` clears.
+    # Translate API attribute names to beets album field names
+    # (``title`` is the API name for the beets ``album`` field) and
+    # ignore read-only attributes (e.g. ``sources``).
+    update_data: dict[str, object] = {}
+    for key in data.model_fields_set:
+        if key in READ_ONLY_ALBUM_ATTRIBUTES:
+            continue
+        update_data["album" if key == "title" else key] = getattr(data, key)
 
     query = build_filter_query(
         query_args.get("filter_query"), query_args.get("filter_ids"), BeetsAlbum
@@ -391,15 +399,15 @@ async def patch_albums(
             album.try_sync(True, False)
             total += 1
 
-    return {"meta": {"total": total}}
+    return BulkResult(meta=MetaObject(total=total))
 
 
 class BulkDeleteQueryParams(BulkFilterParams, total=False):
     delete_files: Annotated[
         bool,
-        Meta(
+        Field(
             description="Also delete the album's files from disk",
-            extra_json_schema={"default": False},
+            json_schema_extra={"default": False},
         ),
     ]
 
@@ -438,4 +446,4 @@ async def delete_albums(query_args: BulkDeleteQueryParams) -> BulkResult:
             album.remove(delete=delete)
             total += 1
 
-    return {"meta": {"total": total}}
+    return BulkResult(meta=MetaObject(total=total))

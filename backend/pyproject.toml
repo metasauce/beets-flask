@@ -41,7 +41,7 @@ dependencies = [
     "typing_extensions",
     "polars>=1.36.1",
     "alembic>=1.18.4",
-    "quart-schema[msgspec] @ git+https://github.com/semohr/quart-schema.git@defs_msgspec",
+    "quart-schema[pydantic] @ git+https://github.com/semohr/quart-schema.git@defs_msgspec",
 ]
 
 [dependency-groups]
@@ -151,6 +151,7 @@ exclude_also = [
 ]
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 check_untyped_defs = true
 disallow_untyped_decorators = true
 allow_redefinition = true

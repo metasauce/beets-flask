@@ -1,9 +1,7 @@
 from quart import Blueprint, Quart
 
-from beets_flask.server.schema import quart_schema
-
+from ..routes_next import register_routes as register_routes_next
 from .art_preview import art_blueprint
-from .beets import beets_bp
 from .config import config_bp
 from .db_models import register_state_models
 from .exception import error_bp
@@ -25,10 +23,6 @@ backend_bp.register_blueprint(inbox_bp)
 backend_bp.register_blueprint(library_bp)
 backend_bp.register_blueprint(monitor_bp)
 
-# Public json:api, exposes beets library
-api_bp = Blueprint("api_v1", __name__, url_prefix="/api_v1")
-api_bp.register_blueprint(beets_bp)
-
 
 def register_routes(app: Quart):
     # Register database state models
@@ -38,8 +32,7 @@ def register_routes(app: Quart):
     app.register_blueprint(backend_bp)
     app.register_blueprint(frontend_bp)
 
-    app.register_blueprint(api_bp)
-    quart_schema.init_app(app)
+    register_routes_next(app)
 
 
 __all__ = ["register_routes"]

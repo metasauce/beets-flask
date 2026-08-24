@@ -466,6 +466,15 @@ def dir_size(path: Path) -> int:
         return -1
 
 
+def file_size(path: Path) -> int:
+    """Size of a file in bytes."""
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        log.error(f"Could not get size of file: {path}")
+        return -1
+
+
 @cached(cache=TTLCache(maxsize=1024, ttl=60), info=True)
 def dir_files(path: Path) -> int:
     """Count the number of files in a directory."""

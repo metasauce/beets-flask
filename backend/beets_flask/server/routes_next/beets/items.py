@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
 from urllib.parse import urlencode
 
-from msgspec import Meta
+from pydantic import Field
 from quart import Blueprint, g, request
 from quart_schema import validate_request, validate_response
 
@@ -11,10 +11,11 @@ from beets_flask.importer.types import BeetsItem
 from beets_flask.server.exceptions import (
     InvalidUsageException,
     NotFoundException,
-    error_responses,
 )
 from beets_flask.server.utility import ensure_writable
+from beets_flask.server.validation import validate_querystring
 
+from ..jsonapi import LinkObject, MetaObject, error_responses
 from ._cursor import (
     DEFAULT_LIMIT,
     MAX_LIMIT,
@@ -27,11 +28,9 @@ from ._types import (
     BulkResult,
     ItemAttributes,
     ItemResource,
-    LinkObject,
     MultiItemDocument,
     SingleItemDocument,
 )
-from ._validation import validate_querystring
 
 if TYPE_CHECKING:
     # For type hinting the global g object
@@ -39,44 +38,20 @@ if TYPE_CHECKING:
 
 items_bp = Blueprint("items", __name__, url_prefix="/items")
 
-# The bare sortable field names of the bulk endpoints.
-SORTABLE_FIELDS = (
-    "added",
-    "year",
-    "title",
-    "artist",
-    "albumartist",
-    "album",
-    "track",
-    "disc",
-    "length",
-    "bitrate",
-)
-
-# All allowed ``sort`` values: a sortable field, optionally prefixed
-# with "+" (ascending) or "-" (descending). The prefixes are generated
-# programmatically from :data:`SORTABLE_FIELDS`.
-SortableField: TypeAlias = Literal[  # type: ignore[valid-type]
-    *(entry for field in SORTABLE_FIELDS for entry in (field, f"+{field}", f"-{field}"))
-]  # mypy does not support PEP 646 star-unpacking in Literal yet
-
-# Description of the ``sort`` query parameter of the bulk endpoints.
-# Computed at module level (not inside an annotation) because f-strings
-# inside ``Annotated`` are not constant-folded and break under
-# ``from __future__ import annotations``.
-SORT_PARAM_DESCRIPTION = (
-    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
-    '(descending), e.g. "+title". Allowed fields: '
-    f'{", ".join(SORTABLE_FIELDS)}. Default: "-added".'
-)
-
 
 def to_item_resource(item: BeetsItem) -> ItemResource:
-    return {
-        "type": "item",
-        "id": str(item.id),
-        "attributes": {"title": item.title},
-    }
+    attributes = ItemAttributes(
+        title=item.title,
+        artist=item.artist,
+    )
+    # TODO: allow for source plugin adapter specific extraction
+    # if data_source == "musibrainz:"
+
+    return ItemResource(
+        type="item",
+        id=str(item.id),
+        attributes=attributes,
+    )
 
 
 # ---------------------------------- Single ---------------------------------- #
@@ -96,9 +71,11 @@ async def get_item(item_id: int) -> SingleItemDocument:
             f"Item with beets_id:{item_id!r} not found in beets db."
         )
 
-    return {
-        "data": to_item_resource(item),
-    }
+    return SingleItemDocument(data=to_item_resource(item))
+
+
+# Attributes that cannot be set via PATCH
+READ_ONLY_ITEM_ATTRIBUTES = frozenset({"album_id", "added", "size", "path", "sources"})
 
 
 @items_bp.route("/<int:item_id>", methods=["PATCH"])
@@ -123,21 +100,28 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
 
     ensure_writable()
 
-    if data:
-        item.update(data)
+    # ``model_fields_set`` are the attributes present in the request body:
+    # absent fields are left unchanged, an explicit ``null`` clears the
+    # field. Read-only attributes (e.g. ``path``, ``sources``) are derived
+    # from the library state and cannot be set by clients; ignore them.
+    update_data = {
+        k: getattr(data, k)
+        for k in data.model_fields_set
+        if k not in READ_ONLY_ITEM_ATTRIBUTES
+    }
+    if update_data:
+        item.update(update_data)
         item.try_sync(True, False)
 
-    return {
-        "data": to_item_resource(item),
-    }
+    return SingleItemDocument(data=to_item_resource(item))
 
 
 class DeleteQueryParams(TypedDict, total=False):
     delete_file: Annotated[
         bool,
-        Meta(
+        Field(
             description="Also delete the item's file from disk",
-            extra_json_schema={"default": False},
+            json_schema_extra={"default": False},
         ),
     ]
 
@@ -168,18 +152,46 @@ async def delete_item(
 
     resource = to_item_resource(item)
     item.remove(delete=query_args.get("delete_file", False))
-    return {
-        "data": resource,
-    }
+    return SingleItemDocument(data=resource)
 
 
 # ----------------------------------- Bulk ----------------------------------- #
+
+# The bare sortable field names of the bulk endpoints.
+SORTABLE_FIELDS = (
+    "added",
+    "year",
+    "title",
+    "artist",
+    "albumartist",
+    "album",
+    "track",
+    "disc",
+    "length",
+    "bitrate",
+)
+
+# All allowed ``sort`` values: a sortable field, optionally prefixed
+# with "+" (ascending) or "-" (descending). The prefixes are generated
+# programmatically from :data:`SORTABLE_FIELDS`.
+SortableField: TypeAlias = Literal[  # type: ignore[valid-type]
+    *(entry for field in SORTABLE_FIELDS for entry in (field, f"+{field}", f"-{field}"))  # type: ignore[misc, valid-type]
+]  # mypy does not support PEP 646 star-unpacking in Literal yet
+
+# Description of the ``sort`` query parameter of the bulk endpoints.
+# Computed at module level (not inside an annotation) because f-strings
+# are not constant-folded and break under``from __future__ import annotations``.
+SORT_PARAM_DESCRIPTION = (
+    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
+    '(descending), e.g. "+title". Allowed fields: '
+    f'{", ".join(SORTABLE_FIELDS)}. Default: "-added".'
+)
 
 
 class BulkGetQueryParams(BulkFilterParams, total=False):
     cursor: Annotated[
         str,
-        Meta(
+        Field(
             description=(
                 "Pagination cursor from the ``links.next`` of a previous "
                 "response. The cursor is self-contained: it encodes the sort "
@@ -192,20 +204,20 @@ class BulkGetQueryParams(BulkFilterParams, total=False):
     ]
     sort: Annotated[
         SortableField,
-        Meta(
+        Field(
             description=SORT_PARAM_DESCRIPTION,
             examples=["+title"],
-            extra_json_schema={"default": "-added"},
+            json_schema_extra={"default": "-added"},
         ),
     ]
     limit: Annotated[
         int,
-        Meta(
+        Field(
             description=(
                 "Page size, i.e. maximum number of items to return. Defaults "
                 "to 100; the minimum is 1, the maximum is 1000."
             ),
-            extra_json_schema={"default": 100},
+            json_schema_extra={"default": 100},
         ),
     ]
 
@@ -259,18 +271,18 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
 
     # Create pagination links. The "next" link is only present if there
     # are more items to fetch.
-    links: LinkObject = {"self": request.url}
+    links = LinkObject(self=request.url)
     if has_next:
         cursor_token = cursor.next_from_entity(items[-1]).to_string()
-        links["next"] = (
+        links.next = (
             request.base_url + "?" + urlencode({"cursor": cursor_token, "limit": limit})
         )
 
-    return {
-        "data": [to_item_resource(item) for item in items],
-        "links": links,
-        "meta": {"total": query.total(g.lib)},
-    }
+    return MultiItemDocument(
+        data=[to_item_resource(item) for item in items],
+        links=links,
+        meta=MetaObject(total=query.total(g.lib)),
+    )
 
 
 class BulkPatchQueryParams(BulkFilterParams, total=False):
@@ -306,7 +318,19 @@ async def patch_items(
         query_args.get("filter_query"), query_args.get("filter_ids"), BeetsItem
     )
 
-    if not data:
+    # ``model_fields_set`` are the attributes present in the request body:
+    # absent fields are left unchanged, an explicit ``null`` clears.
+    if not data.model_fields_set:
+        raise InvalidUsageException("No attributes to update")
+
+    # Read-only attributes (e.g. ``path``, ``sources``) are derived from
+    # the library state and cannot be set by clients; ignore them.
+    update_data = {
+        k: getattr(data, k)
+        for k in data.model_fields_set
+        if k not in READ_ONLY_ITEM_ATTRIBUTES
+    }
+    if not update_data:
         raise InvalidUsageException("No attributes to update")
 
     # Update every matching item in a single transaction: the database
@@ -316,19 +340,19 @@ async def patch_items(
     total = 0
     with g.lib.transaction():
         for item in g.lib.items(query):
-            item.update(data)
+            item.update(update_data)
             item.try_sync(True, False)
             total += 1
 
-    return {"meta": {"total": total}}
+    return BulkResult(meta=MetaObject(total=total))
 
 
 class BulkDeleteQueryParams(BulkFilterParams, total=False):
     delete_file: Annotated[
         bool,
-        Meta(
+        Field(
             description="Also delete the item's file from disk",
-            extra_json_schema={"default": False},
+            json_schema_extra={"default": False},
         ),
     ]
 
@@ -369,4 +393,4 @@ async def delete_items(query_args: BulkDeleteQueryParams) -> BulkResult:
             item.remove(delete=delete)
             total += 1
 
-    return {"meta": {"total": total}}
+    return BulkResult(meta=MetaObject(total=total))

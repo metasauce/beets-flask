@@ -171,7 +171,7 @@ quart_schema = QuartSchema(
             description="Retrieve and modify albums in your beets library.",
         ),
     ],
-    conversion_preference="msgspec",
+    conversion_preference="pydantic",
     info=Info(
         title="BeetsFlask API",
         version="0.1.0",

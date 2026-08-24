@@ -12,13 +12,11 @@ from .artists import artists_bp
 from .artwork import artwork_pb
 from .audio import audio_bp
 from .metadata import metadata_bp
-from .resources import resource_bp
 from .stats import stats_bp
 
 library_bp = Blueprint("library", __name__, url_prefix="/library")
 library_bp.register_blueprint(artwork_pb)
 library_bp.register_blueprint(audio_bp)
-library_bp.register_blueprint(resource_bp)
 library_bp.register_blueprint(stats_bp)
 library_bp.register_blueprint(artists_bp)
 library_bp.register_blueprint(metadata_bp)

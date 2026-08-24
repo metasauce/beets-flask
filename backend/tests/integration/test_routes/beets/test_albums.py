@@ -19,7 +19,7 @@ from beets.library import Album
 from quart.typing import TestClientProtocol as Client
 
 from beets_flask.config import get_config
-from beets_flask.server.routes.beets._cursor import Cursor
+from beets_flask.server.routes_next.beets._cursor import Cursor
 from tests.conftest import beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
@@ -37,7 +37,10 @@ def _assert_album_document(data: dict, album: Album) -> None:
     """
     assert data["data"]["type"] == "album"
     assert data["data"]["id"] == str(album.id)
-    assert data["data"]["attributes"] == {"title": album.album}
+    attributes = data["data"]["attributes"]
+    assert attributes["title"] == album.album
+    assert attributes.get("albumartist") == album.albumartist
+    assert attributes.get("year") == album.year
     rel_ids = {r["id"] for r in data["data"]["relationships"]}
     assert rel_ids == {str(i.id) for i in album.items()}, (
         "Relationships do not match the album's items"
@@ -51,7 +54,7 @@ def _assert_included_items(data: dict, album: Album) -> None:
     included = {i["id"]: i for i in data["included"]}
     assert set(included) == {str(i.id) for i in items}
     for item in items:
-        assert included[str(item.id)]["attributes"] == {"title": item.title}
+        assert included[str(item.id)]["attributes"]["title"] == item.title
 
 
 # ----------------------------------- Get ----------------------------------- #
@@ -287,7 +290,7 @@ class TestDeleteAlbum(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 200, "Response status code is not 200"
         assert data["data"]["id"] == str(album.id)
-        assert data["data"]["attributes"] == {"title": album.album}
+        assert data["data"]["attributes"]["title"] == album.album
         rel_ids = {r["id"] for r in data["data"]["relationships"]}
         assert rel_ids == {str(i) for i in item_ids}
         assert data["included"] == []
@@ -430,7 +433,7 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
 
         assert response.status_code == 200, "Response status code is not 200"
         assert len(data["data"]) == 25
-        assert "next" not in data.get("links", {}), "Unexpected next page"
+        assert data["links"].get("next") is None, "Unexpected next page"
 
     async def test_get_albums_sort(self, client: Client):
         """Sort by album title ascending and descending."""
@@ -548,7 +551,7 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
         assert response.status_code == 200, "Response status code is not 200"
         assert data["data"] == []
         assert data["meta"]["total"] == 0
-        assert "next" not in data.get("links", {})
+        assert data["links"].get("next") is None
 
     async def test_get_albums_invalid_cursor(self, client: Client):
         """An invalid cursor token -> 400."""
