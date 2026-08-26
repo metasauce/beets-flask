@@ -20,7 +20,7 @@ class ArtSource(ABC):
     Providers declare a priority used to order URL matching (a higher
     value means the source is consulted earlier). `matches` decides
     whether the source can handle a given URL, and `get_art` resolves
-    the artwork using a shared aiohttp session.
+    the artwork using the aiohttp session provided by the caller.
     """
 
     name: ClassVar[str]
