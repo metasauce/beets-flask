@@ -1,11 +1,13 @@
 """Unit tests for the art extension interface and its providers."""
 
 import shutil
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import aiohttp
 import pytest
 from aiohttp import web
+from aiohttp.test_utils import TestClient, TestServer
 from mediafile import Image, MediaFile
 
 from beets_flask.extensions.art import ArtResult, ArtSource
@@ -13,6 +15,7 @@ from beets_flask.extensions.providers import ART_SOURCES
 from beets_flask.extensions.providers.file import FileArtSource
 from beets_flask.extensions.providers.musicbrainz import MusicbrainzArtSource
 from beets_flask.extensions.providers.spotify import SpotifyArtSource
+from beets_flask.server.routes.art_preview import make_session
 
 
 class TestArtResult:
@@ -47,13 +50,37 @@ class TestArtResult:
             SpotifyArtSource,
         ),
         (
+            "http://open.spotify.com/album/4zY3KmQkPOCEln8TWT9exA",
+            SpotifyArtSource,
+        ),
+        (
             "https://open.spotify.com.evil.com/album/x",
+            None,
+        ),
+        (
+            "https://evil.com/?x=open.spotify.com/album/4zY3KmQkPOCEln8TWT9exA",
+            None,
+        ),
+        (
+            "ftp://open.spotify.com/album/4zY3KmQkPOCEln8TWT9exA",
             None,
         ),
         # Musicbrainz
         (
             "https://musicbrainz.org/release/1cf2ae06-bb5e-4256-af6c-e40d406abba5",
             MusicbrainzArtSource,
+        ),
+        (
+            "https://notmusicbrainz.org/release/1cf2ae06-bb5e-4256-af6c-e40d406abba5",
+            None,
+        ),
+        (
+            "https://musicbrainz.org.evil.com/release/1cf2ae06-bb5e-4256-af6c-e40d406abba5",
+            None,
+        ),
+        (
+            "https://evil.com/?x=musicbrainz.org/release/1cf2ae06-bb5e-4256-af6c-e40d406abba5",
+            None,
         ),
         # Other
         (
@@ -76,19 +103,20 @@ def test_art_source_matches(url: str, expected: type[ArtSource] | None):
 class TestSpotifyArtSourceGetArt:
     url = "https://open.spotify.com/album/4zY3KmQkPOCEln8TWT9exA"
 
-    async def make_client(self, aiohttp_client, monkeypatch, handler):
+    async def get_art(
+        self,
+        handler: Callable[[web.Request], Awaitable[web.Response]],
+    ) -> ArtResult | None:
+        """Call ``get_art`` against a loopback server serving ``handler`` at /oembed."""
         app = web.Application()
         app.router.add_get("/oembed", handler)
-        client = await aiohttp_client(app)
-        monkeypatch.setattr(
-            SpotifyArtSource,
-            "oembed_base",
-            f"http://127.0.0.1:{client.port}/oembed",
-        )
-        return client
+        async with TestClient(TestServer(app)) as client:
+            source = SpotifyArtSource()
+            source.oembed_base = f"http://127.0.0.1:{client.server.port}/oembed"  # type: ignore[misc]
+            return await source.get_art(self.url, client.session)
 
     @pytest.mark.asyncio
-    async def test_returns_art_from_thumbnail(self, aiohttp_client, monkeypatch):
+    async def test_returns_art_from_thumbnail(self):
         thumbnail = (
             "https://image-cdn-ak.spotifycdn.com/image/"
             "ab67616d00001e0220453e7ab1c42d598d8ff24b"
@@ -97,48 +125,46 @@ class TestSpotifyArtSourceGetArt:
         async def oembed(request: web.Request) -> web.Response:
             return web.json_response({"thumbnail_url": thumbnail})
 
-        client = await self.make_client(aiohttp_client, monkeypatch, oembed)
-
-        result = await SpotifyArtSource().get_art(self.url, client.session)
+        result = await self.get_art(oembed)
 
         assert result == ArtResult.from_url(thumbnail)
 
     @pytest.mark.asyncio
-    async def test_returns_none_without_thumbnail(self, aiohttp_client, monkeypatch):
+    async def test_returns_none_without_thumbnail(self):
         async def oembed(request: web.Request) -> web.Response:
             return web.json_response({"foo": "bar"})
 
-        client = await self.make_client(aiohttp_client, monkeypatch, oembed)
+        result = await self.get_art(oembed)
 
-        assert await SpotifyArtSource().get_art(self.url, client.session) is None
+        assert result is None
 
     @pytest.mark.asyncio
-    async def test_returns_none_on_http_error(self, aiohttp_client, monkeypatch):
+    async def test_returns_none_on_http_error(self):
         async def oembed(request: web.Request) -> web.Response:
             return web.Response(status=404)
 
-        client = await self.make_client(aiohttp_client, monkeypatch, oembed)
+        result = await self.get_art(oembed)
 
-        assert await SpotifyArtSource().get_art(self.url, client.session) is None
+        assert result is None
 
     @pytest.mark.asyncio
-    async def test_returns_none_on_client_error(self, aiohttp_client, monkeypatch):
+    async def test_returns_none_on_client_error(self):
         # A non-JSON content type makes `response.json()` raise a ContentTypeError.
         async def oembed(request: web.Request) -> web.Response:
             return web.Response(text="oops")
 
-        client = await self.make_client(aiohttp_client, monkeypatch, oembed)
+        result = await self.get_art(oembed)
 
-        assert await SpotifyArtSource().get_art(self.url, client.session) is None
+        assert result is None
 
     @pytest.mark.asyncio
-    async def test_returns_none_on_invalid_json(self, aiohttp_client, monkeypatch):
+    async def test_returns_none_on_invalid_json(self):
         async def oembed(request: web.Request) -> web.Response:
             return web.Response(text="not-json", content_type="application/json")
 
-        client = await self.make_client(aiohttp_client, monkeypatch, oembed)
+        result = await self.get_art(oembed)
 
-        assert await SpotifyArtSource().get_art(self.url, client.session) is None
+        assert result is None
 
 
 class TestMusicbrainzArtSourceGetArt:
@@ -166,6 +192,30 @@ class TestMusicbrainzArtSourceGetArt:
             )
 
         assert result is None
+
+
+class TestMakeSession:
+    @pytest.mark.asyncio
+    async def test_sends_default_user_agent(self):
+        received: dict[str, str] = {}
+
+        async def handler(request: web.Request) -> web.Response:
+            received["user_agent"] = request.headers.get("User-Agent", "")
+            return web.Response()
+
+        app = web.Application()
+        app.router.add_get("/", handler)
+        async with TestClient(TestServer(app)) as client:
+            async with make_session() as session:
+                await session.get(f"http://127.0.0.1:{client.server.port}/")
+
+        assert received["user_agent"].startswith("beets-flask/")
+        assert "github.com/pSpitzner/beets-flask" in received["user_agent"]
+
+    @pytest.mark.asyncio
+    async def test_applies_default_timeout(self):
+        async with make_session() as session:
+            assert session.timeout.total == 10
 
 
 class TestFileArtSourceGetArt:

@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import ClassVar
 
@@ -25,15 +26,18 @@ class FileArtSource(ArtSource):
     async def get_art(
         self, url: str, session: aiohttp.ClientSession
     ) -> ArtResult | None:
-        path = url.removeprefix("file://")
+        # MediaFile parsing is blocking IO; keep it off the event loop.
+        return await asyncio.to_thread(self._get_art, url.removeprefix("file://"))
+
+    def _get_art(self, path: str) -> ArtResult | None:
         if not os.path.isdir(path):
             return None
 
-        files = [
+        files = sorted(
             f
             for f in os.listdir(path)
             if f.endswith(tuple(f".{ext}" for ext in AUDIO_EXTENSIONS))
-        ]
+        )
         if not files:
             return None
 

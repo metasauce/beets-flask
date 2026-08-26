@@ -1,10 +1,16 @@
 """Extension framework for beets-flask.
 
-An *extension* wraps an external service (typically a beets plugin, e.g.
-spotify, musicbrainz, ...) behind a common interface so
-that beets-flask can use it without depending on the service directly.
+An *extension* adds functionality to the beets-flask backend without requiring
+the extension-specific code to live in the core. This keeps the core small and
+focused while making it easy to add or replace functionality through
+independent extensions.
 
-Each extension kind lives in its own module (`extensions/art.py` for art
-resolution) and declares an abstract base class plus a set of concrete
-implementations in `extensions/providers/<extension_name>`.
+Extensions typically wrap beets plugins (e.g., Spotify, MusicBrainz, etc.)
+behind a common interface. This allows the backend to support optional
+services without coupling its core implementation to any particular plugin.
+
+Each extension type lives in its own module (e.g., `extensions/art.py` for
+artwork resolution). The module defines an abstract base class describing the
+extension interface, while concrete implementations live under
+`extensions/providers/<extension_name>`.
 """

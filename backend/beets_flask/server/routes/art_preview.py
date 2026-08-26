@@ -8,6 +8,7 @@ and the resulting artwork is served (or proxied) as image bytes.
 from __future__ import annotations
 
 import asyncio
+from importlib.metadata import version
 
 import aiohttp
 from quart import Blueprint, make_response, redirect, request
@@ -27,7 +28,7 @@ async def redirect_external_art():
     if not url:
         raise InvalidUsageException("Missing required 'url' query parameter.")
 
-    async with aiohttp.ClientSession() as session:
+    async with make_session() as session:
         art = await resolve_art(url, session)
 
         if art is None:
@@ -115,3 +116,13 @@ async def _serve_art_result(result: ArtResult, session: aiohttp.ClientSession):
 
     data, content_type = image
     return await _image_response(data, content_type)
+
+
+def make_session() -> aiohttp.ClientSession:
+    """Create an :class:`aiohttp.ClientSession` with the backend defaults."""
+    return aiohttp.ClientSession(
+        headers={
+            "User-Agent": f"beets-flask/{version('beets-flask')} (+https://github.com/pSpitzner/beets-flask)"
+        },
+        timeout=aiohttp.ClientTimeout(total=10),
+    )
