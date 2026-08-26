@@ -11,6 +11,6 @@ services without coupling its core implementation to any particular plugin.
 
 Each extension type lives in its own module (e.g., `extensions/art.py` for
 artwork resolution). The module defines an abstract base class describing the
-extension interface, while concrete implementations live under
-`extensions/providers/<extension_name>`.
+extension interface, while concrete implementations live in
+`extensions/providers/` (one module per provider).
 """
