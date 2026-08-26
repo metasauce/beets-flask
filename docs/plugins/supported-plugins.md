@@ -15,6 +15,7 @@ art preview endpoints, or source links. Enabled in the default configuration.
 
 The [spotify plugin](https://docs.beets.io/en/latest/plugins/spotify.html) has:
 
+- Implements the {ref}`Art extension <art>`
 - Dedicated Spotify SVG icon in the UI for source matches
 - Art previews via the Spotify oEmbed API
 - Links to open.spotify.com from the library view
@@ -25,6 +26,7 @@ Enabled by default.
 
 The [musicbrainz plugin](https://docs.beets.io/en/latest/plugins/musicbrainz.html) has:
 
+- Implements the {ref}`Art extension <art>`
 - Brain icon in the UI for MusicBrainz source matches
 - Art previews via the Cover Art Archive
 - Links to musicbrainz.org from the library view
@@ -73,3 +75,21 @@ it to disk.
 This is a design limitation in the plugin itself, it would need to be refactored
 to use persistent storage (e.g. writing directly to files during tagging) to work
 in a multi-process environment.
+
+(extensions)=
+
+## Extensions
+
+Beets-flask uses extensions to provide additional functionality. The sections
+below describe the available extensions and how they are used. The plugin
+documentation above indicates which extensions are used by each plugin.
+
+All extensions are built on beets-flask's
+[extension system](../develop/resources/extensions.md).
+
+(art)=
+
+### Art
+
+The Art extension provides cover artwork for external release URLs. It allows
+beets-flask to show artwork previews for releases before they are imported.
