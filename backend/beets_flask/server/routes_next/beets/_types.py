@@ -11,6 +11,8 @@ Conventions (implemented in ``items.py`` / ``albums.py``):
   embedded in full in ``included`` by passing ``include``
 """
 
+from collections.abc import Iterable
+from enum import StrEnum
 from typing import Annotated, Literal, TypedDict
 
 from pydantic import BaseModel, Field
@@ -26,8 +28,73 @@ from ..jsonapi import (
 )
 
 # ---------------------------------------------------------------------------- #
+#                                   Sorting                                    #
+# ---------------------------------------------------------------------------- #
+
+
+def _make_sort_members(fields: Iterable[StrEnum]) -> dict[str, str]:
+    """Build the members of a ``sort`` enum from a field enum.
+
+    Each sortable field yields three values: the bare field (ascending,
+    the API's default direction) and the field prefixed with "+"
+    (ascending) or "-" (descending).
+    """
+    members: dict[str, str] = {}
+    for field in fields:
+        members[field.name] = field.value
+        members[f"ASC_{field.name}"] = f"+{field.value}"
+        members[f"DESC_{field.name}"] = f"-{field.value}"
+    return members
+
+
+# ---------------------------------------------------------------------------- #
 #                                     Items                                    #
 # ---------------------------------------------------------------------------- #
+
+
+class ItemSortField(StrEnum):
+    """The fields that items can be sorted by in the bulk endpoints.
+
+    Single source of truth for the sortable fields: the ``sort`` query
+    parameter of the items bulk endpoints accepts these fields,
+    optionally prefixed with ``+`` (ascending) or ``-`` (descending);
+    :class:`ItemSort` is derived from it, :meth:`values` provides the
+    bare names, and the frontend type is generated from it via py2ts.
+    """
+
+    ADDED = "added"
+    YEAR = "year"
+    TITLE = "title"
+    ARTIST = "artist"
+    ALBUMARTIST = "albumartist"
+    ALBUM = "album"
+    TRACK = "track"
+    DISC = "disc"
+    LENGTH = "length"
+    BITRATE = "bitrate"
+
+    @classmethod
+    def values(cls) -> tuple[str, ...]:
+        """The bare sortable field names of the items bulk endpoints."""
+        return tuple(field.value for field in cls)
+
+
+# mypy cannot determine the members of a functional enum from a function
+# call (it requires a literal); the members are only used by pydantic at
+# runtime.
+ItemSort = StrEnum(  # type: ignore[misc]
+    "ItemSort",
+    _make_sort_members(ItemSortField),
+    module=__name__,
+)
+
+ItemSort.__doc__ = """A sort value for the items bulk endpoints.
+
+A sortable field from :class:`ItemSortField`, optionally prefixed with
+"+" (ascending) or "-" (descending), e.g. ``+title``. This is the type
+of the ``sort`` query parameter: pydantic validates the value and
+quart-schema renders it as an enum in the API docs.
+"""
 
 
 class ItemAttributes(BaseModel):
@@ -113,6 +180,43 @@ class MultiAlbumDocument(
     MultiResourceDocumentWithIncluded[AlbumResource, ItemResource]
 ):
     """The response of a request that returns multiple albums."""
+
+
+class AlbumSortField(StrEnum):
+    """The fields that albums can be sorted by in the bulk endpoints.
+
+    Single source of truth for the sortable fields: the ``sort`` query
+    parameter of the albums bulk endpoints accepts these fields,
+    optionally prefixed with ``+`` (ascending) or ``-`` (descending);
+    :class:`AlbumSort` is derived from it and :meth:`values` provides
+    the bare names.
+    """
+
+    ADDED = "added"
+    YEAR = "year"
+    ALBUM = "album"
+    ALBUMARTIST = "albumartist"
+    DISCTOTAL = "disctotal"
+
+    @classmethod
+    def values(cls) -> tuple[str, ...]:
+        """The bare sortable field names of the albums bulk endpoints."""
+        return tuple(field.value for field in cls)
+
+
+AlbumSort = StrEnum(  # type: ignore[misc]
+    "AlbumSort",
+    _make_sort_members(AlbumSortField),
+    module=__name__,
+)
+
+AlbumSort.__doc__ = """A sort value for the albums bulk endpoints.
+
+A sortable field from :class:`AlbumSortField`, optionally prefixed with
+"+" (ascending) or "-" (descending), e.g. ``+album``. This is the type
+of the ``sort`` query parameter: pydantic validates the value and
+quart-schema renders it as an enum in the API docs.
+"""
 
 
 # ---------------------------------------------------------------------------- #

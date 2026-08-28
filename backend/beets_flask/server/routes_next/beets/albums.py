@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
+from typing import TYPE_CHECKING, Annotated, Literal, TypedDict
 from urllib.parse import urlencode
 
 from pydantic import Field
@@ -27,6 +27,8 @@ from ._cursor import (
 from ._types import (
     AlbumAttributes,
     AlbumResource,
+    AlbumSort,
+    AlbumSortField,
     BulkFilterParams,
     BulkResult,
     ItemResource,
@@ -42,8 +44,8 @@ if TYPE_CHECKING:
 albums_bp = Blueprint("albums", __name__, url_prefix="/albums")
 
 
-#: Attributes that cannot be set via PATCH: they are derived from the
-#: library state and ignored in PATCH bodies.
+# Attributes that cannot be set via PATCH: they are derived from the
+# library state and ignored in PATCH bodies.
 READ_ONLY_ALBUM_ATTRIBUTES = frozenset({"sources"})
 
 
@@ -192,32 +194,6 @@ async def delete_album(
 # ----------------------------------- Bulk ----------------------------------- #
 
 
-# The bare sortable field names of the bulk endpoints.
-SORTABLE_FIELDS = (
-    "added",
-    "year",
-    "album",
-    "albumartist",
-    "disctotal",
-)
-
-# All allowed ``sort`` values: a sortable field, optionally prefixed
-# with "+" (ascending) or "-" (descending). The prefixes are generated
-# programmatically from :data:`SORTABLE_FIELDS`.
-SortableField: TypeAlias = Literal[  # type: ignore[valid-type]
-    *(entry for field in SORTABLE_FIELDS for entry in (field, f"+{field}", f"-{field}"))  # type: ignore[misc, valid-type]
-]  # mypy does not support PEP 646 star-unpacking in Literal yet
-
-# Description of the ``sort`` query parameter of the bulk endpoints.
-# Computed at module level (not inside an annotation) because f-strings
-# are not constant-folded and break under``from __future__ import annotations``.
-SORT_PARAM_DESCRIPTION = (
-    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
-    '(descending), e.g. "+year". Allowed fields: '
-    f'{", ".join(SORTABLE_FIELDS)}. Default: "-added".'
-)
-
-
 class BulkGetQueryParams(BulkFilterParams, total=False):
     cursor: Annotated[
         str,
@@ -233,9 +209,12 @@ class BulkGetQueryParams(BulkFilterParams, total=False):
         ),
     ]
     sort: Annotated[
-        SortableField,
+        AlbumSort,
         Field(
-            description=SORT_PARAM_DESCRIPTION,
+            description=(
+                'Sort by a field, optionally prefixed with "+" (ascending) or '
+                '"-" (descending), e.g. "+year". Default: "-added".'
+            ),
             examples=["+year"],
             json_schema_extra={"default": "-added"},
         ),
@@ -301,7 +280,7 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
     ``GET /api_v1/beets/albums/?filter_query=albumartist:Tool&limit=50``
     """
     # Construct cursor either from args or from the encoded cursor string.
-    cursor = build_cursor(query_args, SORTABLE_FIELDS)
+    cursor = build_cursor(query_args, AlbumSortField.values())
 
     # Limit is independent from cursor
     limit = query_args.get("limit", DEFAULT_LIMIT)

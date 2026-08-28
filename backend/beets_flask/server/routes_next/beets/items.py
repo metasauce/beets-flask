@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypedDict
+from typing import TYPE_CHECKING, Annotated, TypedDict
 from urllib.parse import urlencode
 
 from pydantic import Field
@@ -28,6 +28,8 @@ from ._types import (
     BulkResult,
     ItemAttributes,
     ItemResource,
+    ItemSort,
+    ItemSortField,
     MultiItemDocument,
     SingleItemDocument,
 )
@@ -157,36 +159,6 @@ async def delete_item(
 
 # ----------------------------------- Bulk ----------------------------------- #
 
-# The bare sortable field names of the bulk endpoints.
-SORTABLE_FIELDS = (
-    "added",
-    "year",
-    "title",
-    "artist",
-    "albumartist",
-    "album",
-    "track",
-    "disc",
-    "length",
-    "bitrate",
-)
-
-# All allowed ``sort`` values: a sortable field, optionally prefixed
-# with "+" (ascending) or "-" (descending). The prefixes are generated
-# programmatically from :data:`SORTABLE_FIELDS`.
-SortableField: TypeAlias = Literal[  # type: ignore[valid-type]
-    *(entry for field in SORTABLE_FIELDS for entry in (field, f"+{field}", f"-{field}"))  # type: ignore[misc, valid-type]
-]  # mypy does not support PEP 646 star-unpacking in Literal yet
-
-# Description of the ``sort`` query parameter of the bulk endpoints.
-# Computed at module level (not inside an annotation) because f-strings
-# are not constant-folded and break under``from __future__ import annotations``.
-SORT_PARAM_DESCRIPTION = (
-    'Sort by a field, optionally prefixed with "+" (ascending) or "-" '
-    '(descending), e.g. "+title". Allowed fields: '
-    f'{", ".join(SORTABLE_FIELDS)}. Default: "-added".'
-)
-
 
 class BulkGetQueryParams(BulkFilterParams, total=False):
     cursor: Annotated[
@@ -203,9 +175,12 @@ class BulkGetQueryParams(BulkFilterParams, total=False):
         ),
     ]
     sort: Annotated[
-        SortableField,
+        ItemSort,
         Field(
-            description=SORT_PARAM_DESCRIPTION,
+            description=(
+                'Sort by a field, optionally prefixed with "+" (ascending) or '
+                '"-" (descending), e.g. "+title". Default: "-added".'
+            ),
             examples=["+title"],
             json_schema_extra={"default": "-added"},
         ),
@@ -255,7 +230,7 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
     ``GET /api_v1/beets/items/?filter_query=artist:Tool&limit=50``
     """
     # Construct cursor either from args or from the encoded cursor string.
-    cursor = build_cursor(query_args, SORTABLE_FIELDS)
+    cursor = build_cursor(query_args, ItemSortField.values())
 
     # Limit is independent from cursor
     limit = query_args.get("limit", DEFAULT_LIMIT)
