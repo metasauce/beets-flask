@@ -183,6 +183,8 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                 # auto-generating overlapping-table aliases.
                 album_match = aliased(AlbumMatch, flat=True)
                 track_match = aliased(TrackMatch, flat=True)
+
+                # build the CTE/subquery for ranking
                 best_candidate = (
                     select(
                         SessionStateInDb.folder_hash,
@@ -200,21 +202,23 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                         )
                         .label("rn"),
                     )
+                    .select_from(CandidateStateInDb)
                     .join(
                         TaskStateInDb,
-                        CandidateStateInDb.task_id == TaskStateInDb.id,
+                        TaskStateInDb.id == CandidateStateInDb.task_id,
                     )
                     .join(
                         SessionStateInDb,
-                        TaskStateInDb.session_id == SessionStateInDb.id,
+                        SessionStateInDb.id == TaskStateInDb.session_id,
                     )
-                    .where(SessionStateInDb.id.in_(resolved_ids))
-                    .join(Match, CandidateStateInDb.match_id == Match.id)
-                    .join(Distance, Match.distance_id == Distance.id)
+                    .join(Match, Match.id == CandidateStateInDb.match_id)
+                    .join(Distance, Distance.id == Match.distance_id)
+                    # we need outer joins because of the polymorphism of match
                     .outerjoin(album_match, album_match.id == Match.id)
                     .outerjoin(AlbumInfo, AlbumInfo.id == album_match.info_id)
                     .outerjoin(track_match, track_match.id == Match.id)
                     .outerjoin(TrackInfo, TrackInfo.id == track_match.info_id)
+                    .where(SessionStateInDb.id.in_(resolved_ids))
                     .subquery()
                 )
 
