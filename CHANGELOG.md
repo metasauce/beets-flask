@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a database migration setup using [Alembic](https://alembic.sqlalchemy.org/) for future database migrations.
 - Removed unnecessary `nest_asyncio` dependency.
 - Upgraded a number of frontend dependencies to their latest versions.
+- Added a new JSON:API-style beets library API under `/api_v1/beets/items` and `/api_v1/beets/albums` (query, paginate, update and delete items/albums). The old `/library/item(s)`, `/library/album(s)` and `/library/artist/<name>/{albums,items}` resource endpoints were removed in favor of it; the frontend SDK (`frontend/src/api/library.ts`) now uses the new endpoints. Response types are generated from the Python API types with `backend/generate_types.py` (py2ts).
 
 ## [1.2.0] - 25-12-17
 
