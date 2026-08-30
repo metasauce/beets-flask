@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚠️ Breaking Changes ⚠️
 
+- **Repository moved**: The repository has moved from `pSpitzner/beets-flask` to `metasauce/beets-flask`. Please update your remotes and bookmarks accordingly.
 - **Base image changed**: The container base image is now `python:3.12-slim` (previously `python:3.11-alpine`). If you use a custom `startup.sh`, please verify compatibility, as Alpine-specific tooling and shell behavior may differ [#212](https://github.com/metasauce/beets-flask/issues/212)
 - **Upgraded `beets` from `v2.5.1` to `v2.12.0`**
   - This contains many changes and improvements, including some plugins.

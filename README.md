@@ -89,6 +89,10 @@ services:
             - /music_path/clean/:/music_path/clean/
 ```
 
+> [!NOTE]
+> We moved the repo and docker images to an organization account with v2.
+> Please update your docker setup to use `metasauce/beets-flask` instead of `pspitzner/beets-flask` to receive future udpates.
+
 This will create a container with the following folder structure:
 
 ```
