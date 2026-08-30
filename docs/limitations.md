@@ -7,8 +7,9 @@ We try to be feature-complete with respect to beets, but there are some limitati
 You might be tempted to import a large existing library (not previously tagged in beets) all at once by moving it into the inbox folder. Currently, once you hit some hundred folder or so, this will get laggy, due to some frontend-logic we have not optimized yet.
 
 Some possible workarounds have been discussed in the following issues:
-- [#164](https://github.com/pSpitzner/beets-flask/issues/164)
-- [#175](https://github.com/pSpitzner/beets-flask/issues/175)
+
+- [#164](https://github.com/metasauce/beets-flask/issues/164)
+- [#175](https://github.com/metasauce/beets-flask/issues/175)
 
 ## Singletons are not supported (wont fix)
 
@@ -19,7 +20,8 @@ While these exceptions (likely) meant acceptable extra effort when beets was ori
 The simple workaround is to place individual files in their own folder (or zip them).
 
 See also:
-- [#186](https://github.com/pSpitzner/beets-flask/issues/186#issuecomment-3201103451)
+
+- [#186](https://github.com/metasauce/beets-flask/issues/186#issuecomment-3201103451)
 
 ## Only the import option `copy` is supported
 
@@ -27,8 +29,8 @@ In order to provide an easy way to correct automatic imports that went wrong, it
 We are thinking about workarounds that add back the convenience of automatic deletion.
 
 See also:
-- [#193](https://github.com/pSpitzner/beets-flask/issues/193)
 
+- [#193](https://github.com/metasauce/beets-flask/issues/193)
 
 ## Upload via webfrontend only supports files
 

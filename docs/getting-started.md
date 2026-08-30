@@ -16,7 +16,7 @@ cd beets-flask
 2. Download the `docker-compose.yaml` file or create it manually and copy the content from below.
 
 ```bash
-wget https://raw.githubusercontent.com/pspitzner/beets-flask/main/docker/docker-compose.yaml
+wget https://raw.githubusercontent.com/metasauce/beets-flask/main/docker/docker-compose.yaml
 ```
 
 If you want to create it manually, you can use the following content:

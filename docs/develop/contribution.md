@@ -6,19 +6,19 @@ We are always happy to see new contributors! If small or large, every contributi
 
 Some technical knowledge for the following tools is required to get started with the project. If you are not familiar with them, please check out the documentation for each tool and make sure you have them installed.
 
--   [Docker](https://docs.docker.com/get-started/)
--   [Docker Compose](https://docs.docker.com/compose/)
--   [Python](https://www.python.org/downloads/) 3.10 or higher
--   [Node.js](https://nodejs.org/en/download/) 18 or higher
--   [git](https://git-scm.com/downloads)
--   [pnpm](https://pnpm.io/installation) (or any other package manager)
+- [Docker](https://docs.docker.com/get-started/)
+- [Docker Compose](https://docs.docker.com/compose/)
+- [Python](https://www.python.org/downloads/) 3.10 or higher
+- [Node.js](https://nodejs.org/en/download/) 18 or higher
+- [git](https://git-scm.com/downloads)
+- [pnpm](https://pnpm.io/installation) (or any other package manager)
 
 ## Setting Up the Development Environment
 
 1. **Clone the repository:**
 
 ```bash
-git clone https://github.com/pSpitzner/beets-flask
+git clone https://github.com/metasauce/beets-flask
 cd beets-flask
 ```
 
@@ -93,7 +93,7 @@ Fork the repository and create a new branch for your changes. Feel free to follo
 ## Example docker compose
 
 ```bash
-git clone https://github.com/pSpitzner/beets-flask.git ./beets_flask_dev
+git clone https://github.com/metasauce/beets-flask.git ./beets_flask_dev
 cd ./beets_flask_dev
 mkdir local
 ```

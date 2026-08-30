@@ -211,7 +211,7 @@ function Footer() {
                 <Typography variant="caption">&nbsp;Documentation</Typography>
             </Link>
             <Link
-                href="https://github.com/pSpitzner/beets-flask"
+                href="https://github.com/metasauce/beets-flask"
                 target="_blank"
                 variant="body2"
             >
@@ -219,7 +219,7 @@ function Footer() {
                 <Typography variant="caption">&nbsp;GitHub</Typography>
             </Link>
             <Link
-                href="https://github.com/pSpitzner/beets-flask/issues/new"
+                href="https://github.com/metasauce/beets-flask/issues/new"
                 target="_blank"
                 variant="body2"
             >

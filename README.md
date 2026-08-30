@@ -3,10 +3,10 @@
     <h1 align="center">Beets-flask</h1>
 </p>
 
-[![version number](https://img.shields.io/github/package-json/v/pspitzner/beets-flask/main?filename=frontend%2Fpackage.json&label=version&color=blue)](https://github.com/pSpitzner/beets-flask/blob/main/CHANGELOG.md)
-[![Docker Pulls](https://img.shields.io/docker/pulls/pspitzner/beets-flask)](https://hub.docker.com/r/pspitzner/beets-flask/tags)
+[![version number](https://img.shields.io/github/package-json/v/metasauce/beets-flask/main?filename=frontend%2Fpackage.json&label=version&color=blue)](https://github.com/metasauce/beets-flask/blob/main/CHANGELOG.md)
+[![Docker Pulls](https://img.shields.io/docker/pulls/metasauce/beets-flask)](https://hub.docker.com/r/metasauce/beets-flask/tags)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?label=license)](https://opensource.org/licenses/MIT)
-[![docker-hub build status](https://img.shields.io/github/actions/workflow/status/pSpitzner/beets-flask/docker_hub.yml?label=docker%20build)](https://github.com/pSpitzner/beets-flask/pkgs/container/beets-flask)
+[![docker-hub build status](https://img.shields.io/github/actions/workflow/status/metasauce/beets-flask/docker_hub.yml?label=docker%20build)](https://github.com/metasauce/beets-flask/pkgs/container/beets-flask)
 [![Documentation Status](https://readthedocs.org/projects/beets-flask/badge/?version=latest)](https://beets-flask.readthedocs.io/en/latest/?badge=latest)
 
 <p align="center">
@@ -19,14 +19,14 @@
 
 <!-- start features -->
 
--   Autogenerate previews before importing
--   Auto-Import good matches
--   Import via GUI
--   Undo imports
--   Web-Terminal
--   Monitor multiple inboxes
--   Drag-and-drop files to upload into inboxes
--   Library view and search
+- Autogenerate previews before importing
+- Auto-Import good matches
+- Import via GUI
+- Undo imports
+- Web-Terminal
+- Monitor multiple inboxes
+- Drag-and-drop files to upload into inboxes
+- Library view and search
 
 <!-- end features -->
 
@@ -48,7 +48,6 @@ This is the main idea with beets-flask: For all folders in your inbox, we genera
 
 We provide a docker image with the full beeets-flask setup. You can run it with docker-compose or docker. We recommend using the `stable` tag, alternatively you may use `latest` for the most recent build.
 
-
 ### Setup container
 
 **Using docker**
@@ -64,7 +63,7 @@ docker run -d -p 5001:5001 \
     -v /music_path/inbox/:/music_path/inbox/ \
     -v /music_path/clean/:/music_path/clean/ \
     --name beets-flask \
-    pspitzner/beets-flask:stable
+    metasauce/beets-flask:stable
 ```
 
 <!-- end setup container -->
