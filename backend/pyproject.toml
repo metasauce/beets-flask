@@ -1,7 +1,7 @@
 [project]
 name = "beets-flask"
 description = "An opinionated web-interface around the music organizer [beets](https://beets.io/)"
-version = "2.0.0-rc5"
+version = "2.0.0-rc6"
 authors = [
     { name = "F. Paul Spitzner", email = "paul.spitzner@gmail.com" },
     { name = "Sebastian B. Mohr", email = "sebastian@mohrenclan.de" },
