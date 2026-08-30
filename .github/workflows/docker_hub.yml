@@ -23,8 +23,8 @@ jobs:
               with:
                   # list of Docker images to use as base name for tags
                   images: |
-                      pspitzner/beets-flask
-                      ghcr.io/pspitzner/beets-flask
+                      metasauce/beets-flask
+                      ghcr.io/metasauce/beets-flask
                   # generate Docker tags based on the following events/attributes
                   # We use semver and allow pre-releases (e.g. v1.0.0-b1 or v1.0.0-rc3) to be tagged as 'latest' for testing purposes
                   # The 'stable' tag is only applied to non-prerelease versions (e.g. v1.0.0)

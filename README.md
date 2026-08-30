@@ -73,7 +73,7 @@ docker run -d -p 5001:5001 \
 ```yaml
 services:
     beets-flask:
-        image: pspitzner/beets-flask:stable
+        image: metasauce/beets-flask:stable
         restart: unless-stopped
         ports:
             - "5001:5001"
