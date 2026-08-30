@@ -234,7 +234,7 @@ def is_archive_file(path: Path | str) -> bool:
     """Check if a file is an archive file based on its extension.
 
     It seems like there is a memory issue with `tarfile.is_tarfile`
-    (see https://github.com/pSpitzner/beets-flask/issues/258). We try
+    (see https://github.com/metasauce/beets-flask/issues/258). We try
     to avoid this by only checking the file extension here, and not trying to open the file.
     """
     allowed_extensions = allowed_archive_extensions()
