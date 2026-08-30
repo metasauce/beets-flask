@@ -6,15 +6,14 @@
  */
 
 import { FolderClockIcon } from 'lucide-react';
-import { useMemo } from 'react';
 import { Box, darken, styled, Tooltip, useTheme } from '@mui/material';
 import Chip, { ChipProps } from '@mui/material/Chip';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 
 import { useConfig } from '@/api/config';
-import { sessionQueryOptions, statusQueryOptions } from '@/api/session';
-import { Archive, Folder, FolderStatus, Progress } from '@/pythonTypes';
+import { minimalSessionQueryOptions, statusQueryOptions } from '@/api/session';
+import { Archive, Folder, FolderStatus } from '@/pythonTypes';
 
 import {
     FolderStatusIcon,
@@ -165,42 +164,43 @@ export function DuplicateChip({
     ...props
 }: { folder: Folder | Archive } & ChipProps) {
     const theme = useTheme();
-    const { data: session } = useQuery(
-        sessionQueryOptions({ folderPath: folder.full_path })
+    const { data: minimalSession } = useQuery(
+        minimalSessionQueryOptions(folder.hash, folder.full_path)
     );
 
-    //Fixme: Generalize best candidate
-    const bestCandidate = session?.tasks
-        .flatMap((t) => t.candidates.map((c) => c))
-        .filter((c) => c.info.data_source !== 'asis')
-        .sort((a, b) => a.distance - b.distance)[0];
-
-    if (!bestCandidate) {
+    if (
+        !minimalSession ||
+        minimalSession.best_candidate.duplicates.length == 0
+    ) {
         return null;
     }
 
-    if (bestCandidate.duplicate_ids.length == 0) {
-        return null;
-    }
-
-    if (session.status.progress >= Progress.IMPORT_COMPLETED) {
-        return null;
-    }
+    // FIXME: we currently only show one duplicate batch although the best candidate
+    // could have multiple duplicates.
     return (
         <Tooltip title="This album is already in your beets library!">
-            <StyledChip
-                icon={
-                    <PenaltyTypeIcon
-                        type="duplicate"
-                        size={theme.iconSize.sm - 2}
-                    />
-                }
-                label="Duplicate"
-                size="small"
-                color="error"
-                variant="outlined"
-                {...props}
-            />
+            <Link
+                to={'/library/album/$albumId'}
+                params={{
+                    albumId: minimalSession.best_candidate.duplicates[0],
+                }}
+                preload="intent"
+                style={{ gridColumn: 'chip' }}
+            >
+                <StyledChip
+                    icon={
+                        <PenaltyTypeIcon
+                            type="duplicate"
+                            size={theme.iconSize.sm - 2}
+                        />
+                    }
+                    label="Duplicate"
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    {...props}
+                />
+            </Link>
         </Tooltip>
     );
 }
@@ -212,15 +212,15 @@ export function FolderStatusChip({
     folder,
     ...props
 }: { folder: Folder | Archive } & ChipProps) {
-    const { data: statuses } = useQuery(statusQueryOptions);
+    const { data: folderStatus } = useQuery(
+        statusQueryOptions(folder.hash, folder.full_path)
+    );
     const theme = useTheme();
 
-    // Status enum value
-    const folderStatus = useMemo(() => {
-        return statuses?.find((s) => s.path === folder.full_path);
-    }, [statuses, folder.full_path]);
-
-    if (!folderStatus) {
+    /*
+    Only report folders that have a status; unkown means no session
+    */
+    if (!folderStatus || folderStatus.status == FolderStatus.UNKNOWN) {
         return null;
     }
 
@@ -292,26 +292,18 @@ export function BestCandidateChip({
     folder,
     ...props
 }: { folder: Folder | Archive } & ChipProps) {
-    // FIXME: Fetching the full session here is kinda overkill
-    // Only use path here, and
-    // TODO: add hash inconsistency warning badge!
-    const { data: session } = useQuery(
-        sessionQueryOptions({ folderPath: folder.full_path })
+    const { data: minimalSession } = useQuery(
+        minimalSessionQueryOptions(folder.hash, folder.full_path)
     );
 
-    const bestCandidate = session?.tasks
-        .flatMap((t) => t.candidates.map((c) => c))
-        .filter((c) => c.info.data_source !== 'asis')
-        .sort((a, b) => a.distance - b.distance)[0];
-
-    if (!bestCandidate || !bestCandidate.info.data_source) {
+    if (!minimalSession) {
         return null;
     }
 
     return (
         <MatchChip
-            source={bestCandidate.info.data_source}
-            distance={bestCandidate.distance}
+            source={minimalSession.best_candidate.data_source}
+            distance={minimalSession.best_candidate.distance}
             {...props}
         />
     );
@@ -327,15 +319,14 @@ export function HashMismatchChip({
     ...props
 }: { folder: Folder | Archive } & ChipProps) {
     const theme = useTheme();
-    const { data: session } = useQuery(
-        sessionQueryOptions({ folderPath: folder.full_path })
+    const { data: minimalSession } = useQuery(
+        minimalSessionQueryOptions(folder.hash, folder.full_path)
     );
 
-    if (!session) {
-        return null;
-    }
-
-    if (session.folder_hash == folder.hash) {
+    if (
+        !minimalSession?.folder_hash ||
+        minimalSession.folder_hash === folder.hash
+    ) {
         return null;
     }
 

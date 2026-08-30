@@ -382,14 +382,14 @@ class BaseSession(BeetsImportSession, ABC):
         log.info(f"Running {self.__class__.__name__} on state<{self.state.id=}>.")
         log.debug(f"Running {len(self.pipeline.stages)} stages.")
 
-        # reset exception state
-        # TODO: To clear or not to clear,
-        # exception hierarchy and own table for exceptions/warnings
-        # self.state.exc = None
+        # TODO: exception hierarchy and own table for exceptions/warnings
         plugins.send("import_begin", session=self)
         try:
             assert self.pipeline is not None
             await self.pipeline.run_async()
+
+            # Clear error on successful run (e.g. from a previous run on the same session)
+            self.state.exc = None
         except ImportAbortError:
             log.debug(f"Interactive import session aborted by user")
         except ApiException as e:

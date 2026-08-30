@@ -11,8 +11,11 @@ import type { FileSystemItem, Folder, InboxStats } from '@/pythonTypes';
 import { APIError, queryClient } from './common';
 
 // Tree of inbox folders
+// Only refetches when explicitly invalidated (file system updates via the
+// socket, or the manual refresh below); the tree itself is static otherwise.
 export const inboxQueryOptions = () => ({
     queryKey: ['inbox'],
+    staleTime: Infinity,
     queryFn: async () => {
         const response = await fetch(`/inbox/tree`);
         return (await response.json()) as Folder[];
@@ -42,6 +45,8 @@ queryClient.setMutationDefaults(['refreshInboxTree'], {
 });
 
 // A specific folder
+// Same staleness contract as the inbox tree: only refetches when the
+// `['inbox']` key is invalidated (file system updates or manual refresh).
 export const inboxFolderQueryOptions = (path: string, hash?: string) => ({
     queryKey: [
         'inbox',
@@ -50,6 +55,7 @@ export const inboxFolderQueryOptions = (path: string, hash?: string) => ({
             hash,
         },
     ],
+    staleTime: Infinity,
     queryFn: async () => {
         const response = await fetch(`/inbox/folder`, {
             method: 'POST',
@@ -68,6 +74,7 @@ export const inboxFolderQueryOptions = (path: string, hash?: string) => ({
 // Some stats about the inbox(es)
 export const inboxStatsQueryOptions = () => ({
     queryKey: ['inbox', 'stats'],
+    staleTime: Infinity,
     queryFn: async () => {
         const response = await fetch(`/inbox/stats`);
         const dat = (await response.json()) as InboxStats[];
@@ -158,11 +165,25 @@ function deleteFromFolder(
     }
 }
 
-export function* walkFolder(folder: Folder): Generator<FileSystemItem> {
+/**
+ * Depth-first walk over a folder tree.
+ *
+ * @param folder The root folder to walk.
+ * @param depth How many directory levels to descend into. `0` yields only
+ *              the root folder, `1` yields the root and its immediate
+ *              children, etc. Defaults to `Infinity` (full walk).
+ */
+export function* walkFolder(
+    folder: Folder,
+    depth: number = Infinity
+): Generator<FileSystemItem> {
     yield folder;
+    if (depth <= 0) {
+        return;
+    }
     for (const child of folder.children) {
         if (child.type === 'directory') {
-            yield* walkFolder(child as Folder);
+            yield* walkFolder(child as Folder, depth - 1);
         } else {
             yield child;
         }

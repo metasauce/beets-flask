@@ -358,7 +358,11 @@ def is_album_folder(path: Path | str):
     if is_archive_file(path):
         return True
     for paths, items in albums_in_dir(bytestring_path(path)):
-        if all(is_archive_file(i.decode("utf-8")) for i in items):
+        items_str = [i.decode("utf-8") for i in items]
+        if all(is_archive_file(i) for i in items_str):
+            continue
+        # Same music-file requirement as in `all_album_folders`.
+        if not any(audio_regex.match(os.path.basename(i)) for i in items_str):
             continue
         if str(path).encode("utf-8") in paths:
             return True
@@ -387,6 +391,8 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
 
     folders: list[bytes] = []
     for paths, items in albums_in_dir(bytestring_path(root_dir.absolute())):
+        items_str = [i.decode("utf-8") for i in items]
+
         # Our choice on handling archives:
         # - archives are always simple albums. no multi-disc logic supported,
         #   all discs need to be _inside_ the archive.
@@ -394,9 +400,14 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
         #   album folder
         # - if a folder contains a mix of archives and music files, it will be
         #   considered an album folder (as we think archives might be metadata or additional files e.g. cover art)
-
-        if all(is_archive_file(i.decode("utf-8")) for i in items):
+        if all(is_archive_file(i) for i in items_str):
             folders.extend(items)
+            continue
+
+        # beets `albums_in_dir` treats any directory with *any* files as an
+        # album. Require at least one music file; stray uploads or cover art
+        # without music do not make a folder an album.
+        if not any(audio_regex.match(os.path.basename(i)) for i in items_str):
             continue
 
         if subdirs:
