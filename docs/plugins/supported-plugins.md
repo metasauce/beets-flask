@@ -1,9 +1,8 @@
 # Compatibility
 
-
 ```{tip}
 If a plugin works for you or doesn't, consider
-[opening an issue or a PR](https://github.com/pspitzner/beets-flask) to add it to the
+[opening an issue or a PR](https://github.com/metasauce/beets-flask) to add it to the
 compatible or incompatible list.
 ```
 
@@ -37,23 +36,22 @@ Enabled by default.
 
 Plugins confirmed to work. No dedicated UI integration, but function correctly.
 
-| Plugin | Description |
-|--------|-------------|
-| [fetchart](https://docs.beets.io/en/latest/plugins/fetchart.html) | Fetch album artwork from multiple sources |
-| [embedart](https://docs.beets.io/en/latest/plugins/embedart.html) | Embed fetched artwork into audio files |
-| [the](https://docs.beets.io/en/latest/plugins/the.html) | Move articles to end of names |
-| [ftintitle](https://docs.beets.io/en/latest/plugins/ftintitle.html) | Move featured artists to title |
-| [lastgenre](https://docs.beets.io/en/latest/plugins/lastgenre.html) | Fetch genres from Last.fm |
-| [albumtypes](https://docs.beets.io/en/latest/plugins/albumtypes.html) | Add album type info |
-| [scrub](https://docs.beets.io/en/latest/plugins/scrub.html) | Clean extraneous tags |
-| [zero](https://docs.beets.io/en/latest/plugins/zero.html) | Null fields to reduce clutter |
-| [convert](https://docs.beets.io/en/latest/plugins/convert.html) | Transcode audio files |
-| [fromfilename](https://docs.beets.io/en/latest/plugins/fromfilename.html) | Guess metadata from filename |
-| [inline](https://docs.beets.io/en/latest/plugins/inline.html) | Use Python snippets in templates |
-| [edit](https://docs.beets.io/en/latest/plugins/edit.html) | Edit metadata via external editor |
-| [discogs](https://docs.beets.io/en/latest/plugins/discogs.html) | Match against Discogs |
-| [keyfinder](https://docs.beets.io/en/latest/plugins/keyfinder.html) | Detect musical key (requires compilation) |
-
+| Plugin                                                                    | Description                               |
+| ------------------------------------------------------------------------- | ----------------------------------------- |
+| [fetchart](https://docs.beets.io/en/latest/plugins/fetchart.html)         | Fetch album artwork from multiple sources |
+| [embedart](https://docs.beets.io/en/latest/plugins/embedart.html)         | Embed fetched artwork into audio files    |
+| [the](https://docs.beets.io/en/latest/plugins/the.html)                   | Move articles to end of names             |
+| [ftintitle](https://docs.beets.io/en/latest/plugins/ftintitle.html)       | Move featured artists to title            |
+| [lastgenre](https://docs.beets.io/en/latest/plugins/lastgenre.html)       | Fetch genres from Last.fm                 |
+| [albumtypes](https://docs.beets.io/en/latest/plugins/albumtypes.html)     | Add album type info                       |
+| [scrub](https://docs.beets.io/en/latest/plugins/scrub.html)               | Clean extraneous tags                     |
+| [zero](https://docs.beets.io/en/latest/plugins/zero.html)                 | Null fields to reduce clutter             |
+| [convert](https://docs.beets.io/en/latest/plugins/convert.html)           | Transcode audio files                     |
+| [fromfilename](https://docs.beets.io/en/latest/plugins/fromfilename.html) | Guess metadata from filename              |
+| [inline](https://docs.beets.io/en/latest/plugins/inline.html)             | Use Python snippets in templates          |
+| [edit](https://docs.beets.io/en/latest/plugins/edit.html)                 | Edit metadata via external editor         |
+| [discogs](https://docs.beets.io/en/latest/plugins/discogs.html)           | Match against Discogs                     |
+| [keyfinder](https://docs.beets.io/en/latest/plugins/keyfinder.html)       | Detect musical key (requires compilation) |
 
 ## Incompatible
 

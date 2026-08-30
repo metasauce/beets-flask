@@ -9,32 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚠️ Breaking Changes ⚠️
 
-- **Base image changed**: The container base image is now `python:3.12-slim` (previously `python:3.11-alpine`). If you use a custom `startup.sh`, please verify compatibility, as Alpine-specific tooling and shell behavior may differ [#212](https://github.com/pSpitzner/beets-flask/issues/212)
+- **Base image changed**: The container base image is now `python:3.12-slim` (previously `python:3.11-alpine`). If you use a custom `startup.sh`, please verify compatibility, as Alpine-specific tooling and shell behavior may differ [#212](https://github.com/metasauce/beets-flask/issues/212)
 - **Upgraded `beets` from `v2.5.1` to `v2.12.0`**
-    - This contains many changes and improvements, including some plugins.
-    - See the changelog at [beets.readthedocs.io](https://beets.readthedocs.io/en/stable/changelog.html)
+  - This contains many changes and improvements, including some plugins.
+  - See the changelog at [beets.readthedocs.io](https://beets.readthedocs.io/en/stable/changelog.html)
 - Changed config options (beets-flask):
-    - `gui.inbox.folders.your_inbox.autotag` no longer accepts `false`, use `"off"` instead. (This was needed for consistency for the new config validation)
+  - `gui.inbox.folders.your_inbox.autotag` no longer accepts `false`, use `"off"` instead. (This was needed for consistency for the new config validation)
 - Changed config options (beets):
-    - `fetchart.sources` were changed, if you get errors from our previous defaults: change to `"*"`
-
+  - `fetchart.sources` were changed, if you get errors from our previous defaults: change to `"*"`
 
 ### Added
 
-- Config validation. When loading config files we now check that specified options will work. If not, the frontend will show an error message with details on what's wrong. This applies to `gui` settings (i.e. our own ones, `beets-flask/config.yaml`) and very select ones from native beets (only those which we use directly). Hopefully, this will eventually cover all config options of beets native, but this is more of an upsream task. [#224](https://github.com/pSpitzner/beets-flask/pull/224).
+- Config validation. When loading config files we now check that specified options will work. If not, the frontend will show an error message with details on what's wrong. This applies to `gui` settings (i.e. our own ones, `beets-flask/config.yaml`) and very select ones from native beets (only those which we use directly). Hopefully, this will eventually cover all config options of beets native, but this is more of an upsream task. [#224](https://github.com/metasauce/beets-flask/pull/224).
 - Upload Files via the WebUI. You can now drag-and-drop single files into an inbox. To upload whole albums, zip them on your host first (uploading of folders directly is not implemented, as it would require a secure context).
-- New config option `gui.terminal.enabled` (default: true) [#254](https://github.com/pSpitzner/beets-flask/pull/224)
-- You can now alternatively use `PUID` and `PGID` instead of `GROUP_ID` and `USER_ID` environment variables. Good for [yaml anchors](https://docs.docker.com/reference/compose-file/fragments/). [#260](https://github.com/pSpitzner/beets-flask/issues/260)
-- Use an external redis server by setting the `REDIS_URL` environment variable. [#277](https://github.com/pSpitzner/beets-flask/pull/277)
+- New config option `gui.terminal.enabled` (default: true) [#254](https://github.com/metasauce/beets-flask/pull/224)
+- You can now alternatively use `PUID` and `PGID` instead of `GROUP_ID` and `USER_ID` environment variables. Good for [yaml anchors](https://docs.docker.com/reference/compose-file/fragments/). [#260](https://github.com/metasauce/beets-flask/issues/260)
+- Use an external redis server by setting the `REDIS_URL` environment variable. [#277](https://github.com/metasauce/beets-flask/pull/277)
 
 ### Fixed
 
-- Missing library stats dont cause a crash on first launch anymore [#264](https://github.com/pSpitzner/beets-flask/issues/264)
-- Fixed a potential memory leak when checking if files are archives. We now only check the file extension instead of trying to open the file, which should avoid the issue with `tarfile.is_tarfile` [#258](https://github.com/pSpitzner/beets-flask/issues/258)
-- Fixed tmux terminal could not start in some environments if `SHELL` was not set currently. We now always start a bash shell [#282](https://github.com/pSpitzner/beets-flask/issues/282)
+- Missing library stats dont cause a crash on first launch anymore [#264](https://github.com/metasauce/beets-flask/issues/264)
+- Fixed a potential memory leak when checking if files are archives. We now only check the file extension instead of trying to open the file, which should avoid the issue with `tarfile.is_tarfile` [#258](https://github.com/metasauce/beets-flask/issues/258)
+- Fixed tmux terminal could not start in some environments if `SHELL` was not set currently. We now always start a bash shell [#282](https://github.com/metasauce/beets-flask/issues/282)
 - Container user `beetle` now uses bash terminal by default and activates the uv environment automatically.
-- Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/pSpitzner/beets-flask/pull/305)
-- Fixed an issue with timestamps shown in the library view [#289](https://github.com/pSpitzner/beets-flask/issues/289)
+- Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/metasauce/beets-flask/pull/305)
+- Fixed an issue with timestamps shown in the library view [#289](https://github.com/metasauce/beets-flask/issues/289)
 
 ### Other (dev)
 
@@ -55,22 +54,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Duration component could display nothing in some edge cases.
 - Action buttons now have a slight box shadow and are a bit more visible.
 - We now support playing container types [m4a, mp4, mov, alac, aac, mp3] that require seeking. This should fix issues with some mp4/m4a files not playing.
-- If no candidates are found during an import, we now show a message instead of an empty screen. [#190](https://github.com/pSpitzner/beets-flask/issues/190)
-- Archive files can now be deleted [#217](https://github.com/pSpitzner/beets-flask/issues/217)
-- Import Bootleg Button now works as expected [#218](https://github.com/pSpitzner/beets-flask/issues/218)
-- Startup script was not executed correctly if placed in `/config/beets-flask/startup.sh` [#227](https://github.com/pSpitzner/beets-flask/pull/227)
-- Another state-related bug around Searching for Candidates [#225](https://github.com/pSpitzner/beets-flask/issues/225). We now no longer require a certaint type of state before allowing to add candidates.
+- If no candidates are found during an import, we now show a message instead of an empty screen. [#190](https://github.com/metasauce/beets-flask/issues/190)
+- Archive files can now be deleted [#217](https://github.com/metasauce/beets-flask/issues/217)
+- Import Bootleg Button now works as expected [#218](https://github.com/metasauce/beets-flask/issues/218)
+- Startup script was not executed correctly if placed in `/config/beets-flask/startup.sh` [#227](https://github.com/metasauce/beets-flask/pull/227)
+- Another state-related bug around Searching for Candidates [#225](https://github.com/metasauce/beets-flask/issues/225). We now no longer require a certaint type of state before allowing to add candidates.
 - Asis candidates have been restyled to be more consistent with other candidate types. They now also include a cover art preview if available.
-- Fixed a typo in our opiniated beets config [#235](https://github.com/pSpitzner/beets-flask/issues/235)
+- Fixed a typo in our opiniated beets config [#235](https://github.com/metasauce/beets-flask/issues/235)
 - Fixed a styling issue in the artists list view which caused an overflow
 - Fixed a styling issue where an extra cancel-button (cross) was shown on webkit browsers
 
 ### Added
 
-- Added ability to define more groups to take care of ACLs, so that our non-root user can delete files on host systems, if desired. New environment variable `EXTRA_GROUPS` [#234](https://github.com/pSpitzner/beets-flask/issues/234)
-- The inbox info button now has a description of all actions [#145](https://github.com/pSpitzner/beets-flask/issues/145)
-- Subpage for version information and configs. You can access it via the version number in the navbar. [#205](https://github.com/pSpitzner/beets-flask/issues/205)
-- New config option `gui.inbox.debounce_before_autotag` to configure how many seconds to wait after the last filesystem event before starting autotagging. Same debounce applies to all inboxes. [#222](https://github.com/pSpitzner/beets-flask/issues/222)
+- Added ability to define more groups to take care of ACLs, so that our non-root user can delete files on host systems, if desired. New environment variable `EXTRA_GROUPS` [#234](https://github.com/metasauce/beets-flask/issues/234)
+- The inbox info button now has a description of all actions [#145](https://github.com/metasauce/beets-flask/issues/145)
+- Subpage for version information and configs. You can access it via the version number in the navbar. [#205](https://github.com/metasauce/beets-flask/issues/205)
+- New config option `gui.inbox.debounce_before_autotag` to configure how many seconds to wait after the last filesystem event before starting autotagging. Same debounce applies to all inboxes. [#222](https://github.com/metasauce/beets-flask/issues/222)
 - The library view on mobile now has a button to collapse the overview (above the tabs). This allows for more space when browsing the library on small screens.
 
 ### Other (dev)
@@ -100,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Resolved an issue in Vite development server where pythonTypes.ts would fail to load on first start due to inconsistent indentation (tabs vs spaces). This only affected the dev environment.
 - Development Docker container now runs as the `beetle` user instead of root, improving parity with the production environment.
-- Trailing slashes in configured inbox paths no longer cause crashes. [#182](https://github.com/pSpitzner/beets-flask/issues/182)
+- Trailing slashes in configured inbox paths no longer cause crashes. [#182](https://github.com/metasauce/beets-flask/issues/182)
 - The container now sets the `EDITOR` environment variable to `vi` so that `beet edit` and `beet config -e` work out of the box.
 
 ### Dependencies
@@ -112,14 +111,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Updated refresh_config to scan all modules for config references and overwrite them as needed to ensure consistency [#188](https://github.com/pSpitzner/beets-flask/issues/188)
+- Updated refresh_config to scan all modules for config references and overwrite them as needed to ensure consistency [#188](https://github.com/metasauce/beets-flask/issues/188)
 
 ## [1.1.1] - 25-08-15
 
 ### Fixed
 
-- Session cache wasn't invalidated on all folder updates. This especially fixes an issues where the watchdog would not trigger a session invalidation when a folder was deleted or renamed. [#163](https://github.com/pSpitzner/beets-flask/issues/163)
-- We now use the beets `ignore` config option to ignore files and folders in the inbox view. This allows you to ignore files like `*.tmp`, `*.log`, etc. We also allow users to define the `gui.inbox.ignore` option to customize the ignored file patterns. [#176](https://github.com/pSpitzner/beets-flask/issues/176)
+- Session cache wasn't invalidated on all folder updates. This especially fixes an issues where the watchdog would not trigger a session invalidation when a folder was deleted or renamed. [#163](https://github.com/metasauce/beets-flask/issues/163)
+- We now use the beets `ignore` config option to ignore files and folders in the inbox view. This allows you to ignore files like `*.tmp`, `*.log`, etc. We also allow users to define the `gui.inbox.ignore` option to customize the ignored file patterns. [#176](https://github.com/metasauce/beets-flask/issues/176)
 - Scrollbar for beets instructions wasn't visible on small screens.
 
 ### Other (dev)
@@ -144,14 +143,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed search results not showing [#161](https://github.com/pSpitzner/beets-flask/issues/161))
-- Fixed search box not clickable on small screens [#162](https://github.com/pSpitzner/beets-flask/issues/162)
+- Fixed search results not showing [#161](https://github.com/metasauce/beets-flask/issues/161))
+- Fixed search box not clickable on small screens [#162](https://github.com/metasauce/beets-flask/issues/162)
 
 ## [1.0.2] - 25-07-21
 
 ### Fixed
 
-- Artists separators were not regex escaped correctly, leading to issues with artists containing special characters. Additionally an empty list of separators was not handled correctly. [#159](https://github.com/pSpitzner/beets-flask/issues/159)
+- Artists separators were not regex escaped correctly, leading to issues with artists containing special characters. Additionally an empty list of separators was not handled correctly. [#159](https://github.com/metasauce/beets-flask/issues/159)
 
 ## [1.0.1] - 25-07-17
 
@@ -168,10 +167,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - For bootlegs, display of track changes after import no longer broken
 - Navigating from inbox into folder details no longer toggles selection.
 - Padding issue where navbar could block content on mobile.
-- Cache invalidation now triggers on delete folder in frontend [#138](https://github.com/pSpitzner/beets-flask/issues/138)
-- In albums and items view the clicking on artists does not return any results if the contained a separator character (e.g. `&`) [#132](https://github.com/pSpitzner/beets-flask/issues/138)
-- Cleanup old actions.tsx file, which included old unused code [#134](https://github.com/pSpitzner/beets-flask/issues/134)
-- The `cli_exit` event is now triggered after the import task is finished. This adds compatibility with some plugins which expected this event to be triggered after the import task is done. [#154](https://github.com/pSpitzner/beets-flask/issues/154).
+- Cache invalidation now triggers on delete folder in frontend [#138](https://github.com/metasauce/beets-flask/issues/138)
+- In albums and items view the clicking on artists does not return any results if the contained a separator character (e.g. `&`) [#132](https://github.com/metasauce/beets-flask/issues/138)
+- Cleanup old actions.tsx file, which included old unused code [#134](https://github.com/metasauce/beets-flask/issues/134)
+- The `cli_exit` event is now triggered after the import task is finished. This adds compatibility with some plugins which expected this event to be triggered after the import task is done. [#154](https://github.com/metasauce/beets-flask/issues/154).
 
 ### Changed
 
@@ -233,7 +232,7 @@ Small version bump with fixes before jumping to 1.0.0.
 ### Added
 
 - Logo and favicon
-- Image now on docker hub: `pspitzner/beets-flask:stable`
+- Image now on docker hub: `metasauce/beets-flask:stable`
 - Auto-import: automatically import folders that are added to the inbox if the match is good enough.
   After a preview, import will start if the match quality is above the configured.
   Enable via the config.yaml, set the `autotag` field of a configred inbox folders to `"auto"`.
@@ -287,17 +286,17 @@ Small version bump with fixes before jumping to 1.0.0.
 
 - initial commit
 
-[Unreleased]: https://github.com/pSpitzner/beets-flask/compare/v1.2.0...HEAD
-[1.2.0]: https://github.com/pSpitzner/beets-flask/compare/v1.1.3...v1.2.0
-[1.1.3]: https://github.com/pSpitzner/beets-flask/compare/v1.1.2...v1.1.3
-[1.1.2]: https://github.com/pSpitzner/beets-flask/compare/v1.1.1...v1.1.2
-[1.1.1]: https://github.com/pSpitzner/beets-flask/compare/v1.1.0...v1.1.1
-[1.1.0]: https://github.com/pSpitzner/beets-flask/compare/v1.0.3...v1.1.0
-[1.0.3]: https://github.com/pSpitzner/beets-flask/compare/v1.0.2...v1.0.3
-[1.0.2]: https://github.com/pSpitzner/beets-flask/compare/v1.0.1...v1.0.2
-[1.0.1]: https://github.com/pSpitzner/beets-flask/compare/v1.0.0...v1.0.1
-[1.0.0]: https://github.com/pSpitzner/beets-flask/compare/v0.1.0...v1.0.0
-[0.1.0]: https://github.com/pSpitzner/beets-flask/compare/v0.0.4...v0.1.0
-[0.0.4]: https://github.com/pSpitzner/beets-flask/compare/v0.0.3...v0.0.4
-[0.0.3]: https://github.com/pSpitzner/beets-flask/compare/v0.0.2...v0.0.3
-[0.0.2]: https://github.com/pSpitzner/beets-flask/compare/v0.0.1...v0.0.2
+[Unreleased]: https://github.com/metasauce/beets-flask/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/metasauce/beets-flask/compare/v1.1.3...v1.2.0
+[1.1.3]: https://github.com/metasauce/beets-flask/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/metasauce/beets-flask/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/metasauce/beets-flask/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/metasauce/beets-flask/compare/v1.0.3...v1.1.0
+[1.0.3]: https://github.com/metasauce/beets-flask/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/metasauce/beets-flask/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/metasauce/beets-flask/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/metasauce/beets-flask/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/metasauce/beets-flask/compare/v0.0.4...v0.1.0
+[0.0.4]: https://github.com/metasauce/beets-flask/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/metasauce/beets-flask/compare/v0.0.2...v0.0.3
+[0.0.2]: https://github.com/metasauce/beets-flask/compare/v0.0.1...v0.0.2

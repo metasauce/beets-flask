@@ -207,7 +207,7 @@ export function GenericErrorCard({
                         sx={{ color: 'text.secondary', marginTop: '0.2rem' }}
                     >
                         If this is a reoccurring issue, feel free to raise an{' '}
-                        <Link href="https://github.com/pSpitzner/beets-flask/issues">
+                        <Link href="https://github.com/metasauce/beets-flask/issues">
                             issue on GitHub
                         </Link>
                         .
