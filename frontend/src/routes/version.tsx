@@ -1,8 +1,10 @@
 import { ChevronDownIcon } from 'lucide-react';
+import { lazy, Suspense, useState } from 'react';
 import {
     AccordionDetails,
     AccordionSummary,
     Box,
+    Button,
     Divider,
     Paper,
     Typography,
@@ -16,8 +18,16 @@ import { authProvidersQueryOptions } from '@/api/auth';
 import { configYamlQueryOptions, useConfig } from '@/api/config';
 import { SourceTypeIcon } from '@/components/common/icons';
 import { PageWrapper } from '@/components/common/page';
+import { AuthProviderStatus } from '@/pythonTypes';
 
 import { VersionString } from './_frontpage';
+
+/** Lazily loaded so the dialog chunk is only fetched when first opened. */
+const AuthDialog = lazy(() =>
+    import('@/components/auth/AuthDialog').then((m) => ({
+        default: m.AuthDialog,
+    }))
+);
 
 export const Route = createFileRoute('/version')({
     component: RouteComponent,
@@ -33,7 +43,7 @@ const accordionSx = {
         padding: 0,
         margin: 0,
     },
-    button: {
+    '.MuiAccordionSummary-root': {
         height: 'auto',
         padding: 0,
         display: 'flex',
@@ -200,9 +210,8 @@ function Plugins() {
     );
 }
 
+/** Section listing enabled beets-flask extensions. */
 function Extensions() {
-    const { data: providers } = useSuspenseQuery(authProvidersQueryOptions());
-
     return (
         <>
             <Typography
@@ -227,52 +236,78 @@ function Extensions() {
                         <Typography fontFamily="monospace">Auth</Typography>
                     </AccordionSummary>
                     <AccordionDetails>
-                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                            {providers.length === 0 ? (
-                                <Typography
-                                    variant="body1"
-                                    component="span"
-                                    fontFamily="monospace"
-                                >
-                                    none enabled
-                                </Typography>
-                            ) : (
-                                providers.map((provider) => (
-                                    <Box
-                                        key={provider.name}
-                                        sx={{
-                                            display: 'flex',
-                                            gap: 1,
-                                            alignItems: 'center',
-                                        }}
-                                    >
-                                        <Typography
-                                            variant="body1"
-                                            component="span"
-                                            fontFamily="monospace"
-                                        >
-                                            {provider.name}
-                                        </Typography>
-                                        <Typography
-                                            variant="body1"
-                                            component="span"
-                                            color={
-                                                provider.authenticated
-                                                    ? 'success'
-                                                    : 'error'
-                                            }
-                                        >
-                                            {provider.authenticated
-                                                ? 'authenticated'
-                                                : 'not authenticated'}
-                                        </Typography>
-                                    </Box>
-                                ))
-                            )}
-                        </Box>
+                        <AuthExtensions />
                     </AccordionDetails>
                 </Accordion>
             </Box>
+        </>
+    );
+}
+
+/** Auth extensions content: per-provider status with (re-)authentication. */
+function AuthExtensions() {
+    const { data: providers } = useSuspenseQuery(authProvidersQueryOptions());
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            {providers.length === 0 ? (
+                <Typography
+                    variant="body1"
+                    component="span"
+                    fontFamily="monospace"
+                >
+                    none enabled
+                </Typography>
+            ) : (
+                providers.map((provider) => (
+                    <AuthProviderRow key={provider.name} provider={provider} />
+                ))
+            )}
+        </Box>
+    );
+}
+
+/** A single auth provider row: name, status and a (re-)auth button. */
+function AuthProviderRow({ provider }: { provider: AuthProviderStatus }) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Typography
+                    variant="body1"
+                    component="span"
+                    fontFamily="monospace"
+                >
+                    {provider.name}
+                </Typography>
+                <Typography
+                    variant="body1"
+                    component="span"
+                    color={provider.authenticated ? 'success' : 'error'}
+                >
+                    {provider.authenticated
+                        ? 'authenticated'
+                        : 'not authenticated'}
+                </Typography>
+                <Button
+                    size="small"
+                    sx={{ ml: 'auto' }}
+                    onClick={() => setOpen(true)}
+                >
+                    {provider.authenticated
+                        ? 'Re-authenticate'
+                        : 'Authenticate'}
+                </Button>
+            </Box>
+            {open && (
+                <Suspense fallback={null}>
+                    <AuthDialog
+                        provider={provider.name}
+                        onClose={() => setOpen(false)}
+                    />
+                </Suspense>
+            )}
         </>
     );
 }
