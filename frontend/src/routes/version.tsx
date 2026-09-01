@@ -12,6 +12,7 @@ import { Accordion } from '@mui/material';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
+import { authProvidersQueryOptions } from '@/api/auth';
 import { configYamlQueryOptions, useConfig } from '@/api/config';
 import { SourceTypeIcon } from '@/components/common/icons';
 import { PageWrapper } from '@/components/common/page';
@@ -21,6 +22,25 @@ import { VersionString } from './_frontpage';
 export const Route = createFileRoute('/version')({
     component: RouteComponent,
 });
+
+/** Shared styling so all accordions on this page look alike. */
+const accordionSx = {
+    boxShadow: 'none',
+    border: 'none',
+    outline: 'none',
+    '::before': { backgroundColor: 'unset' },
+    '.MuiAccordionSummary-content': {
+        padding: 0,
+        margin: 0,
+    },
+    button: {
+        height: 'auto',
+        padding: 0,
+        display: 'flex',
+        alignItems: 'flex-start',
+        minHeight: 'auto',
+    },
+};
 
 /** A relative simple page showing the current version */
 function RouteComponent() {
@@ -67,6 +87,7 @@ function RouteComponent() {
                     <Version />
                     <DataSources />
                     <Plugins />
+                    <Extensions />
                     <Config />
                 </Box>
             </Paper>
@@ -179,6 +200,83 @@ function Plugins() {
     );
 }
 
+function Extensions() {
+    const { data: providers } = useSuspenseQuery(authProvidersQueryOptions());
+
+    return (
+        <>
+            <Typography
+                component="label"
+                variant="caption"
+                fontWeight="bold"
+                color="textSecondary"
+            >
+                Extensions
+            </Typography>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    gap: 1,
+                }}
+            >
+                <Accordion disableGutters sx={accordionSx}>
+                    <AccordionSummary expandIcon={<ChevronDownIcon />}>
+                        <Typography fontFamily="monospace">Auth</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            {providers.length === 0 ? (
+                                <Typography
+                                    variant="body1"
+                                    component="span"
+                                    fontFamily="monospace"
+                                >
+                                    none enabled
+                                </Typography>
+                            ) : (
+                                providers.map((provider) => (
+                                    <Box
+                                        key={provider.name}
+                                        sx={{
+                                            display: 'flex',
+                                            gap: 1,
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        <Typography
+                                            variant="body1"
+                                            component="span"
+                                            fontFamily="monospace"
+                                        >
+                                            {provider.name}
+                                        </Typography>
+                                        <Typography
+                                            variant="body1"
+                                            component="span"
+                                            color={
+                                                provider.authenticated
+                                                    ? 'success'
+                                                    : 'error'
+                                            }
+                                        >
+                                            {provider.authenticated
+                                                ? 'authenticated'
+                                                : 'not authenticated'}
+                                        </Typography>
+                                    </Box>
+                                ))
+                            )}
+                        </Box>
+                    </AccordionDetails>
+                </Accordion>
+            </Box>
+        </>
+    );
+}
+
 function Config() {
     const theme = useTheme();
 
@@ -207,26 +305,7 @@ function Config() {
                     gap: 1,
                 }}
             >
-                <Accordion
-                    disableGutters
-                    sx={{
-                        boxShadow: 'none',
-                        border: 'none',
-                        outline: 'none',
-                        '::before': { backgroundColor: 'unset' },
-                        '.MuiAccordionSummary-content': {
-                            padding: 0,
-                            margin: 0,
-                        },
-                        button: {
-                            height: 'auto',
-                            padding: 0,
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            minHeight: 'auto',
-                        },
-                    }}
-                >
+                <Accordion disableGutters sx={accordionSx}>
                     <AccordionSummary expandIcon={<ChevronDownIcon />}>
                         <Typography fontFamily="monospace">
                             Beets configuration
@@ -249,26 +328,7 @@ function Config() {
                         </Typography>
                     </AccordionDetails>
                 </Accordion>
-                <Accordion
-                    disableGutters
-                    sx={{
-                        boxShadow: 'none',
-                        border: 'none',
-                        outline: 'none',
-                        '::before': { backgroundColor: 'unset' },
-                        '.MuiAccordionSummary-content': {
-                            padding: 0,
-                            margin: 0,
-                        },
-                        button: {
-                            height: 'auto',
-                            padding: 0,
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            minHeight: 'auto',
-                        },
-                    }}
-                >
+                <Accordion disableGutters sx={accordionSx}>
                     <AccordionSummary expandIcon={<ChevronDownIcon />} sx={{}}>
                         <Typography fontFamily="monospace">
                             Beets Flask configuration
