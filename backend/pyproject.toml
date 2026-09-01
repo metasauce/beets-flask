@@ -39,7 +39,7 @@ dependencies = [
     "aiofiles",
     "numpy",
     "typing_extensions",
-    "polars>=1.36.1",
+    "polars[rtcompat]>=1.36.1",
     "alembic>=1.18.4",
 ]
 
