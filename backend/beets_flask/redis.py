@@ -1,7 +1,10 @@
 import asyncio
+import json
 import os
+import secrets
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 import redis
 from rq import Queue
@@ -19,6 +22,37 @@ import_queue = Queue("import", connection=redis_conn, default_timeout=600)
 
 
 queues = [preview_queue, import_queue]
+
+
+_KEY_PREFIX = "store:"
+
+
+def store(value: Any, ttl: int = 600) -> str:
+    """Store a JSON-serializable value and return an opaque id (with a TTL).
+
+    The value expires after ``ttl`` seconds. The returned id is what the
+    caller hands to :func:`consume` to retrieve (and delete) the value.
+    """
+    object_id = secrets.token_urlsafe(32)
+    redis_conn.set(
+        f"{_KEY_PREFIX}{object_id}",
+        json.dumps(value),
+        ex=ttl,
+    )
+    return object_id
+
+
+def consume(object_id: str) -> Any | None:
+    """Retrieve and delete a stored value by id (single-use).
+
+    Returns the stored value, or None if the id is unknown or has expired.
+    """
+    key = f"{_KEY_PREFIX}{object_id}"
+    raw = redis_conn.get(key)
+    if raw is None:
+        return None
+    redis_conn.delete(key)
+    return json.loads(raw)
 
 
 async def wait_for_job_results(
@@ -71,4 +105,6 @@ __all__ = [
     "preview_queue",
     "redis_conn",
     "wait_for_job_results",
+    "store",
+    "consume",
 ]
