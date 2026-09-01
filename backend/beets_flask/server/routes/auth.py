@@ -38,13 +38,15 @@ async def get_providers() -> list[AuthProviderStatus]:
     return providers
 
 
-class AuthUrlResponse(TypedDict):
+class AuthFlow(TypedDict):
+    """In-progress PKCE flow handed to the client (see ``AuthExtension``)."""
+
     url: str
     flow_id: str
 
 
 @auth_bp.route("/<name>/url", methods=["GET"])
-async def get_authentication_url(name: str) -> dict[str, str]:
+async def get_authentication_url(name: str) -> AuthFlow:
     """Start the PKCE flow for ``name``.
 
     Returns the URL the user must visit together with an opaque ``flow_id``
