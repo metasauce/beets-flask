@@ -10,7 +10,8 @@ if __name__ == "__main__":
         factory=True,
         host="0.0.0.0",
         port=5001,
-        workers=4,
+        workers=1,
+        loop="uvloop",
         log_config=None,  # Disable default uvicorn logging config
         access_log=False,
     )

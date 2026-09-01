@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from quart import Quart
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from sqlalchemy.pool import QueuePool
 
 from beets_flask.config import get_flask_config
 from beets_flask.logger import log
@@ -45,7 +46,15 @@ def _setup_factory():
     global engine
     global session_factory
 
-    engine = create_engine(get_flask_config()["DATABASE_URI"])
+    engine = create_engine(
+        get_flask_config()["DATABASE_URI"],
+        # The following arguments help save some RAM by reducing idle connections
+        poolclass=QueuePool,
+        pool_size=5,  # Max active connections (was unlimited)
+        max_overflow=10,  # Queue overflow
+        pool_recycle=3600,  # Recycle stale connections
+        pool_pre_ping=True,  # Validate before use
+    )
     session_factory = scoped_session(sessionmaker(bind=engine, expire_on_commit=False))
 
 

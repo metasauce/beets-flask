@@ -27,6 +27,7 @@ dependencies = [
     "Deprecated>=1.2.18",
     # Used for hosting the web-interface & api
     "uvicorn>=0.36.0",
+    "uvloop>=0.22.1",
     # beets plugin dependencies
     "pylast>=5.2.0",
     "python2ts>=0.6.1",
