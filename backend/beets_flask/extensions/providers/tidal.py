@@ -1,17 +1,23 @@
+"""Tidal provider: authentication and album art resolution."""
+
 from __future__ import annotations
 
+import asyncio
+import re
 from functools import cache
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Literal, NotRequired, TypedDict, cast
 
+import aiohttp
 from beets import plugins as beets_plugins
 from beets.exceptions import UserError
 
 from beets_flask.logger import log
 
-from .. import AuthExtension, PkceData
+from .. import ArtResult, ArtSource, AuthExtension, PkceData
 
 if TYPE_CHECKING:
     from beetsplug.tidal import TidalPlugin
+    from beetsplug.tidal.api_types import AlbumDocument
 
 
 class TidalAuth(AuthExtension):
@@ -98,3 +104,96 @@ class TidalAuth(AuthExtension):
             include_client_id=True,
         )
         session.save_token(session.token)
+
+
+# The beets tidal plugin does not type the artwork resources, so the
+# cover-related parts of its ``AlbumDocument`` are defined here.
+class ArtworkFileMeta(TypedDict):
+    width: int
+    height: int
+
+
+class ArtworkFile(TypedDict):
+    href: str
+    meta: ArtworkFileMeta
+
+
+class ArtworkAttributes(TypedDict):
+    mediaType: NotRequired[str]
+    files: list[ArtworkFile]
+
+
+class TidalArtwork(TypedDict):
+    id: str
+    type: Literal["artworks"]
+    attributes: NotRequired[ArtworkAttributes]
+
+
+# Anchored via `match` (start of URL), so a matching host cannot be
+# smuggled in via a subdomain, path segment, or query parameter.
+_TIDAL_ALBUM_URL = re.compile(
+    r"https?://(?:listen\.)?tidal\.com/(?:browse/)?album/(\d+)"
+)
+
+
+class TidalArtSource(ArtSource):
+    """Resolve album art for Tidal URLs via the authenticated Tidal API.
+
+    The cover artwork (with file URLs for all sizes) is fetched through the
+    beets tidal plugin's API; small preview sizes are returned first.
+    """
+
+    name: ClassVar[str] = "tidal"
+    priority: ClassVar[int] = 10
+
+    def matches(self, url: str) -> bool:
+        return self._extract_album_id(url) is not None
+
+    async def get_art(
+        self, url: str, session: aiohttp.ClientSession
+    ) -> ArtResult | None:
+        album_id = self._extract_album_id(url)
+        if album_id is None:
+            return None
+
+        # The plugin API is blocking IO (requests); keep it off the event loop.
+        urls = await asyncio.to_thread(self._fetch_cover_urls, album_id)
+        return ArtResult.from_urls(urls) if urls else None
+
+    def _fetch_cover_urls(self, album_id: str) -> list[str]:
+        """Return cover file URLs for a Tidal album, small previews first."""
+        plugin = TidalAuth.tidal_plugin()
+        if plugin is None:
+            log.info("Tidal plugin not enabled; cannot fetch art for %s", album_id)
+            return []
+
+        try:
+            doc = plugin.api.get_albums(ids=[album_id], include=["coverArt"])
+        except Exception as err:
+            log.warning("Error fetching Tidal album %s: %s", album_id, err)
+            return []
+
+        files = [
+            f
+            for f in self._extract_cover_files(doc)
+            if f.get("href") and int(f["meta"]["width"]) >= 200
+        ]
+        # Smallest first (but skipping tiny thumbnails), so the art route
+        # serves a cheap preview.
+        return [f["href"] for f in sorted(files, key=lambda f: f["meta"]["width"])]
+
+    @staticmethod
+    def _extract_cover_files(doc: AlbumDocument) -> list[ArtworkFile]:
+        """Return the cover artwork file list from an AlbumDocument, or []."""
+        for included in doc.get("included", []):
+            if included["type"] == "artworks":
+                artwork = cast(TidalArtwork, included)
+                attributes = artwork.get("attributes")
+                return attributes.get("files", []) if attributes else []
+        return []
+
+    @staticmethod
+    def _extract_album_id(url: str) -> str | None:
+        """Return the album id from a Tidal album URL, else None."""
+        match = _TIDAL_ALBUM_URL.match(url)
+        return match.group(1) if match else None
