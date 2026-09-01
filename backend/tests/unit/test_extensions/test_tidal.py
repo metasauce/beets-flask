@@ -1,13 +1,15 @@
-"""Unit tests for the Tidal auth provider."""
+"""Unit tests for the Tidal provider."""
 
 from types import SimpleNamespace
 from typing import Any
 
+import aiohttp
 import pytest
 from beets.exceptions import UserError
 
+from beets_flask.extensions.art import ArtResult
 from beets_flask.extensions.auth import PkceData
-from beets_flask.extensions.providers.tidal import TidalAuth
+from beets_flask.extensions.providers.tidal import TidalArtSource, TidalAuth
 
 AUTH_URL = "https://login.tidal.com/authorize"
 TOKEN_URL = "https://auth.tidal.com/v1/oauth2/token"
@@ -37,9 +39,20 @@ class FakeSession:
 class FakePlugin:
     """Minimal stand-in for beets' ``TidalPlugin``."""
 
-    def __init__(self, session: FakeSession, authenticated: bool = True) -> None:
-        self.api = SimpleNamespace(session=session)
+    def __init__(
+        self,
+        session: FakeSession,
+        authenticated: bool = True,
+        doc: dict | None = None,
+    ) -> None:
+        self.api = SimpleNamespace(session=session, get_albums=self._get_albums)
         self.authenticated = authenticated
+        self._doc = doc or {"data": [], "included": []}
+        self.last_get_albums_kwargs: dict[str, Any] = {}
+
+    def _get_albums(self, **kwargs) -> dict:
+        self.last_get_albums_kwargs = kwargs
+        return self._doc
 
     def require_authentication(self) -> None:
         if not self.authenticated:
@@ -105,3 +118,68 @@ class TestTidalAuth:
 
     def test_is_authenticated_false_without_plugin(self, no_plugin):
         assert TidalAuth().is_authenticated() is False
+
+
+def cover_files(*widths: int) -> list[dict]:
+    """Cover artwork files for the fake API, largest first like the real one."""
+    return [
+        {
+            "href": f"https://resources.tidal.com/images/cover-uuid/{w}x{w}.jpg",
+            "meta": {"width": w, "height": w},
+        }
+        for w in sorted(widths, reverse=True)
+    ]
+
+
+def album_doc(files: list[dict] | None = None) -> dict:
+    """Build an ``AlbumDocument``-shaped dict for the fake API."""
+    return {
+        "data": [{"id": "123", "type": "albums", "attributes": {}}],
+        "included": [
+            {
+                "id": "artwork",
+                "type": "artworks",
+                "attributes": {"files": files or []},
+            }
+        ],
+    }
+
+
+class TestTidalArtSource:
+    url = "https://tidal.com/browse/album/12345678"
+
+    @staticmethod
+    def patch_plugin(monkeypatch, doc: dict) -> FakePlugin:
+        plugin = FakePlugin(FakeSession(), doc=doc)
+        monkeypatch.setattr(TidalAuth, "tidal_plugin", classmethod(lambda cls: plugin))
+        return plugin
+
+    async def get_art(self, url: str | None = None) -> ArtResult | None:
+        async with aiohttp.ClientSession() as session:
+            return await TidalArtSource().get_art(url or self.url, session)
+
+    async def test_returns_urls_smallest_first(self, monkeypatch):
+        plugin = self.patch_plugin(
+            monkeypatch, album_doc(cover_files(1280, 750, 320, 160, 80))
+        )
+
+        result = await self.get_art()
+
+        # Tiny thumbnails (< 200px) are skipped.
+        assert result == ArtResult.from_urls(
+            [
+                "https://resources.tidal.com/images/cover-uuid/320x320.jpg",
+                "https://resources.tidal.com/images/cover-uuid/750x750.jpg",
+                "https://resources.tidal.com/images/cover-uuid/1280x1280.jpg",
+            ]
+        )
+        # The artwork must be requested explicitly.
+        assert plugin.last_get_albums_kwargs["include"] == ["coverArt"]
+
+    async def test_returns_none_without_cover(self, monkeypatch):
+        self.patch_plugin(monkeypatch, album_doc())
+
+        assert await self.get_art() is None
+
+    async def test_returns_none_without_plugin(self, no_plugin):
+        assert await self.get_art() is None

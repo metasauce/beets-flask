@@ -9,7 +9,7 @@ from __future__ import annotations
 from .file import FileArtSource
 from .musicbrainz import MusicbrainzArtSource
 from .spotify import SpotifyArtSource
-from .tidal import TidalAuth
+from .tidal import TidalArtSource, TidalAuth
 
 # TODO: We should add a proper registry here to simplify this
 # Not needed for now but once we add more parts to the extension system
@@ -19,6 +19,7 @@ ART_SOURCES = [
     FileArtSource(),
     SpotifyArtSource(),
     MusicbrainzArtSource(),
+    TidalArtSource(),
 ]
 
 

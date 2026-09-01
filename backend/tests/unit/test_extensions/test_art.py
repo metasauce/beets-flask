@@ -15,6 +15,7 @@ from beets_flask.extensions.providers import ART_SOURCES
 from beets_flask.extensions.providers.file import FileArtSource
 from beets_flask.extensions.providers.musicbrainz import MusicbrainzArtSource
 from beets_flask.extensions.providers.spotify import SpotifyArtSource
+from beets_flask.extensions.providers.tidal import TidalArtSource
 from beets_flask.server.routes.art_preview import make_session
 
 
@@ -63,6 +64,39 @@ class TestArtResult:
         ),
         (
             "ftp://open.spotify.com/album/4zY3KmQkPOCEln8TWT9exA",
+            None,
+        ),
+        # Tidal
+        (
+            "https://tidal.com/browse/album/12345678",
+            TidalArtSource,
+        ),
+        (
+            "http://tidal.com/browse/album/12345678",
+            TidalArtSource,
+        ),
+        (
+            "https://listen.tidal.com/album/12345678",
+            TidalArtSource,
+        ),
+        (
+            "https://tidal.com/album/12345678",
+            TidalArtSource,
+        ),
+        (
+            "https://tidal.com/browse/track/12345678",
+            None,
+        ),
+        (
+            "https://tidal.com.evil.com/browse/album/12345678",
+            None,
+        ),
+        (
+            "https://evil.com/?x=tidal.com/browse/album/12345678",
+            None,
+        ),
+        (
+            "ftp://tidal.com/browse/album/12345678",
             None,
         ),
         # Musicbrainz
