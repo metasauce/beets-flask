@@ -33,6 +33,23 @@ To enable `7z` support, you can use the `py7zr` package.
 py7zr
 ```
 
+## Server hangs silently on older CPUs (no AVX2)
+
+If logs show the server starting but the web UI never becomes reachable, your CPU may lack `AVX2`/`FMA`/`BMI1`/`BMI2` (common on Celeron/Pentium Silver N-series), which makes `polars` crash on import (`SIGILL`) silently in a background worker.
+
+Fix: add polars' compatibility runtime and restart the container.
+
+```bash
+# /config/requirements.txt
+polars[rtcompat]
+```
+
+```{note}
+Reinstalled (~50 MB download) on every container *recreation* unless the uv cache is persisted. Not needed on newer hardware.
+```
+
+See #338.
+
 ## Troubleshooting and Debugging
 
 A good starting point is to check the logs of the container. We can do this by running:
