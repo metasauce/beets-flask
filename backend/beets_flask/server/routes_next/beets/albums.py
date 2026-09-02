@@ -44,16 +44,17 @@ if TYPE_CHECKING:
 albums_bp = Blueprint("albums", __name__, url_prefix="/albums")
 
 
-# Attributes that cannot be set via PATCH: they are derived from the
-# library state and ignored in PATCH bodies.
+# Attributes that cannot be set via PATCH: i.e. they are derived from the
+# library state and thus ignored in PATCH bodies.
 READ_ONLY_ALBUM_ATTRIBUTES = frozenset({"sources"})
 
 
 def to_album_resource(album: BeetsAlbum, items: Iterable[BeetsItem]) -> AlbumResource:
     attributes = AlbumAttributes(
-        title=album.album,
+        album=album.album,
         albumartist=album.albumartist,
         year=album.year,
+        # TODO: Add more in controlled way
     )
 
     # TODO: allow for source plugin adapter specific extraction
@@ -108,6 +109,29 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
     return SingleAlbumDocument(data=to_album_resource(album, items), included=included)
 
 
+def _construct_update_data(data: AlbumAttributes) -> dict[str, object]:
+    """Construct a dict of album attributes to update from the request body.
+
+    Attributes that are not present in the body are left unchanged; an
+    explicit ``null`` clears the field. Read-only attributes are ignored.
+    """
+
+    # ``model_fields_set`` are the attributes present in the request body:
+    # absent fields are left unchanged, an explicit ``null`` clears.
+    update_data: dict[str, object] = {}
+    for key in data.model_fields_set:
+        if key in READ_ONLY_ALBUM_ATTRIBUTES:
+            continue
+
+        # All keys in AlbumAttributes are also beets album fields!
+        update_data[key] = getattr(data, key)
+
+    if not update_data:
+        raise InvalidUsageException("No attributes to update")
+
+    return update_data
+
+
 @albums_bp.route("/<int:album_id>", methods=["PATCH"])
 @validate_querystring(GetQueryParams)
 @validate_request(AlbumAttributes)
@@ -129,19 +153,7 @@ async def patch_album(
 
     ensure_writable()
 
-    # ``model_fields_set`` are the attributes present in the request body:
-    # absent fields are left unchanged, an explicit ``null`` clears.
-    # Translate API attribute names to beets album field names
-    # (``title`` is the API name for the beets ``album`` field) and
-    # ignore read-only attributes (e.g. ``sources``).
-    update_data: dict[str, object] = {}
-    for key in data.model_fields_set:
-        if key in READ_ONLY_ALBUM_ATTRIBUTES:
-            continue
-        update_data["album" if key == "title" else key] = getattr(data, key)
-
-    if update_data:
-        # Write back to file
+    if update_data := _construct_update_data(data):
         album.update(update_data)
         album.try_sync(True, False)
 
@@ -349,28 +361,12 @@ async def patch_albums(
     """
     ensure_writable()
 
-    # ``model_fields_set`` are the attributes present in the request body:
-    # absent fields are left unchanged, an explicit ``null`` clears.
-    # Translate API attribute names to beets album field names
-    # (``title`` is the API name for the beets ``album`` field) and
-    # ignore read-only attributes (e.g. ``sources``).
-    update_data: dict[str, object] = {}
-    for key in data.model_fields_set:
-        if key in READ_ONLY_ALBUM_ATTRIBUTES:
-            continue
-        update_data["album" if key == "title" else key] = getattr(data, key)
-
+    update_data = _construct_update_data(data)
     query = build_filter_query(
         query_args.get("filter_query"), query_args.get("filter_ids"), BeetsAlbum
     )
 
-    if not update_data:
-        raise InvalidUsageException("No attributes to update")
-
-    # Update every matching album in a single transaction: the database
-    # writes are committed together. If an update fails midway, the
-    # already-written files stay consistent with the committed database
-    # state, and the error propagates.
+    # Update every matching album in a single transaction
     total = 0
     with g.lib.transaction():
         for album in g.lib.albums(query):
@@ -414,10 +410,7 @@ async def delete_albums(query_args: BulkDeleteQueryParams) -> BulkResult:
         query_args.get("filter_query"), query_args.get("filter_ids"), BeetsAlbum
     )
 
-    # Delete every matching album in a single transaction: the database
-    # writes are committed together. If a deletion fails midway, the
-    # already-deleted files stay consistent with the committed database
-    # state, and the error propagates.
+    # Delete every matching album in a single transaction
     delete = query_args.get("delete_files", False)
     total = 0
     with g.lib.transaction():

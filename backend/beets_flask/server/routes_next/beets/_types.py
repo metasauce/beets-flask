@@ -147,7 +147,7 @@ class AlbumAttributes(BaseModel):
     bodies.
     """
 
-    title: Annotated[str | None, Field(description="The title of the album")] = None
+    album: Annotated[str | None, Field(description="The title of the album")] = None
     albumartist: Annotated[
         str | None, Field(description="The album artist of the album")
     ] = None

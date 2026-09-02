@@ -41,6 +41,11 @@ if TYPE_CHECKING:
 items_bp = Blueprint("items", __name__, url_prefix="/items")
 
 
+# Attributes that cannot be set via PATCH: i.e. they are derived from the
+# library state and thus ignored in PATCH bodies.
+READ_ONLY_ITEM_ATTRIBUTES = frozenset({"album_id", "added", "size", "path", "sources"})
+
+
 def to_item_resource(item: BeetsItem) -> ItemResource:
     attributes = ItemAttributes(
         title=item.title,
@@ -76,8 +81,29 @@ async def get_item(item_id: int) -> SingleItemDocument:
     return SingleItemDocument(data=to_item_resource(item))
 
 
-# Attributes that cannot be set via PATCH
-READ_ONLY_ITEM_ATTRIBUTES = frozenset({"album_id", "added", "size", "path", "sources"})
+def _construct_update_data(data: ItemAttributes) -> dict[str, object]:
+    """Construct a dict of attributes to update from the request body.
+
+    Attributes that are not present in the body are left unchanged; an
+    explicit ``null`` clears the field. Read-only attributes (e.g.
+    ``path``, ``sources``) are derived from the library state and cannot
+    be set by clients; ignore them.
+    """
+
+    # ``model_fields_set`` are the attributes present in the request body:
+    # absent fields are left unchanged, an explicit ``null`` clears.
+    update_data: dict[str, object] = {}
+    for key in data.model_fields_set:
+        if key in READ_ONLY_ITEM_ATTRIBUTES:
+            continue
+
+        # All keys in ItemAttributes are also beets item fields!
+        update_data[key] = getattr(data, key)
+
+    if not update_data:
+        raise InvalidUsageException("No attributes to update")
+
+    return update_data
 
 
 @items_bp.route("/<int:item_id>", methods=["PATCH"])
@@ -102,16 +128,7 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
 
     ensure_writable()
 
-    # ``model_fields_set`` are the attributes present in the request body:
-    # absent fields are left unchanged, an explicit ``null`` clears the
-    # field. Read-only attributes (e.g. ``path``, ``sources``) are derived
-    # from the library state and cannot be set by clients; ignore them.
-    update_data = {
-        k: getattr(data, k)
-        for k in data.model_fields_set
-        if k not in READ_ONLY_ITEM_ATTRIBUTES
-    }
-    if update_data:
+    if update_data := _construct_update_data(data):
         item.update(update_data)
         item.try_sync(True, False)
 
@@ -289,29 +306,12 @@ async def patch_items(
     """
     ensure_writable()
 
+    update_data = _construct_update_data(data)
     query = build_filter_query(
         query_args.get("filter_query"), query_args.get("filter_ids"), BeetsItem
     )
 
-    # ``model_fields_set`` are the attributes present in the request body:
-    # absent fields are left unchanged, an explicit ``null`` clears.
-    if not data.model_fields_set:
-        raise InvalidUsageException("No attributes to update")
-
-    # Read-only attributes (e.g. ``path``, ``sources``) are derived from
-    # the library state and cannot be set by clients; ignore them.
-    update_data = {
-        k: getattr(data, k)
-        for k in data.model_fields_set
-        if k not in READ_ONLY_ITEM_ATTRIBUTES
-    }
-    if not update_data:
-        raise InvalidUsageException("No attributes to update")
-
-    # Update every matching item in a single transaction: the database
-    # writes are committed together. If an update fails midway, the
-    # already-written files stay consistent with the committed database
-    # state, and the error propagates.
+    # Update every matching item in a single transaction
     total = 0
     with g.lib.transaction():
         for item in g.lib.items(query):
@@ -357,10 +357,7 @@ async def delete_items(query_args: BulkDeleteQueryParams) -> BulkResult:
         query_args.get("filter_query"), query_args.get("filter_ids"), BeetsItem
     )
 
-    # Delete every matching item in a single transaction: the database
-    # writes are committed together. If a deletion fails midway, the
-    # already-deleted files stay consistent with the committed database
-    # state, and the error propagates.
+    # Delete every matching item in a single transaction
     delete = query_args.get("delete_file", False)
     total = 0
     with g.lib.transaction():
