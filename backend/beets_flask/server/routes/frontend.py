@@ -30,3 +30,11 @@ async def reverse_proxy(path):
 
     r = await send_from_directory(current_app.config["FRONTEND_DIST_DIR"], path)
     return r
+
+
+@frontend_bp.route("/api_docs")
+async def redoc():
+    return """
+    <redoc spec-url="./openapi.json"></redoc>
+    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"> </script>
+    """

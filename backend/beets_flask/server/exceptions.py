@@ -44,10 +44,7 @@ class ApiException(Exception):
 
 
 class InvalidUsageException(ApiException):
-    """Invalid usage of the API.
-
-    This is used to indicate that the API was used incorrectly.
-    """
+    """Invalid usage of the API."""
 
     status_code: int = 400
 
@@ -68,6 +65,15 @@ class IntegrityException(ApiException):
     """
 
     status_code: int = 409
+
+
+class NotImplementedException(ApiException):
+    """Feature not implemented yet.
+
+    The endpoint exists, but its functionality is not implemented yet.
+    """
+
+    status_code: int = 501
 
 
 class NotImportedException(ApiException):
@@ -208,5 +214,7 @@ __all__ = [
     "InvalidUsageException",
     "NotFoundException",
     "IntegrityException",
+    "NotImplementedException",
+    "error_responses",
     "to_serialized_exception",
 ]

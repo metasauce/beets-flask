@@ -5,6 +5,7 @@ import os
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 from quart import Quart
@@ -20,6 +21,7 @@ def create_app(config: str | ServerConfig | None = None) -> Quart:
     config = config or os.getenv("BEETSFLASK_ENV", None)
     # create and configure the app
     app = Quart(__name__, instance_relative_config=True)
+    app.asgi_app = PerfLogMiddleWare(app.asgi_app)
 
     config = init_server_config(config)
     app.config.from_object(config)
@@ -42,6 +44,12 @@ def create_app(config: str | ServerConfig | None = None) -> Quart:
 
     register_routes(app)
     register_socketio(app)
+
+    # Quart's default JSON provider sorts object keys alphabetically, which
+    # would reorder the paths and HTTP methods in the generated openapi docs
+    # (e.g. DELETE, GET, PATCH instead of GET, PATCH, DELETE). Keep the
+    # insertion order we define in the schema instead.
+    app.json.sort_keys = False
 
     log.debug("Quart app created!")
 
@@ -89,3 +97,14 @@ class Encoder(json.JSONEncoder):
             return str(o)
 
         return json.JSONEncoder.default(self, o)
+
+
+class PerfLogMiddleWare:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        start = perf_counter()
+        res = await self.app(scope, receive, send)
+        log.info(f"{scope['path']} {(perf_counter() - start) * 1000:.2f}ms")
+        return res

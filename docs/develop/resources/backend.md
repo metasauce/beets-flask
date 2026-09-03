@@ -8,6 +8,7 @@ Beets-Flask provides a quart application with REST API for the beets music libra
 ./classes
 ./database
 ./state_serialize
+./beets_library_api
 ```
 
 ## Resumability of import

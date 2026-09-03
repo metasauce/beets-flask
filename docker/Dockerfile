@@ -34,6 +34,8 @@ ENV UV_NO_EDITABLE=1
 ENV UV_PYTHON_DOWNLOADS=0
 ENV UV_PROJECT_ENVIRONMENT=/venv
 
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 # Install backend dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=backend/uv.lock,target=uv.lock \

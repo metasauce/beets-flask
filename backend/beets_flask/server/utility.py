@@ -4,6 +4,7 @@ from typing import cast
 
 from typing_extensions import TypeVar
 
+from beets_flask.config import get_config
 from beets_flask.invoker.job import ExtraJobMeta
 
 from .exceptions import InvalidUsageException
@@ -139,3 +140,9 @@ def pop_paths_param(params: dict, key: str, default: D | None = None) -> list[Pa
         default=default,
         error_message=f"Invalid parameter '{key}'",
     )
+
+
+def ensure_writable() -> None:
+    """Raise 400 when the library is configured as read-only."""
+    if get_config().data.gui.library.readonly:
+        raise InvalidUsageException("Library is read-only")

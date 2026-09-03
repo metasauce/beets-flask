@@ -1,5 +1,6 @@
 from quart import Blueprint, Quart
 
+from ..routes_next import register_routes as register_routes_next
 from .art_preview import art_blueprint
 from .config import config_bp
 from .db_models import register_state_models
@@ -30,6 +31,8 @@ def register_routes(app: Quart):
 
     app.register_blueprint(backend_bp)
     app.register_blueprint(frontend_bp)
+
+    register_routes_next(app)
 
 
 __all__ = ["register_routes"]

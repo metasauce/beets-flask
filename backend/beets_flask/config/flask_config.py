@@ -84,6 +84,7 @@ class DeploymentDocker(DevelopmentDocker):
     TESTING = False
     PROPAGATE_EXCEPTIONS = True
     FRONTEND_DIST_DIR = "/repo/frontend/dist/"
+    QUART_SCHEMA_RESPONSE_VALIDATION = False
 
 
 def init_server_config(input_config: str | ServerConfig | None = None) -> ServerConfig:
