@@ -3,7 +3,7 @@ revision = 3
 requires-python = "==3.12.*"
 
 [options]
-exclude-newer = "2026-08-27T13:53:25.481042Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P3D"
 
 [[package]]
@@ -257,6 +257,7 @@ dependencies = [
     { name = "tinytag" },
     { name = "typing-extensions" },
     { name = "uvicorn" },
+    { name = "uvloop" },
     { name = "watchdog" },
 ]
 
@@ -270,7 +271,6 @@ dev = [
     { name = "paracelsus" },
     { name = "pre-commit" },
     { name = "pytest" },
-    { name = "pytest-aiohttp" },
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
@@ -300,7 +300,6 @@ docs = [
 test = [
     { name = "fakeredis" },
     { name = "pytest" },
-    { name = "pytest-aiohttp" },
     { name = "pytest-asyncio" },
     { name = "pytest-benchmark" },
     { name = "pytest-cov" },
@@ -340,6 +339,7 @@ requires-dist = [
     { name = "tinytag" },
     { name = "typing-extensions" },
     { name = "uvicorn", specifier = ">=0.36.0" },
+    { name = "uvloop", specifier = ">=0.22.1" },
     { name = "watchdog", specifier = ">=5.0.3" },
 ]
 
@@ -353,7 +353,6 @@ dev = [
     { name = "paracelsus", specifier = ">=0.15.0" },
     { name = "pre-commit", specifier = ">=3.8.0" },
     { name = "pytest", specifier = ">=8.2.2" },
-    { name = "pytest-aiohttp", specifier = ">=1.1.1" },
     { name = "pytest-asyncio", specifier = ">=0.23.8" },
     { name = "pytest-benchmark", specifier = ">=5.2.3" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
@@ -383,7 +382,6 @@ docs = [
 test = [
     { name = "fakeredis" },
     { name = "pytest", specifier = ">=8.2.2" },
-    { name = "pytest-aiohttp", specifier = ">=1.1.1" },
     { name = "pytest-asyncio", specifier = ">=0.23.8" },
     { name = "pytest-benchmark", specifier = ">=5.2.3" },
     { name = "pytest-cov", specifier = ">=5.0.0" },
@@ -1753,20 +1751,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-aiohttp"
-version = "1.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "aiohttp" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/51/4d/c6621fc79022f6c84a806e23d9b7eca24fae4f3ee779219bbe524339d666/pytest_aiohttp-1.1.1.tar.gz", hash = "sha256:3aa9c9fe26e543eaccc7eb0add381c685ba3ed3e2fed0af74540f63bcd31458d", size = 13704, upload-time = "2026-06-07T23:56:34.173Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/b0/5056ed4c3f68a4db2b4a39fb0ec61b1e4cf1d89ee14effe5261cc587264c/pytest_aiohttp-1.1.1-py3-none-any.whl", hash = "sha256:f293441ad4f8446a1e12257130c26c7de03a615c2a5572a8cb046e5b3b4e5211", size = 9007, upload-time = "2026-06-07T23:56:33.333Z" },
-]
-
-[[package]]
 name = "pytest-asyncio"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2541,6 +2525,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c4/1f/fa18009dea8469069cca78a4e877a008ab78f08b064bfc9ab891579077ff/uvicorn-0.49.0.tar.gz", hash = "sha256:ebf4271aa580d9de97f93192d4595176df6e91f9aae919ca73e4fc07df1e66a3", size = 91284, upload-time = "2026-06-03T22:01:30.448Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/fa/e1388bbcf24ef3274f45c0c1c7b501fd14971037c1b6ee23610553307497/uvicorn-0.49.0-py3-none-any.whl", hash = "sha256:ba3d14c3ee7e41c6c654c46c9eb489d33213cdd30aa1696eab1374337c13f68f", size = 71376, upload-time = "2026-06-03T22:01:29.037Z" },
+]
+
+[[package]]
+name = "uvloop"
+version = "0.22.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/f0/18d39dbd1971d6d62c4629cc7fa67f74821b0dc1f5a77af43719de7936a7/uvloop-0.22.1.tar.gz", hash = "sha256:6c84bae345b9147082b17371e3dd5d42775bddce91f885499017f4607fdaf39f", size = 2443250, upload-time = "2025-10-16T22:17:19.342Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3d/ff/7f72e8170be527b4977b033239a83a68d5c881cc4775fca255c677f7ac5d/uvloop-0.22.1-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:fe94b4564e865d968414598eea1a6de60adba0c040ba4ed05ac1300de402cd42", size = 1359936, upload-time = "2025-10-16T22:16:29.436Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/c6/e5d433f88fd54d81ef4be58b2b7b0cea13c442454a1db703a1eea0db1a59/uvloop-0.22.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:51eb9bd88391483410daad430813d982010f9c9c89512321f5b60e2cddbdddd6", size = 752769, upload-time = "2025-10-16T22:16:30.493Z" },
+    { url = "https://files.pythonhosted.org/packages/24/68/a6ac446820273e71aa762fa21cdcc09861edd3536ff47c5cd3b7afb10eeb/uvloop-0.22.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:700e674a166ca5778255e0e1dc4e9d79ab2acc57b9171b79e65feba7184b3370", size = 4317413, upload-time = "2025-10-16T22:16:31.644Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/6f/e62b4dfc7ad6518e7eff2516f680d02a0f6eb62c0c212e152ca708a0085e/uvloop-0.22.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:7b5b1ac819a3f946d3b2ee07f09149578ae76066d70b44df3fa990add49a82e4", size = 4426307, upload-time = "2025-10-16T22:16:32.917Z" },
+    { url = "https://files.pythonhosted.org/packages/90/60/97362554ac21e20e81bcef1150cb2a7e4ffdaf8ea1e5b2e8bf7a053caa18/uvloop-0.22.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:e047cc068570bac9866237739607d1313b9253c3051ad84738cbb095be0537b2", size = 4131970, upload-time = "2025-10-16T22:16:34.015Z" },
+    { url = "https://files.pythonhosted.org/packages/99/39/6b3f7d234ba3964c428a6e40006340f53ba37993f46ed6e111c6e9141d18/uvloop-0.22.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:512fec6815e2dd45161054592441ef76c830eddaad55c8aa30952e6fe1ed07c0", size = 4296343, upload-time = "2025-10-16T22:16:35.149Z" },
 ]
 
 [[package]]
