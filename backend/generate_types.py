@@ -11,6 +11,7 @@ from beets_flask.invoker import EnqueueKind
 from beets_flask.invoker.enqueue import (
     Search,
 )
+from beets_flask.server.routes.auth import AuthFlow, AuthProviderStatus
 from beets_flask.server.routes.db_models.session import MinimalSession
 from beets_flask.server.routes.inbox import InboxStats
 from beets_flask.server.routes.library.resources import (
@@ -83,6 +84,13 @@ builder.add(AlbumResponseMinimalExpanded)
 builder.add(FolderStatusUpdate)
 builder.add(JobStatusUpdate)
 builder.add(FileSystemUpdate)
+
+
+# ---------------------------------- Auth ---------------------------------- #
+
+# Auth endpoint responses
+builder.add(AuthProviderStatus)
+builder.add(AuthFlow)
 
 
 # ---------------------------------- Config ---------------------------------- #

@@ -73,6 +73,23 @@ def fixture_client(testapp: Quart) -> TestClientProtocol:
     return testapp.test_client()
 
 
+@pytest.fixture
+def fake_redis(monkeypatch):
+    """Replace ``beets_flask.redis.redis_conn`` with an in-memory fake.
+
+    Note: unlike ``local_redis`` (which only mocks the rq queues), this also
+    replaces the shared connection, so code that talks to redis directly
+    (e.g. the auth flow store) works in tests.
+    """
+    from fakeredis import FakeStrictRedis
+
+    import beets_flask.redis
+
+    conn = FakeStrictRedis()
+    monkeypatch.setattr(beets_flask.redis, "redis_conn", conn)
+    return conn
+
+
 @pytest.fixture(name="runner")
 def fixture_runner(app):
     return app.test_cli_runner()
