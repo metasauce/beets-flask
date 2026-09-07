@@ -221,9 +221,7 @@ async def all_albums(query: str = ""):
     )
 
     if len(params) > 0:
-        raise InvalidUsageError(
-            "Unexpected query parameters: , ".join(params.keys())
-        )
+        raise InvalidUsageError("Unexpected query parameters: , ".join(params.keys()))
 
     sub_query = parse_query_string(query, Album)
 
@@ -321,9 +319,7 @@ async def all_items(query: str = ""):
     )
 
     if len(params) > 0:
-        raise InvalidUsageError(
-            "Unexpected query parameters: , ".join(params.keys())
-        )
+        raise InvalidUsageError("Unexpected query parameters: , ".join(params.keys()))
 
     sub_query = parse_query_string(query, Item)
 
@@ -460,8 +456,10 @@ class Cursor:
             eq_sign = ">"
 
         return (
-            f"({self.order_by_column} {eq_sign} ?) OR "
-            f"({self.order_by_column} = ? AND id {eq_sign} ?)",
+            (
+                f"({self.order_by_column} {eq_sign} ?) OR "
+                f"({self.order_by_column} = ? AND id {eq_sign} ?)"
+            ),
             (
                 self.last_order_by_value,
                 self.last_order_by_value,
@@ -897,7 +895,7 @@ def _rep(entity: Item | Album | None, expand=False, minimal=False):
         raise ValueError(f"Unknown entity type: {type(entity)}")
 
 
-def __is_empty(value: str | None | list[Any], zero_empty: bool = True) -> bool:
+def __is_empty(value: str | list[Any] | None, zero_empty: bool = True) -> bool:
     """Check if empty value."""
     if value is None:
         return True

@@ -66,7 +66,7 @@ def default_duplicate_action_from_config(config) -> BeetsDuplicateAction:
 class PromptChoice(NamedTuple):
     short: str
     long: str
-    callback: None | Callable
+    callback: Callable | None
 
     def serialize(self):
         return {

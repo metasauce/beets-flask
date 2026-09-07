@@ -281,7 +281,7 @@ def stage[*Arg, Task: BeetsImportTask, Ret](
                     task = yield cast(Task, t)
             else:
                 task = yield cast(
-                    Task | None | Ret, task
+                    Task | Ret | None, task
                 )  # wait for send to arrive. the first next() always returns None
             # yield task, call func which gives new task, yield new task in next()
             task = cast(Task, task)  # Slightly hacky, but we know task is a Task here
