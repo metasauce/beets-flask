@@ -31,8 +31,8 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
     from the beets library via the API.
     """
 
-    artists = ["Basstripper", "Beta", "Foo; Bar,Baz"]
-    expected_artists = [
+    artists: ClassVar[list[str]] = ["Basstripper", "Beta", "Foo; Bar,Baz"]
+    expected_artists: ClassVar[list[str]] = [
         "Basstripper",
         "Beta",
         "Foo",
@@ -40,7 +40,7 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
         "Baz",
     ]  # Artists should be split by semicolon
 
-    _albums: list[Album] = []
+    _albums: ClassVar[list[Album]] = []
 
     @pytest.fixture(autouse=True)
     def albums(self):  # type: ignore

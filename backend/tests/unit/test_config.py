@@ -24,8 +24,8 @@ def hide_config():
 
     for p in paths:
         try:
-            os.unlink(p)
-        except:
+            p.unlink()
+        except FileNotFoundError:
             pass
         shutil.move(str(p) + "_bak", p)
 

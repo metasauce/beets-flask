@@ -10,7 +10,7 @@ from beets_flask.config import get_config
 def _reset_beets():
     beets.config.clear()
     beets.config.read()
-    loaded_data = beets.config.flatten()
+    beets.config.flatten()
     plugin_instances.clear()
     load_plugins()
 
@@ -26,5 +26,5 @@ def test_beets_config(benchmark):
 
 
 def test_beets_flask_config(benchmark):
-    config = get_config()
+    get_config()
     benchmark(_reset_beets_flask)

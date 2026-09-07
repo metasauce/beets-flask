@@ -70,7 +70,7 @@ class SendStatusMockMixin(ABC):
     """
 
     # list[{path: str, hash: str, status: FolderStatus}]
-    statuses: list[FolderStatusUpdate] = []
+    statuses: ClassVar[list[FolderStatusUpdate]] = []
 
     async def send_status_update(self, status):
         """Mock the emit_status decorator"""

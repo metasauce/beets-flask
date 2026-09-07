@@ -1,4 +1,5 @@
 from abc import ABC
+from typing import ClassVar
 from unittest import mock
 
 import pytest
@@ -20,7 +21,7 @@ class PluginEventsMixin(ABC):
 
     """
 
-    events: list[str] = []
+    events: ClassVar[list[str]] = []
 
     def send_event(self, event: EventType, **kwargs):
         self.events.append(event)

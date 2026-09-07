@@ -119,7 +119,7 @@ class NoCandidatesFoundError(ApiError):
             else:
                 error_text += "No source plugins are enabled."
 
-        except:
+        except Exception:
             error_text += "Could not determine enabled metadata source plugins."
         return error_text
 

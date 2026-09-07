@@ -155,7 +155,7 @@ class TestIsAlbumFolder:
         assert is_album_folder(s_base + "/artist/album_rogue/CD2")
 
     def test_archive(self, s_base):
-        assert is_album_folder(s_base + "/artist/archive") == False
+        assert not is_album_folder(s_base + "/artist/archive")
         assert is_album_folder(s_base + "/artist/archive/foo.zip")
 
     @pytest.mark.skip("is_album_folder tricky logic for archive and music")
@@ -163,7 +163,7 @@ class TestIsAlbumFolder:
     # `is_album_folder` and `all_album_folders`
     def test_archive_and_music(self, s_base):
         assert is_album_folder(s_base + "/artist/archive_and_music")
-        assert is_album_folder(s_base + "/artist/archive_and_music/foo.zip") == False
+        assert not is_album_folder(s_base + "/artist/archive_and_music/foo.zip")
 
 
 class TestAllAlbumFolders:

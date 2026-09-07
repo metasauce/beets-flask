@@ -283,7 +283,7 @@ def enqueue_import_candidate(
         with db_session_factory() as db_session:
             _get_live_state_by_folder(hash, path, db_session)
             # raises if no state found
-    except:
+    except Exception:
         log.info(
             f"No previous session state fround for {hash=} {path=} "
              "switching to auto-import"

@@ -87,10 +87,15 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
 
     auto_inboxes = [i for i in _inboxes if i.autotag not in (False, "off")]
 
+    # Keep references to the tasks so they are not garbage collected.
+    background_tasks: set[asyncio.Task] = set()
+
     for inbox in auto_inboxes:
         album_folders = all_album_folders(inbox.path)
         for f in album_folders:
-            asyncio.create_task(auto_tag_wait_for_workers(f))
+            task = asyncio.create_task(auto_tag_wait_for_workers(f))
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
 
     return watchdog
 

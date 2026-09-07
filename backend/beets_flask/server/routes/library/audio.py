@@ -105,11 +105,14 @@ class FFmpegStreamer:
     """
 
     process: Process | None
-    _stderr_lines: list[str] = []
+    _stderr_lines: list[str]
+    _stderr_task: asyncio.Task | None
     chunk_size: int = 4096
 
     def __init__(self):
         self.process = None
+        self._stderr_lines = []
+        self._stderr_task = None
 
     async def start(self, *ffmpeg_args):
         """Initialize a persistent FFmpeg process with stdin open for input."""
@@ -121,7 +124,7 @@ class FFmpegStreamer:
             stdout=PIPE,
             stderr=PIPE,
         )
-        asyncio.create_task(self._drain_stderr())
+        self._stderr_task = asyncio.create_task(self._drain_stderr())
 
     async def stream_file(self, file_path: str | None) -> AsyncIterator[bytes]:
         """Stream an audio file through the pre-warmed FFmpeg process.

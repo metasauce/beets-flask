@@ -46,7 +46,7 @@ def register_tmux():
 
     try:
         abs_path_lib = get_config().data.gui.terminal.start_path
-    except:
+    except Exception:
         abs_path_lib = "/repo"
 
     try:
@@ -72,7 +72,7 @@ def is_session_alive():
             return True
         else:
             return False
-    except:
+    except Exception:
         return False
 
 
