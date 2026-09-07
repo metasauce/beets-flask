@@ -1,8 +1,11 @@
 """Unit tests for the art extension interface and its providers."""
 
+from __future__ import annotations
+
 import shutil
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import aiohttp
 import pytest
@@ -16,6 +19,9 @@ from beets_flask.extensions.providers.file import FileArtSource
 from beets_flask.extensions.providers.musicbrainz import MusicbrainzArtSource
 from beets_flask.extensions.providers.spotify import SpotifyArtSource
 from beets_flask.server.routes.art_preview import make_session
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 
 class TestArtResult:

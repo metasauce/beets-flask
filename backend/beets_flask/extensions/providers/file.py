@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import asyncio
 import os
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import aiohttp
 from mediafile import MediaFile
 
 from beets_flask.extensions.art import ArtResult, ArtSource
 from beets_flask.utility import AUDIO_EXTENSIONS
+
+if TYPE_CHECKING:
+    import aiohttp
 
 
 class FileArtSource(ArtSource):

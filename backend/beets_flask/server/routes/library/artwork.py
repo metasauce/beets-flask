@@ -1,6 +1,6 @@
 import os
 from io import BytesIO
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from beets import util as beets_util
 from mediafile import Image, MediaFile  # comes with the beets install
@@ -23,9 +23,7 @@ from beets_flask.server.exceptions import (
     NotFoundException,
 )
 
-if TYPE_CHECKING:
-    # For type hinting the global g object
-    from . import g
+from . import g
 
 __all__ = ["artwork_pb"]
 

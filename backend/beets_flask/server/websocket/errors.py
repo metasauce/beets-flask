@@ -8,6 +8,7 @@ from __future__ import annotations
 import functools
 from collections.abc import Awaitable, Callable
 from typing import (
+    TYPE_CHECKING,
     NotRequired,
     ParamSpec,
     TypedDict,
@@ -15,6 +16,11 @@ from typing import (
 )
 
 from beets_flask import log
+
+from . import sio
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 
 class WebSocketErrorDict(TypedDict):

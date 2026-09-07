@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from cachetools import Cache
 from quart import Blueprint, jsonify, request
@@ -31,6 +33,9 @@ from beets_flask.watchdog.inbox import (
     get_inbox_folders,
     get_inbox_for_path,
 )
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 inbox_bp = Blueprint("inbox", __name__, url_prefix="/inbox")
 

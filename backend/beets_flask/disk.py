@@ -11,6 +11,7 @@ from fnmatch import fnmatch
 from functools import cache
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Literal,
 )
 
@@ -23,6 +24,9 @@ from beets_flask.config import get_config
 from beets_flask.dirhash_custom import archive_hash, dirhash_c
 from beets_flask.logger import log
 from beets_flask.utility import AUDIO_EXTENSIONS
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
 
 # Regex pattern to exclude hidden files (files starting with ".")
 audio_regex = re.compile(

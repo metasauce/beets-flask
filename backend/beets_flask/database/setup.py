@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 from quart import Quart
 from sqlalchemy import Engine, create_engine
@@ -9,6 +12,9 @@ from beets_flask.config import get_flask_config
 from beets_flask.logger import log
 
 from .models import Base
+
+if TYPE_CHECKING:
+    from quart import Quart
 
 engine: Engine | None = None
 session_factory: scoped_session[Session]

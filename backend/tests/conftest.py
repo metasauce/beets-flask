@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
@@ -6,6 +8,7 @@ import shutil
 from collections.abc import Callable, Generator
 from contextlib import _GeneratorContextManager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import yaml
@@ -17,6 +20,16 @@ from sqlalchemy.orm import Session
 
 from beets_flask.importer.types import BeetsLibrary
 from beets_flask.server.app import create_app
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+    from contextlib import _GeneratorContextManager
+
+    from quart import Quart
+    from quart.typing import TestClientProtocol
+    from sqlalchemy.orm import Session
+
+    from beets_flask.importer.types import BeetsLibrary
 
 log = logging.getLogger(__name__)
 

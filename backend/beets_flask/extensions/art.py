@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
-import aiohttp
+if TYPE_CHECKING:
+    import aiohttp
 
 
 class ArtSource(ABC):

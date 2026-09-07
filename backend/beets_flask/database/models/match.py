@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from .base import Base
-from .pending import Item
+
+if TYPE_CHECKING:
+    from .pending import Item
 
 # --------------------------------- Distance --------------------------------- #
 

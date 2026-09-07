@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 from uuid import uuid4 as uuid
 
 from beets import importer
@@ -42,6 +42,12 @@ from .types import (
     ItemInfo,
     TrackInfo,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from beets_flask.importer.types import BeetsDuplicateAction
+    from beets_flask.server.exceptions import SerializedException
 
 
 class BaseState(ABC):

@@ -3,6 +3,9 @@ Currently still requires a beets library with some content in
 the default location of the user.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 from unittest import mock
 from urllib.parse import quote_plus
 
@@ -13,6 +16,10 @@ from quart.typing import TestClientProtocol as Client
 from beets_flask.config import get_config
 from tests.conftest import beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
+
+if TYPE_CHECKING:
+    from beets.library import Album
+    from quart.typing import TestClientProtocol as Client
 
 # ----------------------------------- Artist --------------------------------- #
 

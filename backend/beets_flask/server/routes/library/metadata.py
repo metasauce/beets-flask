@@ -3,6 +3,8 @@
 TODO: Allow to modify metadata or let ppl apply beets changes for a library item.
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING

@@ -4,10 +4,10 @@ Adapted from https://github.com/biesnecker/hachiko/blob/master/hachiko/hachiko.p
 MIT License
 """
 
+from __future__ import annotations
+
 import asyncio
-from collections.abc import Callable
-from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from watchdog.events import (
     DirCreatedEvent,
@@ -28,6 +28,12 @@ from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
 from beets_flask import log
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
+
+    from watchdog.observers.api import BaseObserver
 
 EVENT_TYPE_MOVED = "moved"
 EVENT_TYPE_DELETED = "deleted"

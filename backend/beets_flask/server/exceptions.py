@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import traceback
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import NotRequired, ParamSpec, TypedDict, TypeVar
+from typing import TYPE_CHECKING, NotRequired, ParamSpec, TypedDict, TypeVar
 
 from beets_flask.logger import log
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 
 class SerializedException(TypedDict):

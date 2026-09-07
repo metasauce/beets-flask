@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import os
 import shutil
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from beets_flask.disk import Folder
 
 from ..test_flows import SendStatusMockMixin
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestDeleteEndpoint(SendStatusMockMixin):

@@ -32,7 +32,7 @@ from collections.abc import Callable
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, TypedDict, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard, TypeVar
 
 from beets import autotag, plugins
 from beets.exceptions import UserError
@@ -78,6 +78,9 @@ from .stages import (
     user_query,
 )
 from .states import ProgressState, SessionState
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # ---------------------------------------------------------------------------- #
 #                               Types and helpers                              #

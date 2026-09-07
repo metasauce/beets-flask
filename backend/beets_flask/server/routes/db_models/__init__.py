@@ -1,10 +1,15 @@
-from quart import Blueprint, Quart
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from beets_flask.database.models.states import CandidateStateInDb, TaskStateInDb
 
 from .base import ModelAPIBlueprint
 from .folder import FolderAPIBlueprint
 from .session import SessionAPIBlueprint
+
+if TYPE_CHECKING:
+    from quart import Blueprint, Quart
 
 
 def register_state_models(app: Blueprint | Quart):

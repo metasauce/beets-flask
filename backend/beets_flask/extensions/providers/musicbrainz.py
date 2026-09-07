@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
-from typing import ClassVar
-
-import aiohttp
+from typing import TYPE_CHECKING, ClassVar
 
 from beets_flask.extensions.art import ArtResult, ArtSource
+
+if TYPE_CHECKING:
+    import aiohttp
 
 _MUSICBRAINZ_RELEASE_URL = re.compile(
     r"https?://musicbrainz\.org/release/([0-9a-fA-F-]{36})"

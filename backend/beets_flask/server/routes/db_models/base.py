@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from quart import Blueprint, request
 from sqlalchemy import select
@@ -9,6 +9,9 @@ from beets_flask.database import db_session_factory
 from beets_flask.database.models.base import Base
 from beets_flask.server.routes.exception import InvalidUsageException
 from beets_flask.server.utility import pop_query_param
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 __all__ = ["ModelAPIBlueprint"]
 

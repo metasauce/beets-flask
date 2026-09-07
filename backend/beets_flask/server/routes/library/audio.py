@@ -3,6 +3,8 @@
 Allows to stream an item's file as mp3.
 """
 
+from __future__ import annotations
+
 import asyncio
 import os
 import time

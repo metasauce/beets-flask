@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import asyncio
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from watchdog.events import FileMovedEvent, FileSystemEvent
 from watchdog.observers.polling import PollingObserver
@@ -19,6 +21,9 @@ from beets_flask.invoker import enqueue
 from beets_flask.logger import log
 from beets_flask.server.websocket.status import FileSystemUpdate, send_status_update
 from beets_flask.watchdog.eventhandler import AIOEventHandler, AIOWatchdog
+
+if TYPE_CHECKING:
+    from beets_flask.config.schema import InboxFolderSchema
 
 # ------------------------------------------------------------------------------------ #
 #                                   init and watchdog                                  #

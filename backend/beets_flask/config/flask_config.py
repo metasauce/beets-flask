@@ -11,9 +11,12 @@ function in the `__init__.py` file.
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ..logger import log
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 cwd = os.getcwd()
 

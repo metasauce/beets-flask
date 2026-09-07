@@ -16,6 +16,7 @@ from __future__ import annotations
 import pickle
 from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from beets.importer import Action
 from sqlalchemy import (
@@ -42,7 +43,16 @@ from beets_flask.importer.states import SessionState
 from beets_flask.logger import log
 from beets_flask.server.exceptions import SerializedException
 
-from .pending import TaskItem
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from beets.importer import Action
+    from sqlalchemy.sql.elements import ColumnElement
+
+    from beets_flask.importer.states import SessionState
+    from beets_flask.server.exceptions import SerializedException
+
+    from .pending import TaskItem
 
 
 class FolderInDb(Base):

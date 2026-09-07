@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TypedDict
 
 from quart import Blueprint, g, jsonify
 
@@ -7,9 +7,7 @@ from beets_flask.config import get_config
 from beets_flask.disk import dir_size
 from beets_flask.importer.types import BEETS_DB_MULTI_VALUE_DELIMITER
 
-if TYPE_CHECKING:
-    # For type hinting the global g object
-    from . import g
+from . import g
 
 stats_bp = Blueprint("stats", __name__)
 

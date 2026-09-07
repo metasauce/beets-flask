@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import asyncio
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 import redis
 from rq import Queue
-from rq.job import Job
+
+if TYPE_CHECKING:
+    from rq.job import Job
 
 # Setup redis connection
 if os.environ.get("REDIS_URL"):

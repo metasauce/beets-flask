@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import os
-from collections.abc import Callable
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import socketio
 from eyconf.validation import ConfigurationError, MultiConfigurationError
 
 from beets_flask.config import get_config
 from beets_flask.logger import log
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 old_on = socketio.AsyncServer.on
 

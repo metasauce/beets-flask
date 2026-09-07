@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 from uuid import uuid4
 
 from sqlalchemy import LargeBinary, select
@@ -19,6 +19,9 @@ from sqlalchemy.sql import func
 from beets_flask.logger import log
 
 from .types import DictType, FloatListType, IntDictType, StrDictType
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 
 class Base(DeclarativeBase):

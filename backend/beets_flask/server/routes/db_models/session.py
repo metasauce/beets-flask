@@ -42,7 +42,7 @@ from beets_flask.server.websocket.status import FolderStatusUpdate, JobStatusUpd
 
 from .base import ModelAPIBlueprint
 
-__all__ = ["MinimalChipInfo", "SessionAPIBlueprint"]
+__all__ = ["MinimalSession", "SessionAPIBlueprint"]
 
 
 class MinimalBestCandidateInfo(TypedDict):

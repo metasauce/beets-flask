@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import os
 from hashlib import md5
 from pathlib import Path
-from re import Pattern
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from re import Pattern
 
 from cachetools import Cache
 

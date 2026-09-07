@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from beets import autotag, importer
@@ -11,6 +14,10 @@ from beets_flask.importer.states import SessionState
 from tests.conftest import beets_lib_item
 from tests.mixins.database import IsolatedDBMixin
 from tests.unit.test_importer.test_states import get_album_match
+
+if TYPE_CHECKING:
+    from quart.typing import TestClientProtocol as Client
+    from sqlalchemy.orm import Session
 
 
 @pytest.fixture

@@ -5,9 +5,12 @@ flows may be triggered from the frontend by the users and we want to ensure that
 has a well defined path to follow.
 """
 
+from __future__ import annotations
+
 import pickle
 from abc import ABC
 from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar
 from unittest import mock
 
 import pytest
@@ -41,6 +44,15 @@ from tests.unit.test_importer.conftest import (
     VALID_PATHS,
     album_path_absolute,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from beets_flask.importer.session import (
+        CandidateChoice,
+        TaskIdMappingArg,
+    )
+    from beets_flask.server.websocket.status import FolderStatusUpdate
 
 
 class SendStatusMockMixin(ABC):

@@ -9,6 +9,7 @@ from abc import ABC
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import (
+    TYPE_CHECKING,
     Any,
     Literal,
     NamedTuple,
@@ -29,6 +30,9 @@ from beets.importer import ImportTask as BeetsImportTask
 from beets.library import Album as BeetsAlbum
 from beets.library import Item as BeetsItem
 from beets.library import Library as BeetsLibrary
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 __all__ = [
     # Our stuff

@@ -3,6 +3,8 @@
 Makes it possible to query and expose items to the frontend.
 """
 
+from typing import TYPE_CHECKING
+
 from beets.ui import _open_library
 from quart import Blueprint, g
 
@@ -22,8 +24,6 @@ library_bp.register_blueprint(resource_bp)
 library_bp.register_blueprint(stats_bp)
 library_bp.register_blueprint(artists_bp)
 library_bp.register_blueprint(metadata_bp)
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from beets.library import Library

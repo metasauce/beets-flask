@@ -4,7 +4,6 @@ Split artists by separators, and do some basic aggregation.
 """
 
 import re
-from typing import TYPE_CHECKING
 
 import polars as pl
 from quart import Blueprint, Response, g
@@ -14,9 +13,6 @@ from beets_flask.server.exceptions import NotFoundException
 
 artists_bp = Blueprint("artists", __name__)
 
-if TYPE_CHECKING:
-    # For type hinting the global g object
-    from . import g
 
 # TODOs:
 # Currently artist_sort is completely ignored. Im not even sure what it is supposed to do.

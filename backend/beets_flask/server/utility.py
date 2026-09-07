@@ -1,12 +1,16 @@
-from collections.abc import Callable
+from __future__ import annotations
+
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from typing_extensions import TypeVar
 
 from beets_flask.invoker.job import ExtraJobMeta
 
 from .exceptions import InvalidUsageException
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 R = TypeVar("R")
 D = TypeVar(

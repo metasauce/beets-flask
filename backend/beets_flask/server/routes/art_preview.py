@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from importlib.metadata import version
+from typing import TYPE_CHECKING
 
 import aiohttp
 from quart import Blueprint, make_response, redirect, request
@@ -17,6 +18,9 @@ from beets_flask.extensions.art import ArtResult
 from beets_flask.extensions.providers import ART_SOURCES
 from beets_flask.logger import log
 from beets_flask.server.exceptions import InvalidUsageException, NotFoundException
+
+if TYPE_CHECKING:
+    from beets_flask.extensions.art import ArtResult
 
 art_blueprint = Blueprint("art", __name__, url_prefix="/art")
 
