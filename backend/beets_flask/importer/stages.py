@@ -275,8 +275,10 @@ def stage[*Arg, Task: BeetsImportTask, Ret](
         task: Task | Ret | Generator[Task] | None = None
         while True:
             if isgenerator(task):
+                # isgenerator() narrows the type to Generator[object], but
+                # these are the tasks we are forwarding downstream.
                 for t in task:
-                    task = yield t
+                    task = yield cast(Task, t)
             else:
                 task = yield cast(
                     Task | None | Ret, task

@@ -83,9 +83,9 @@ class SendStatusMockMixin(ABC):
         ):
             yield
 
-        # Unexpectetly, this does not reset the statuses after each test.
-        # -> do it manually in the tests as needed.
-        self.statuses = []
+        # Clear the shared status list after each test so statuses do not
+        # leak into the next test. Some tests also reset mid-test as needed.
+        self.statuses.clear()
 
 
 class TestPreview(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryMixin):
@@ -111,7 +111,7 @@ class TestPreview(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryMixi
         db_session: Session,
         path,
     ):
-        self.statuses = []
+        self.statuses.clear()
         self.reset_database()
 
         stmt = select(SessionStateInDb).order_by(SessionStateInDb.created_at.desc())
@@ -185,7 +185,7 @@ class TestPreviewMultipleTasks(
         expected_tasks: int,
         autotag: bool,
     ):
-        self.statuses = []
+        self.statuses.clear()
         self.reset_database()
 
         stmt = select(SessionStateInDb).order_by(SessionStateInDb.created_at.desc())
@@ -458,7 +458,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         # Check if mapping is set correctly
         assert self.check_mapping_consistency(db_session)
 
-        self.statuses = []
+        self.statuses.clear()
         exc = await run_import_candidate(
             "obsolete_hash_import",
             str(path),
@@ -521,7 +521,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             "test"
         )
 
-        self.statuses = []
+        self.statuses.clear()
 
         exc = await run_import_candidate(
             "obsolete_hash_import",
@@ -585,7 +585,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         assert item is not None, "Should have imported at least one item for this test."
         imported_path = Path(item.path.decode("utf-8"))
 
-        self.statuses = []
+        self.statuses.clear()
         exc = await run_import_undo(
             f.hash,
             str(path),
@@ -670,7 +670,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             task.progress = Progress.PREVIEW_COMPLETED
         db_session.commit()
 
-        self.statuses = []
+        self.statuses.clear()
         exc = await run_import_candidate(
             "obsolete_hash_import",
             p,
@@ -742,7 +742,7 @@ class TestImportAuto(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             "Database should be empty before the test"
         )
 
-        self.statuses = []
+        self.statuses.clear()
 
         await run_preview(
             "obsolete_hash_preview",
@@ -790,7 +790,7 @@ class TestImportAutoFails(
             "Database should be empty before the test"
         )
 
-        self.statuses = []
+        self.statuses.clear()
 
         await run_preview(
             "obsolete_hash_preview",
@@ -1038,7 +1038,7 @@ class TestPluginEvents(
         return path
 
     async def test_preview_events(self, db_session: Session, path: Path):
-        self.events = []
+        self.events.clear()
 
         await run_preview(
             "obsolete_hash_preview",
@@ -1053,7 +1053,7 @@ class TestPluginEvents(
         assert len(self.events) == 3
 
     async def test_import_auto_events(self, db_session: Session, path: Path):
-        self.events = []
+        self.events.clear()
 
         exc = await run_import_auto(
             "obsolete_hash_import_auto",
@@ -1072,7 +1072,7 @@ class TestPluginEvents(
         assert "cli_exit" in self.events[-1]
 
     async def test_undo_events(self, db_session: Session, path: Path):
-        self.events = []
+        self.events.clear()
 
         exc = await run_import_undo(
             "obsolete_hash_import",
@@ -1141,7 +1141,7 @@ class TestImportBootleg(
         """
         Check that the import goes through, no matter what.
         """
-        self.statuses = []
+        self.statuses.clear()
         self.reset_database()
 
         stmt = select(SessionStateInDb).order_by(SessionStateInDb.created_at.desc())
@@ -1149,7 +1149,7 @@ class TestImportBootleg(
             "Database should be empty before the test"
         )
 
-        self.statuses = []
+        self.statuses.clear()
 
         exc = await run_import_bootleg(
             "obsolete_hash_import_auto",

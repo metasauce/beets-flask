@@ -133,7 +133,7 @@ class Match(Base):
     distance_id: Mapped[str] = mapped_column(ForeignKey("distances.id"))
     distance: Mapped[Distance] = relationship()
 
-    __mapper_args__: ClassVar[dict[str, str]] = {
+    __mapper_args__: ClassVar[dict[str, str]] = {  # type: ignore[misc]
         "polymorphic_on": "type",
         "polymorphic_identity": "matches",
     }
@@ -152,7 +152,7 @@ class AlbumMatch(Match):
         cascade="all, delete-orphan",
     )
 
-    __mapper_args__: ClassVar[dict[str, str]] = {
+    __mapper_args__: ClassVar[dict[str, str]] = {  # type: ignore[misc]
         "polymorphic_identity": "album",
     }
 
@@ -178,7 +178,7 @@ class TrackMatch(Match):
     info: Mapped[TrackInfo] = relationship()
     item: Mapped[Item] = relationship()
 
-    __mapper_args__: ClassVar[dict[str, str]] = {
+    __mapper_args__: ClassVar[dict[str, str]] = {  # type: ignore[misc]
         "polymorphic_identity": "track",
     }
 

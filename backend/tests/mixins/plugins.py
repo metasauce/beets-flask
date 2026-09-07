@@ -37,4 +37,5 @@ class PluginEventsMixin(ABC):
         ):
             yield
 
-        self.events = []
+        # Clear the shared capture list so events do not leak into the next test.
+        self.events.clear()
