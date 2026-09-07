@@ -210,7 +210,7 @@ export function FolderStatusIcon({
         case FolderStatus.UNKNOWN:
             return <CircleHelpIcon {...props} />;
         case FolderStatus.FAILED:
-            if (exception && exception.type === 'NoCandidatesFoundException') {
+            if (exception && exception.type === 'NoCandidatesFoundError') {
                 return <SearchXIcon {...props} />;
             }
             return <TriangleAlertIcon {...props} />;

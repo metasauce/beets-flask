@@ -29,8 +29,8 @@ from beets_flask.database.models.states import (
 from beets_flask.importer.progress import FolderStatus, Progress
 from beets_flask.logger import log
 from beets_flask.server.exceptions import (
-    InvalidUsageException,
-    NotFoundException,
+    InvalidUsageError,
+    NotFoundError,
     SerializedException,
 )
 from beets_flask.server.utility import (
@@ -106,7 +106,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
         folder_path = request.args.get("folder_path")
 
         if not folder_hash and not folder_path:
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 "Provide one folder hash OR one folder path", status_code=400
             )
 
@@ -122,7 +122,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                 # raise, but we do not want to spam the
                 # frontend console with errors.
                 # we manually handle this in sessionQueryOptions.
-                raise NotFoundException(
+                raise NotFoundError(
                     f"Item with {folder_hash=} {folder_path=} not found",
                     status_code=200,
                 )
@@ -157,12 +157,12 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
         folder_paths = request.args.getlist("folder_path")
 
         if len(folder_hashes) == 0:
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 "Provide at least one folder hash", status_code=400
             )
 
         if len(folder_hashes) != len(folder_paths):
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 "Provide the same number of folder hashes and paths", status_code=400
             )
 
@@ -276,7 +276,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
         folder_hashes, folder_paths = pop_folder_params(params)
         kind = pop_query_param(params, "kind", str)
         if not isinstance(kind, str):
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 "kind must be one of " + str(invoker.EnqueueKind.__members__)
             )
 
@@ -323,7 +323,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                 )
                 session_indb = db_session.execute(stmt_session).scalar_one_or_none()
                 if session_indb is None:
-                    raise InvalidUsageException(
+                    raise InvalidUsageError(
                         f"Session with session_id {session_id} not found",
                     )
 
@@ -334,7 +334,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                 stmt_task = select(TaskStateInDb).where(TaskStateInDb.id == task_id)
                 task_indb = db_session.execute(stmt_task).scalar_one_or_none()
                 if task_indb is None:
-                    raise InvalidUsageException(
+                    raise InvalidUsageError(
                         f"Task with task_id {task_id} not found",
                     )
 
@@ -342,7 +342,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                 folder_hash = task_indb.session.folder.hash
 
         if folder_hash is None or folder_path is None:
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 "task_id or session_id must be provided",
             )
 
@@ -374,7 +374,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
         folder_paths = request.args.getlist("folder_path")
 
         if len(folder_hashes) != len(folder_paths):
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 "Provide the same number of folder hashes and paths", status_code=400
             )
 

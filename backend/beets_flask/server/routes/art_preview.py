@@ -17,7 +17,7 @@ from quart import Blueprint, make_response, redirect, request
 from beets_flask.extensions.art import ArtResult
 from beets_flask.extensions.providers import ART_SOURCES
 from beets_flask.logger import log
-from beets_flask.server.exceptions import InvalidUsageException, NotFoundException
+from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
 
 if TYPE_CHECKING:
     from beets_flask.extensions.art import ArtResult
@@ -30,13 +30,13 @@ async def redirect_external_art():
     """Resolve cover art for external release URLs used in preview mode."""
     url = request.args.get("url")
     if not url:
-        raise InvalidUsageException("Missing required 'url' query parameter.")
+        raise InvalidUsageError("Missing required 'url' query parameter.")
 
     async with make_session() as session:
         art = await resolve_art(url, session)
 
         if art is None:
-            raise NotFoundException("No Artwork preview was found for the given URL.")
+            raise NotFoundError("No Artwork preview was found for the given URL.")
 
         return await _serve_art_result(art, session)
 
@@ -116,7 +116,7 @@ async def _serve_art_result(result: ArtResult, session: aiohttp.ClientSession):
 
     image = await fetch_image(session, result.urls)
     if image is None:
-        raise NotFoundException("No Artwork preview was found for the given URL.")
+        raise NotFoundError("No Artwork preview was found for the given URL.")
 
     data, content_type = image
     return await _image_response(data, content_type)

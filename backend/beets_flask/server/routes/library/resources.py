@@ -30,8 +30,8 @@ from quart import Blueprint, Response, abort, g, json, jsonify, request
 
 from beets_flask.config import get_config
 from beets_flask.logger import log
-from beets_flask.server.exceptions import NotFoundException
-from beets_flask.server.routes.exception import InvalidUsageException
+from beets_flask.server.exceptions import NotFoundError
+from beets_flask.server.routes.exception import InvalidUsageError
 from beets_flask.server.utility import pop_query_param
 
 if TYPE_CHECKING:
@@ -164,7 +164,7 @@ def resource(
 async def album(id: int):
     item = g.lib.get_album(id)
     if not item:
-        raise NotFoundException(f"Album with beets_id:'{id}' not found in beets db.")
+        raise NotFoundError(f"Album with beets_id:'{id}' not found in beets db.")
     return item
 
 
@@ -177,7 +177,7 @@ async def album_by_bf_id(bf_id: str):
     """
     albums = g.lib.albums(f"gui_import_id:{bf_id}")
     if len(albums) == 0:
-        raise NotFoundException(
+        raise NotFoundError(
             f"Album with gui_import_id:'{bf_id}' not found in beets db."
         )
 
@@ -220,7 +220,7 @@ async def all_albums(query: str = ""):
     )
 
     if len(params) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "Unexpected query parameters: , ".join(params.keys())
         )
 
@@ -287,7 +287,7 @@ async def albums_by_artist(artist_name: str):
 async def item(id: int):
     item = g.lib.get_item(id)
     if not item:
-        raise NotFoundException(f"Item with beets_id:'{id}' not found in beets db.")
+        raise NotFoundError(f"Item with beets_id:'{id}' not found in beets db.")
 
     return item
 
@@ -320,7 +320,7 @@ async def all_items(query: str = ""):
     )
 
     if len(params) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "Unexpected query parameters: , ".join(params.keys())
         )
 
@@ -616,9 +616,9 @@ class ItemSource(TypedDict):
 source_prefixes = ["mb", "spotify", "tidal", "discogs"]
 
 
-def _repr_Item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseMinimal:
+def _repr_item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseMinimal:
     if not item:
-        raise NotFoundException("Item not found")
+        raise NotFoundError("Item not found")
 
     out: dict[str, Any] = dict()
 
@@ -788,7 +788,7 @@ class AlbumSource(TypedDict):
     extra: NotRequired[dict[str, str]]
 
 
-def _rep_Album(
+def _rep_album(
     album: Album, expand=False, minimal=False
 ) -> AlbumResponse | AlbumResponseMinimal:
     """Get a flat -- i.e., JSON-ish -- representation of a beets Item/Album object.
@@ -869,7 +869,7 @@ def _rep_Album(
             out[key] = datetime.datetime.fromtimestamp(out[key])
 
     if expand:
-        out["items"] = [_repr_Item(item, minimal) for item in album.items()]
+        out["items"] = [_repr_item(item, minimal) for item in album.items()]
 
     return cast(AlbumResponse | AlbumResponseMinimal, out)
 
@@ -882,12 +882,12 @@ def _rep(entity: Item | Album | None, expand=False, minimal=False):
     """
 
     if not entity:
-        raise NotFoundException("Entity not found")
+        raise NotFoundError("Entity not found")
 
     if isinstance(entity, Item):
-        return _repr_Item(entity, minimal)
+        return _repr_item(entity, minimal)
     elif isinstance(entity, Album):
-        return _rep_Album(entity, expand, minimal)
+        return _rep_album(entity, expand, minimal)
     else:
         raise ValueError(f"Unknown entity type: {type(entity)}")
 

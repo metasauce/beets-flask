@@ -20,7 +20,7 @@ from cachetools.keys import hashkey
 from quart import Blueprint, Response, g
 
 from beets_flask.logger import log
-from beets_flask.server.exceptions import IntegrityException, NotFoundException
+from beets_flask.server.exceptions import IntegrityError, NotFoundError
 
 audio_bp = Blueprint("audio", __name__)
 
@@ -29,10 +29,10 @@ if TYPE_CHECKING:
     from . import g
 
 
-transcodeCache: Cache[Hashable, Any] = TTLCache(
+transcode_cache: Cache[Hashable, Any] = TTLCache(
     maxsize=128, ttl=60 * 60
 )  # 1 hour cache
-peaksCache: Cache[Hashable, Any] = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
+peaks_cache: Cache[Hashable, Any] = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
 
 
 @audio_bp.route("/item/<int:item_id>/audio", methods=["GET"])
@@ -43,19 +43,19 @@ async def item_audio(item_id: int):
     """
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundException(
+        raise NotFoundError(
             f"Item with beets_id:'{item_id}' not found in beets db."
         )
 
     item_path = beets_util.syspath(item.path)
     if not os.path.exists(item_path):
-        raise IntegrityException(
+        raise IntegrityError(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."
         )
 
     it = await transcode_to_webm(item_path)
     return Response(
-        cached_async_iterator(item_path, it, transcodeCache),
+        cached_async_iterator(item_path, it, transcode_cache),
         mimetype="audio/webm",
     )
 
@@ -68,13 +68,13 @@ async def item_audio_peaks(item_id: int):
     """
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundException(
+        raise NotFoundError(
             f"Item with beets_id:'{item_id}' not found in beets db."
         )
 
     item_path = beets_util.syspath(item.path)
     if not os.path.exists(item_path):
-        raise IntegrityException(
+        raise IntegrityError(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."
         )
 
@@ -310,18 +310,18 @@ async def transcode_to_webm(file_path: str) -> AsyncIterator[bytes]:
     return ffmpeg_streamer.stream_file(file_path)
 
 
-peaksCache = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
+peaks_cache = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
 
 
 async def audio_peaks_cached(item_path: str) -> np.ndarray:
     """Helper function with LRU caching."""
     cache_key = hashkey(item_path)
-    if cache_key in peaksCache:
+    if cache_key in peaks_cache:
         log.debug(f"Using cached peaks for {item_path}")
-        return peaksCache[cache_key]
+        return peaks_cache[cache_key]
 
     result = await audio_peaks(item_path)
-    peaksCache[cache_key] = result
+    peaks_cache[cache_key] = result
     return result
 
 

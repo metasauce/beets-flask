@@ -21,7 +21,7 @@ from beets_flask.importer.progress import FolderStatus
 from beets_flask.invoker.job import JobMeta
 from beets_flask.logger import log
 from beets_flask.server.exceptions import (
-    InvalidUsageException,
+    InvalidUsageError,
     SerializedException,
     to_serialized_exception,
 )
@@ -176,7 +176,7 @@ def emit_folder_status(
                         FolderInDb.id == hash, session=db_session
                     )
                     if f_on_disk is None:
-                        raise InvalidUsageException(
+                        raise InvalidUsageError(
                             "If only hash is given, it must be in the db."
                         )
                     path = f_on_disk.full_path

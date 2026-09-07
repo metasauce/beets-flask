@@ -21,11 +21,11 @@ def test_stage_insert_order():
     stages = StageOrder()
 
     # Workaround to avoid mypy error
-    dummySession: AutoImportSession = cast(AutoImportSession, None)
+    dummy_session: AutoImportSession = cast(AutoImportSession, None)
 
-    stages.append(identify_duplicates(dummySession))
-    stages.append(user_query(dummySession))
-    stages.append(stage=user_query(dummySession), name="foo")
+    stages.append(identify_duplicates(dummy_session))
+    stages.append(user_query(dummy_session))
+    stages.append(stage=user_query(dummy_session), name="foo")
 
     assert len(stages) == 3
     assert list(stages.keys())[0] == "identify_duplicates"
@@ -33,14 +33,14 @@ def test_stage_insert_order():
     assert list(stages.keys())[2] == "foo"
 
     stages.insert(
-        after="identify_duplicates", stage=match_threshold(dummySession), name="bar"
+        after="identify_duplicates", stage=match_threshold(dummy_session), name="bar"
     )
 
     assert len(stages) == 4
     assert list(stages.keys())[1] == "bar"
 
     stages.insert(
-        before="identify_duplicates", stage=match_threshold(dummySession), name="baz"
+        before="identify_duplicates", stage=match_threshold(dummy_session), name="baz"
     )
 
     assert len(stages) == 5

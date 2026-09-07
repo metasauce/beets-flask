@@ -29,7 +29,7 @@ class SerializedException(TypedDict):
     trace: NotRequired[str | None]
 
 
-class ApiException(Exception):
+class ApiError(Exception):
     """Base class for all API errors."""
 
     persist_in_db: bool
@@ -48,7 +48,7 @@ class ApiException(Exception):
         self.persist_in_db = persist_in_db
 
 
-class InvalidUsageException(ApiException):
+class InvalidUsageError(ApiError):
     """Invalid usage of the API.
 
     This is used to indicate that the API was used incorrectly.
@@ -57,7 +57,7 @@ class InvalidUsageException(ApiException):
     status_code: int = 400
 
 
-class NotFoundException(ApiException):
+class NotFoundError(ApiError):
     """Resource not found.
 
     This is used to indicate that the requested resource was not found.
@@ -66,7 +66,7 @@ class NotFoundException(ApiException):
     status_code: int = 404
 
 
-class IntegrityException(ApiException):
+class IntegrityError(ApiError):
     """Integrity error.
 
     This is used to indicate that the requested resource was not found.
@@ -75,7 +75,7 @@ class IntegrityException(ApiException):
     status_code: int = 409
 
 
-class NotImportedException(ApiException):
+class NotImportedError(ApiError):
     """Not imported error.
 
     So far only used for the auto import session, when the best
@@ -85,7 +85,7 @@ class NotImportedException(ApiException):
     status_code: int = 409
 
 
-class NoCandidatesFoundException(ApiException):
+class NoCandidatesFoundError(ApiError):
     """No candidates found error.
 
     Raised when an online search does not return any candidates.
@@ -124,7 +124,7 @@ class NoCandidatesFoundException(ApiException):
         return error_text
 
 
-class UserException(Exception):
+class UserError(Exception):
     """Base class for errors caused by user input or config."""
 
     status_code: int = 422
@@ -135,7 +135,7 @@ class UserException(Exception):
             self.status_code = status_code
 
 
-class DuplicateException(UserException):
+class DuplicateError(UserError):
     """Duplicate error.
 
     Raised when we have trouble resolving duplicates in the beets library.
@@ -198,7 +198,7 @@ def exception_as_return_value(
             return await f(*args, **kwargs)
         # Some exceptions are not serializable, so we need to convert them to a
         # serialized format. E.g. OSErrors
-        except ApiException as e:
+        except ApiError as e:
             log.info(e)
             return to_serialized_exception(e)
         except Exception as e:
@@ -209,10 +209,10 @@ def exception_as_return_value(
 
 
 __all__ = [
-    "ApiException",
-    "IntegrityException",
-    "InvalidUsageException",
-    "NotFoundException",
+    "ApiError",
+    "IntegrityError",
+    "InvalidUsageError",
+    "NotFoundError",
     "SerializedException",
     "to_serialized_exception",
 ]

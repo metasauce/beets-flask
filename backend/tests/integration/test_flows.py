@@ -364,7 +364,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
             },
         )
         assert exc is not None, "Should return an error"
-        assert exc["type"] == "NoCandidatesFoundException"
+        assert exc["type"] == "NoCandidatesFoundError"
 
         # Refetch state from db
         stmt = select(SessionStateInDb).order_by(SessionStateInDb.created_at.desc())
@@ -377,7 +377,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         assert self.check_mapping_consistency(db_session)
 
     async def test_add_candidates_cleared(self, db_session: Session, path: Path):
-        """Tests that candidates can be added after a NoCandidatesFoundException
+        """Tests that candidates can be added after a NoCandidatesFoundError
         and the exception is cleared"""
 
         stmt = select(SessionStateInDb).order_by(SessionStateInDb.created_at.desc())
@@ -385,7 +385,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
 
         assert s_state_indb is not None
         assert len(s_state_indb.tasks) == 1
-        s_state_indb.exc = pickle.dumps({"type": "NoCandidatesFoundException"})
+        s_state_indb.exc = pickle.dumps({"type": "NoCandidatesFoundError"})
         # commit
         db_session.commit()
 
@@ -570,7 +570,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
 
         # FIXME: We might want to raise our own exception here
         assert exc is not None
-        assert exc["type"] == "DuplicateException"
+        assert exc["type"] == "DuplicateError"
 
     async def test_undo(self, db_session: Session, path: Path):
         """Test the undo of the import process.
@@ -718,7 +718,7 @@ class TestImportBest(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         )
 
         assert exc is not None
-        assert exc["type"] == "IntegrityException"
+        assert exc["type"] == "IntegrityError"
 
 
 class TestImportAuto(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryMixin):

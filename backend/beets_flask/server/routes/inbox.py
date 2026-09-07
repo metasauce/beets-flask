@@ -22,7 +22,7 @@ from beets_flask.disk import (
 )
 from beets_flask.importer.progress import Progress
 from beets_flask.logger import log
-from beets_flask.server.exceptions import InvalidUsageException, NotFoundException
+from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
 from beets_flask.server.utility import (
     pop_folder_params,
 )
@@ -69,7 +69,7 @@ async def get_folder():
     folder_hashes, folder_paths = pop_folder_params(params, allow_mismatch=True)
 
     if len(folder_paths) != 1 and len(folder_hashes) != 1:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             f"Only one folder path or hash must be provided. Got: {folder_hashes=}, {folder_paths=}"
         )
 
@@ -78,7 +78,7 @@ async def get_folder():
 
     # Only absolute paths are allowed
     if folder_path is not None and not Path(folder_path).is_absolute():
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             f"Only absolute paths are allowed. Got: {folder_path=}"
         )
 
@@ -130,7 +130,7 @@ async def get_folder():
 
     # If we still don't have a folder, raise an error
     if folder is None:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             f"Could not find folder with {folder_hash=} or path {folder_path=}.",
             status_code=404,
         )
@@ -184,7 +184,7 @@ async def delete():
             continue
         folders.append(f)
         if f.hash != folder_hash:
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 "Folder hash does not match the current folder hash! Please refresh your hashes before deleting!",
             )
 
@@ -195,7 +195,7 @@ async def delete():
         elif isinstance(f, Folder):
             shutil.rmtree(f.full_path)
         else:
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 f"Cannot delete object of type {type(f)} at {f.full_path}"
             )
 
@@ -255,7 +255,7 @@ def compute_stats(folder: str):
     """
     inbox = get_inbox_for_path(folder)
     if inbox is None:
-        raise NotFoundException(f"Inbox folder `{folder} not found.")
+        raise NotFoundError(f"Inbox folder `{folder} not found.")
 
     p = Path(folder)
 

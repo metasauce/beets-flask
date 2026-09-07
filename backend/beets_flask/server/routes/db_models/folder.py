@@ -2,7 +2,7 @@ from sqlalchemy import select
 
 from beets_flask.database import db_session_factory
 from beets_flask.database.models import FolderInDb, SessionStateInDb, TaskStateInDb
-from beets_flask.server.exceptions import NotFoundException
+from beets_flask.server.exceptions import NotFoundError
 
 from .base import ModelAPIBlueprint
 
@@ -36,6 +36,6 @@ class FolderAPIBlueprint(ModelAPIBlueprint[FolderInDb]):
             folder = db_session.execute(stmt).scalars().first()
 
             if folder is None:
-                raise NotFoundException("Folder not found")
+                raise NotFoundError("Folder not found")
 
             return folder.to_dict()

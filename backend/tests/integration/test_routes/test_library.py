@@ -195,15 +195,15 @@ class TestAlbumsPagination(IsolatedBeetsLibraryMixin):
     @pytest.fixture(autouse=True)
     def albums(self):  # type: ignore
         """Fixture to add albums to the beets library before running tests."""
-        nAlbums = 100
+        n_albums = 100
         if len(self.beets_lib.albums()) == 0:
-            for i in range(nAlbums):
+            for i in range(n_albums):
                 artist = "Even" if i % 2 == 0 else "Odd"
                 a = beets_lib_album(albumartist=f"{artist}", album=f"Album {i}")
                 self.beets_lib.add(a)
                 self.beets_lib.add(beets_lib_item(artist=f"{artist}", album_id=a.id))
 
-        assert len(self.beets_lib.albums()) == nAlbums
+        assert len(self.beets_lib.albums()) == n_albums
 
     async def test_get_albums(self, client: Client):
         """Test the GET request to retrieve all albums with pagination.
@@ -349,15 +349,15 @@ class TestItemsPagination(IsolatedBeetsLibraryMixin):
     @pytest.fixture(autouse=True)
     def items(self):  # type: ignore
         """Fixture to add items to the beets library before running tests."""
-        nItems = 100
+        n_items = 100
         if len(self.beets_lib.items()) == 0:
-            for i in range(nItems):
+            for i in range(n_items):
                 artist = "Even" if i % 2 == 0 else "Odd"
                 self.beets_lib.add(
                     beets_lib_item(artist=f"{artist}", album=f"Album {i}")
                 )
 
-        assert len(self.beets_lib.items()) == nItems
+        assert len(self.beets_lib.items()) == n_items
 
     async def test_get_items(self, client: Client):
         """Test the GET request to retrieve all items with pagination.

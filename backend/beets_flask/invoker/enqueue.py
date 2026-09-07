@@ -39,7 +39,7 @@ from beets_flask.importer.types import BeetsDuplicateAction
 from beets_flask.logger import log
 from beets_flask.redis import import_queue, preview_queue
 from beets_flask.server.exceptions import (
-    InvalidUsageException,
+    InvalidUsageError,
     exception_as_return_value,
 )
 from beets_flask.server.websocket.status import (
@@ -185,7 +185,7 @@ async def enqueue(
         case EnqueueKind.IMPORT_UNDO:
             job = enqueue_import_undo(hash, path, extra_meta, **kwargs)
         case _:
-            raise InvalidUsageException(f"Unknown kind {kind}")
+            raise InvalidUsageError(f"Unknown kind {kind}")
 
     log.debug(f"Enqueued {job.id=} {job.meta=}")
 
@@ -201,7 +201,7 @@ def enqueue_preview(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs) ->
     autotag: bool | None = kwargs.pop("autotag", None)
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException("EnqueueKind.PREVIEW does not accept any kwargs.")
+        raise InvalidUsageError("EnqueueKind.PREVIEW does not accept any kwargs.")
     job = _enqueue(preview_queue, run_preview, hash, path, group_albums, autotag)
     _set_job_meta(job, hash, path, EnqueueKind.PREVIEW, extra_meta)
     return job
@@ -215,13 +215,13 @@ def enqueue_preview_add_candidates(
 
     search: TaskIdMappingArg[Search | Literal["skip"]] = kwargs.pop("search", None)
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.PREVIEW_ADD_CANDIDATES only accepts the following kwargs: "
              "search"
         )
 
     if search is None:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.PREVIEW_ADD_CANDIDATES requires a search kwarg."
         )
 
@@ -263,7 +263,7 @@ def enqueue_import_candidate(
     )
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.IMPORT only accepts the following kwargs: "
              "candidate_ids, duplicate_actions."
         )
@@ -322,7 +322,7 @@ def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
     )
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.IMPORT_AUTO only accepts the following kwargs: "
              "group_albums, autotag, import_threshold, duplicate_actions."
         )
@@ -359,7 +359,7 @@ def enqueue_import_undo(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
     delete_files: bool = kwargs.pop("delete_files", True)
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.IMPORT_UNDO only accepts the following kwargs: "
              "delete_files."
         )
@@ -647,7 +647,7 @@ def _get_live_state_by_folder(
 
     if s_state_indb is None:
         # TODO: rq error handling
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             f"No session state found for {path=} {hash=} "
              f"fresh_hash_on_disk={f_on_disk}, this should not happen."
         )

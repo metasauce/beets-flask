@@ -90,7 +90,7 @@ class TestFileUploadRoute:
         )
         data = await response.get_json()
         assert str(response.status_code).startswith("4")
-        assert data["type"] == "InvalidUsageException"
+        assert data["type"] == "InvalidUsageError"
         assert "Missing header" in data["message"]
 
     async def test_invalid_target_path(self, client, monkeypatch):
@@ -109,7 +109,7 @@ class TestFileUploadRoute:
         )
         data = await response.get_json()
         assert str(response.status_code).startswith("4")
-        assert data["type"] == "InvalidUsageException"
+        assert data["type"] == "InvalidUsageError"
         assert "Invalid target path" in data["message"]
 
     async def test_invalid_filename_with_path_separators(self, client, monkeypatch):
@@ -128,7 +128,7 @@ class TestFileUploadRoute:
         )
         data = await response.get_json()
         assert str(response.status_code).startswith("4")
-        assert data["type"] == "InvalidUsageException"
+        assert data["type"] == "InvalidUsageError"
         assert "Invalid filename" in data["message"]
 
 
@@ -152,7 +152,7 @@ class TestFileUploadValidationRoute:
         assert data["status"] == "ok"
 
     async def test_validate_endpoint_missing_headers(self, client):
-        """Test that the validate endpoint raises InvalidUsageException for missing headers."""
+        """Test that the validate endpoint raises InvalidUsageError for missing headers."""
         response = await client.post(
             "/api_v1/file_upload/validate",
             headers={
@@ -162,11 +162,11 @@ class TestFileUploadValidationRoute:
         )
         assert str(response.status_code).startswith("4")
         data = await response.get_json()
-        assert data["type"] == "InvalidUsageException"
+        assert data["type"] == "InvalidUsageError"
         assert "Missing header" in data["message"]
 
     async def test_validate_endpoint_invalid_filename(self, client, monkeypatch):
-        """Test that the validate endpoint raises InvalidUsageException for invalid filenames."""
+        """Test that the validate endpoint raises InvalidUsageError for invalid filenames."""
         # Patch get_inbox_folders to return a known inbox path
         monkeypatch.setattr(
             "beets_flask.server.routes.file_upload.get_inbox_folders",
@@ -182,11 +182,11 @@ class TestFileUploadValidationRoute:
         )
         assert str(response.status_code).startswith("4")
         data = await response.get_json()
-        assert data["type"] == "InvalidUsageException"
+        assert data["type"] == "InvalidUsageError"
         assert "Invalid filename" in data["message"]
 
     async def test_validate_endpoint_invalid_target_path(self, client, monkeypatch):
-        """Test that the validate endpoint raises InvalidUsageException for invalid target paths."""
+        """Test that the validate endpoint raises InvalidUsageError for invalid target paths."""
         # Patch get_inbox_folders to return a known inbox path
         monkeypatch.setattr(
             "beets_flask.server.routes.file_upload.get_inbox_folders",
@@ -202,5 +202,5 @@ class TestFileUploadValidationRoute:
         )
         assert str(response.status_code).startswith("4")
         data = await response.get_json()
-        assert data["type"] == "InvalidUsageException"
+        assert data["type"] == "InvalidUsageError"
         assert "Invalid target path" in data["message"]

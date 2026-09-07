@@ -7,7 +7,7 @@ from typing_extensions import TypeVar
 
 from beets_flask.invoker.job import ExtraJobMeta
 
-from .exceptions import InvalidUsageException
+from .exceptions import InvalidUsageError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -55,7 +55,7 @@ def pop_query_param(
     except (ValueError, TypeError):
         if error_message is None:
             error_message = f"Invalid parameter'{key}'"
-        raise InvalidUsageException(error_message)
+        raise InvalidUsageError(error_message)
 
     return value
 
@@ -80,9 +80,9 @@ def pop_extra_meta(params: dict, n_jobs=1) -> list[ExtraJobMeta]:
     if job_refs is None:
         return [{} for _ in range(n_jobs)]
     if not isinstance(job_refs, list):
-        raise InvalidUsageException("job_frontend_refs must be a list")
+        raise InvalidUsageError("job_frontend_refs must be a list")
     if len(job_refs) != n_jobs:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             f"job_frontend_refs must be a list of length {n_jobs}"
         )
 
@@ -120,12 +120,12 @@ def pop_folder_params(
     )
 
     if not allow_mismatch and len(folder_hashes) != len(folder_paths):
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "folder_hashes and folder_paths must be of the same length"
         )
 
     if not allow_empty and ((len(folder_hashes) + len(folder_paths)) == 0):
-        raise InvalidUsageException("folder_hashes and folder_paths cannot be empty")
+        raise InvalidUsageError("folder_hashes and folder_paths cannot be empty")
 
     return folder_hashes, folder_paths
 

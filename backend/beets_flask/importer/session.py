@@ -56,11 +56,11 @@ from beets_flask.importer.types import (
 )
 from beets_flask.logger import log
 from beets_flask.server.exceptions import (
-    ApiException,
-    DuplicateException,
-    IntegrityException,
-    NoCandidatesFoundException,
-    NotImportedException,
+    ApiError,
+    DuplicateError,
+    IntegrityError,
+    NoCandidatesFoundError,
+    NotImportedError,
     to_serialized_exception,
 )
 
@@ -394,7 +394,7 @@ class BaseSession(BeetsImportSession, ABC):
             self.state.exc = None
         except ImportAbortError:
             log.debug("Interactive import session aborted by user")
-        except ApiException as e:
+        except ApiError as e:
             if e.persist_in_db:
                 log.debug(f"Persisting exception {e} in session state")
                 self.state.exc = to_serialized_exception(e)
@@ -489,7 +489,7 @@ class PreviewSession(BaseSession):
         task.lookup_candidates(search_ids)
 
         if not task.candidates or len(task.candidates) == 0:
-            raise NoCandidatesFoundException(persist_in_db=True)
+            raise NoCandidatesFoundError(persist_in_db=True)
 
         # Update our state
         task_state = self.state.get_task_state_for_task_raise(task)
@@ -576,18 +576,18 @@ class AddCandidatesSession(PreviewSession):
                 error_text += f"artist: {search['search_artist']}; "
             if search["search_name"]:
                 error_text += f"album: {search['search_name']}; "
-            error_text += NoCandidatesFoundException.metadata_plugin_info()
-            raise NoCandidatesFoundException(
+            error_text += NoCandidatesFoundError.metadata_plugin_info()
+            raise NoCandidatesFoundError(
                 error_text,
                 persist_in_db=False,
             )
         # Hack: Clear exception if we found new candidates
         elif (
             self.state.exc is not None
-            and self.state.exc["type"] == "NoCandidatesFoundException"
+            and self.state.exc["type"] == "NoCandidatesFoundError"
         ):
             log.debug(
-                "Clearing previous NoCandidatesFoundException after finding candidates via search."
+                "Clearing previous NoCandidatesFoundError after finding candidates via search."
             )
             self.state.exc = None
 
@@ -742,7 +742,7 @@ class ImportSession(BaseSession):
         """
         if (
             self.state.exc is not None
-            and self.state.exc["type"] == "NotImportedException"
+            and self.state.exc["type"] == "NotImportedError"
             and self.state.exc["message"].startswith("Match below threshold")
         ):
             log.debug(
@@ -820,7 +820,7 @@ class ImportSession(BaseSession):
         task_duplicate_action = self.duplicate_actions[task_state.id]
         task_state.duplicate_action = task_duplicate_action
         if task_duplicate_action is BeetsDuplicateAction.ASK:
-            raise DuplicateException(
+            raise DuplicateError(
                 "You have set the duplicate action to 'ask' in your beets config."
             )
 
@@ -920,7 +920,7 @@ class AutoImportSession(ImportSession):
 
     The default threshold is 0.04, so that a "96% match or better" will be imported.
 
-    Raises a `NotImportedException` if the match quality is worse than the threshold,
+    Raises a `NotImportedError` if the match quality is worse than the threshold,
     stopping the pipeline.
     """
 
@@ -986,7 +986,7 @@ class AutoImportSession(ImportSession):
             distance = 2.0
 
         if not task.candidates or len(task.candidates) == 0:
-            raise NoCandidatesFoundException()
+            raise NoCandidatesFoundError()
 
         if distance > self.import_threshold:
             log.debug(
@@ -994,7 +994,7 @@ class AutoImportSession(ImportSession):
             )
             d = (1 - distance) * 100
             t = (1 - self.import_threshold) * 100
-            raise NotImportedException(f"Match below threshold ({d:.0f}% < {t:.0f}%)")
+            raise NotImportedError(f"Match below threshold ({d:.0f}% < {t:.0f}%)")
             # beets would handle this via the task action:
             task.set_choice(BeetsImportAction.SKIP)
         else:
@@ -1080,7 +1080,7 @@ class UndoSession(BaseSession):
 
             # FIXME: Multi/array exceptions need handling
             self.state.exc = to_serialized_exception(excs[0])
-            raise IntegrityException(
+            raise IntegrityError(
                 "Could not delete all items. Some items might be left in the library. "
                  f"Problematic files were: {pths}"
             )

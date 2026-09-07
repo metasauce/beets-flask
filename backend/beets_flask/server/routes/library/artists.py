@@ -9,7 +9,7 @@ import polars as pl
 from quart import Blueprint, Response, g
 
 from beets_flask.config import get_config
-from beets_flask.server.exceptions import NotFoundException
+from beets_flask.server.exceptions import NotFoundError
 
 artists_bp = Blueprint("artists", __name__)
 
@@ -177,7 +177,7 @@ async def all_artists(artist_name: str | None = None):
 
     if artist_name is not None:
         if artists.is_empty():
-            raise NotFoundException(f"Artist '{artist_name}' not found.")
+            raise NotFoundError(f"Artist '{artist_name}' not found.")
         else:
             return artists.row(0, named=True), 200
     # TODO: We serialize as records here it might be better to have a different structure as we send quite a bit of data

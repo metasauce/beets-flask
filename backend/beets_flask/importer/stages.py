@@ -34,8 +34,8 @@ from beets.util import pipeline as beets_pipeline
 
 from beets_flask import log
 from beets_flask.server.exceptions import (
-    NoCandidatesFoundException,
-    NotImportedException,
+    NoCandidatesFoundError,
+    NotImportedError,
 )
 
 from .progress import Progress, ProgressState
@@ -151,7 +151,7 @@ def set_progress(
 
     @set_progress(
         Progress.LOOKING_UP_CANDIDATES,
-        on_Error={NoCandidatesFoundException: Progress.PREVIEW_COMPLETED}
+        on_Error={NoCandidatesFoundError: Progress.PREVIEW_COMPLETED}
     )
     def lookup_candidates(session: BaseSessionNew, task: ImportTask):
         pass
@@ -403,7 +403,7 @@ def group_albums(
 @skip_until(Progress.LOOKING_UP_CANDIDATES)
 @set_progress(
     Progress.LOOKING_UP_CANDIDATES,
-    on_error={NoCandidatesFoundException: Progress.PREVIEW_COMPLETED},
+    on_error={NoCandidatesFoundError: Progress.PREVIEW_COMPLETED},
 )
 def lookup_candidates(
     session: BaseSession,
@@ -549,7 +549,7 @@ def plugin_stage(
 @skip_until(Progress.MATCH_THRESHOLD)
 @set_progress(
     Progress.MATCH_THRESHOLD,
-    on_error={NotImportedException: Progress.PREVIEW_COMPLETED},
+    on_error={NotImportedError: Progress.PREVIEW_COMPLETED},
 )
 def match_threshold(
     session: AutoImportSession,

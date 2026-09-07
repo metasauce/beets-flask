@@ -10,7 +10,7 @@ from quart import Blueprint, jsonify, request
 
 from beets_flask.config import get_config
 from beets_flask.logger import log
-from beets_flask.server.exceptions import InvalidUsageException
+from beets_flask.server.exceptions import InvalidUsageError
 from beets_flask.watchdog.inbox import get_inbox_folders
 
 file_upload_bp = Blueprint("file_upload", __name__, url_prefix="/file_upload")
@@ -65,14 +65,14 @@ def _get_filename_and_dir() -> tuple[str, Path]:
     filedir = request.headers.get("X-File-Target-Dir")
 
     if not filename or not filedir:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "Missing header: X-Filename and X-File-Target-Dir are required"
         )
 
     # Assert filename does not contain path separators
     filename = unquote_plus(filename)
     if "/" in filename or "\\" in filename:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "Invalid filename, must not contain path separators."
         )
 
@@ -86,6 +86,6 @@ def _get_filename_and_dir() -> tuple[str, Path]:
 
     if not is_valid_filepath:
         log.error(f"Invalid target path {filedir}, must be within an inbox.")
-        raise InvalidUsageException("Invalid target path, must be within an inbox.")
+        raise InvalidUsageError("Invalid target path, must be within an inbox.")
 
     return filename, filedir

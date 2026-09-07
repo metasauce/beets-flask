@@ -7,7 +7,7 @@ class TestErrorHandling:
         assert response.status_code == 500
 
         # Returned data is a SerializedException
-        assert data["type"] == "ApiException"
+        assert data["type"] == "ApiError"
         assert data["message"] == "This is a bad request"
         assert data["description"] is not None
 
@@ -17,7 +17,7 @@ class TestErrorHandling:
         assert response.status_code == 400
 
         # Returned data is a SerializedException
-        assert data["type"] == "InvalidUsageException"
+        assert data["type"] == "InvalidUsageError"
         assert data["message"] == "This is a bad request"
         assert data["description"] is not None
 
@@ -37,7 +37,7 @@ class TestErrorHandling:
         assert response.status_code == 409
 
         # Returned data is a SerializedException
-        assert data["type"] == "IntegrityException"
+        assert data["type"] == "IntegrityError"
         assert data["message"] == "This is an integrity error"
         assert data["description"] is not None
 
@@ -78,6 +78,6 @@ class TestErrorHandling:
         assert response.status_code == 404
 
         # Returned data is a SerializedException
-        assert data["type"] == "NotFoundException"
+        assert data["type"] == "NotFoundError"
         assert data["message"] == "This is a not found error"
         assert data["description"] is not None
