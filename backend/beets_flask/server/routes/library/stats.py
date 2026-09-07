@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import TypedDict
 
-from quart import Blueprint, g, jsonify
+from quart import Blueprint, jsonify
 
 from beets_flask.config import get_config
 from beets_flask.disk import dir_size
@@ -36,7 +36,8 @@ async def stats():
 
     with g.lib.transaction() as tx:
         album_stats = tx.query(
-            "SELECT COUNT(*), COUNT(DISTINCT label), COUNT(DISTINCT albumartist) FROM albums"
+            "SELECT COUNT(*), COUNT(DISTINCT label), "
+            "COUNT(DISTINCT albumartist) FROM albums"
         )
         items_stats = tx.query(
             "SELECT COUNT(*), MAX(added), MAX(mtime), SUM(length) FROM items"

@@ -19,7 +19,6 @@ from collections.abc import (
 )
 from typing import (
     Any,
-    Generic,
     Literal,
     TypeVar,
 )
@@ -41,7 +40,7 @@ Stage = (
 )
 
 
-class AsyncPipeline(Generic[Task, R]):
+class AsyncPipeline[Task: Any, R]:
     start_tasks: AsyncIterable[Task]
     stages: list[Stage[Task, R]]
 
@@ -99,7 +98,7 @@ class AsyncPipeline(Generic[Task, R]):
             pass
 
 
-async def _next_resolve_async(gen: Generator[Y, S, R] | AsyncGenerator[Y, S]):
+async def _next_resolve_async[Y, S, R](gen: Generator[Y, S, R] | AsyncGenerator[Y, S]):
     """Call next on the generator."""
     if isinstance(gen, Generator):
         return next(gen)
@@ -107,7 +106,7 @@ async def _next_resolve_async(gen: Generator[Y, S, R] | AsyncGenerator[Y, S]):
         return await anext(gen)
 
 
-async def _send_resolve_async(
+async def _send_resolve_async[Y, S, R](
     gen: Generator[Y, S, R] | AsyncGenerator[Y, S], *args, **kwargs
 ):
     """Send to the generator."""
@@ -117,7 +116,7 @@ async def _send_resolve_async(
         return await gen.asend(*args, **kwargs)
 
 
-async def _async_iterable_from_iterable(
+async def _async_iterable_from_iterable[Task: Any](
     iterable: Iterable[Task],
 ) -> AsyncIterable[Task]:
     for item in iterable:

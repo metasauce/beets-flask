@@ -234,7 +234,7 @@ class TestSessionState(StateTest):
 
         assert serialized["status"]["message"] is None
         assert serialized["status"]["progress"] == Progress.NOT_STARTED
-        assert serialized["status"]["plugin_name"] == None
+        assert serialized["status"]["plugin_name"] is None
 
         # Can be serialized with json.dumps and Encoder
         import json

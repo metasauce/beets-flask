@@ -14,11 +14,9 @@ Why not just have State and StateInDb in the same class?
 from __future__ import annotations
 
 import pickle
-from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from beets.importer import Action
 from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
@@ -32,16 +30,13 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
-from sqlalchemy.sql.elements import ColumnElement
 
 from beets_flask.database.mapper.base import Context
 from beets_flask.database.models.base import Base
 from beets_flask.database.models.match import Distance, Match
 from beets_flask.disk import Archive, Folder
 from beets_flask.importer.progress import Progress
-from beets_flask.importer.states import SessionState
 from beets_flask.logger import log
-from beets_flask.server.exceptions import SerializedException
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -81,6 +76,10 @@ class FolderInDb(Base):
         ----------
         path : Path
             The path to create the object from.
+        hash : str
+            The hash of the folder.
+        is_album : bool | None, optional
+            Whether the folder is an album; None if not checked yet.
 
         """
         if isinstance(path, str):
@@ -120,7 +119,9 @@ class FolderInDb(Base):
     def hash(self) -> str:
         """Convenience property to get the id.
 
-        Note: Although the id is just the hash, when querying the db, you **must** use `FolderInDb.id == hash`. Sqlalchemy does not resolve properties.
+        Note: Although the id is just the hash, when querying the db, you
+        **must** use `FolderInDb.id == hash`. Sqlalchemy does not resolve
+        properties.
         """
         return self.id
 
@@ -134,13 +135,15 @@ class FolderInDb(Base):
 
     @classmethod
     def get_current_on_disk(cls, hash: str, path: Path | str) -> Folder | Archive:
-        """Check that a folders hash is still the same, as you have previously determined.
+        """Check that a folder's hash is still the same as previously determined.
 
-        If changed, a new instance of FolderInDb is created and stored in the DB.
+        If changed, a new instance of FolderInDb is created and stored in
+        the DB.
 
         Returns
         -------
-        Folder: The live folder object on disk, with the potentially new (current) hash.
+        Folder: The live folder object on disk, with the potentially new
+        (current) hash.
 
         """
         from beets_flask.database.setup import db_session_factory
@@ -164,7 +167,7 @@ class FolderInDb(Base):
             if f_in_db.hash != f_on_disk.hash:
                 log.debug(
                     f"Hash mismatch {path=} {f_in_db.hash=} {f_on_disk.hash=}"
-                     "This indicatest that the folder has changed."
+                    "This indicatest that the folder has changed."
                 )
             return f_on_disk
 
@@ -214,11 +217,12 @@ class SessionStateInDb(Base):
             "folder_hash", "folder_revision", name="uq_folder_hash_revision"
         ),
     )
-    # We have folder revisions to allow multiple sessions for the same folder hash,
-    # the purpose being that we want to keep old sessions around. E.g. to not loose
-    # old data when regenerating previews.
-    # but at the same time, we want a soft 1:1 mapping between folder hash and session.
-    # Thus, revisions are needed: the session-hash link always uses the highest revision.
+    # We have folder revisions to allow multiple sessions for the same folder
+    # hash, the purpose being that we want to keep old sessions around. E.g.
+    # to not loose old data when regenerating previews. But at the same time,
+    # we want a soft 1:1 mapping between folder hash and session.
+    # Thus, revisions are needed: the session-hash link always uses the
+    # highest revision.
 
     # FIXME: This should be a getter for the which queries the tasks
     progress: Mapped[Progress]
@@ -494,7 +498,7 @@ class CandidateStateInDb(Base):
         return distance.raw_distance / distance.max_distance
 
     @normalized_distance.inplace.expression
-    def _normalized_distance_expression(cls) -> ColumnElement[float]:
+    def _normalized_distance_expression(self) -> ColumnElement[float]:
         """SQL counterpart of `normalized_distance`.
 
         Requires joins to `Match` and `Distance` in the query.

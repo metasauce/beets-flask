@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Self
 from uuid import uuid4
@@ -52,7 +51,8 @@ class Base(DeclarativeBase):
         close_after = False
         if session is None:
             log.debug(
-                "No session provided, you will not be able to make changes to the database."
+                "No session provided, you will not be able to make changes "
+                "to the database."
             )
             close_after = True
             from beets_flask.database.setup import session_factory
@@ -74,7 +74,8 @@ class Base(DeclarativeBase):
         close_after = False
         if session is None:
             log.debug(
-                "No session provided, you will not be able to make changes to the database."
+                "No session provided, you will not be able to make changes "
+                "to the database."
             )
             close_after = True
             from beets_flask.database.setup import session_factory

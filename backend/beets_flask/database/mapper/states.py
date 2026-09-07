@@ -58,7 +58,7 @@ class TaskStateMapper(DBMapper[TaskState, TaskStateInDb]):
         self.candidate_mapper = CandidateStateMapper()
 
     def _from_db(self, model: TaskStateInDb, ctx: Context) -> TaskState:
-        """Recreate the live TaskState with underlying task from its stored version in the db."""
+        """Recreate the live TaskState with its underlying task from the db."""
 
         # We just assume it is a normal import task
         beets_task = BeetsImportTask(

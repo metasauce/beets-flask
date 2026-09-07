@@ -1,4 +1,4 @@
-"""Tests for the state mappers: SessionStateMapper, TaskStateMapper, CandidateStateMapper.
+"""Tests for the state mappers (Session/Task/CandidateStateMapper).
 
 These tests verify bidirectional (roundtrip) conversion between live state objects
 and their database model representations, following the same pattern as test_match.py.
@@ -29,7 +29,6 @@ from beets_flask.database.models.states import (
     TaskStateInDb,
 )
 from beets_flask.importer.states import CandidateState, SessionState, TaskState
-from beets_flask.importer.types import BeetsItem
 from tests.conftest import beets_lib_item
 from tests.unit.test_database.mapper.test_match import create_beets_album_match
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
@@ -70,7 +69,8 @@ async def get_folder():
 
     if len(folder_paths) != 1 and len(folder_hashes) != 1:
         raise InvalidUsageError(
-            f"Only one folder path or hash must be provided. Got: {folder_hashes=}, {folder_paths=}"
+            "Only one folder path or hash must be provided. "
+            f"Got: {folder_hashes=}, {folder_paths=}"
         )
 
     folder_path = folder_paths[0] if len(folder_paths) == 1 else None
@@ -169,7 +169,8 @@ async def delete():
             seen.add((path, hash))
             folder_paths_and_hashes.append((path, hash))
 
-    # Sort by length of the path (longest first, to delete the most nested folders first)
+    # Sort by length of the path (longest first, to delete the most nested
+    # folders first)
     folder_paths_and_hashes = sorted(
         folder_paths_and_hashes, key=lambda x: len(x[0].parts), reverse=True
     )
@@ -185,7 +186,8 @@ async def delete():
         folders.append(f)
         if f.hash != folder_hash:
             raise InvalidUsageError(
-                "Folder hash does not match the current folder hash! Please refresh your hashes before deleting!",
+                "Folder hash does not match the current folder hash! "
+                "Please refresh your hashes before deleting!",
             )
 
     # Delete the folders

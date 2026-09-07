@@ -148,13 +148,19 @@ def create_beets_album_match(
         album_url: Album URL (default: "https://example.com/album")
         album_image_path: Album cover path (default: "/path/to/image.jpg")
         album_disambig: Album disambiguation (default: "")
-        tracks: Custom list of TrackInfo objects. If None, generates from album_track_count.
-        distance_penalties: Dict of {key: value} penalties. Defaults to {"artist": 0.1, "album": 0.2}
-        track_distances: Dict of {TrackInfo: Dict of {key: value}} for track-level penalties.
-                          e.g., {track1: {"track_title": 0.05}, track2: {"track_title": 0.0}}
-        mapping: Dict of {Item: TrackInfo} mappings. If None, generates from album_track_count.
-        extra_items: List of extra Item objects. If None, generates from album_track_count.
-        extra_tracks: List of extra TrackInfo objects. If None, generates from album_track_count.
+        tracks: Custom list of TrackInfo objects. If None, generates from
+            album_track_count.
+        distance_penalties: Dict of {key: value} penalties. Defaults to
+            {"artist": 0.1, "album": 0.2}
+        track_distances: Dict of {TrackInfo: Dict of {key: value}} for
+            track-level penalties.
+            e.g., {track1: {"track_title": 0.05}, track2: {"track_title": 0.0}}
+        mapping: Dict of {Item: TrackInfo} mappings. If None, generates
+            from album_track_count.
+        extra_items: List of extra Item objects. If None, generates from
+            album_track_count.
+        extra_tracks: List of extra TrackInfo objects. If None, generates
+            from album_track_count.
 
     Returns:
         beets.autotag.hooks.AlbumMatch: A test AlbumMatch object

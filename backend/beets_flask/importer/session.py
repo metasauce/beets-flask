@@ -1,12 +1,14 @@
 """Session classes for the import pipeline.
 
-Sessions often take particular arguments, such as a duplicate action. In the simplest and most common case,
-each session has one task (i.e. one album) to deal with. Sometimes, however, one session may have multiple tasks,
-such as when one folder contains files from two albums.
+Sessions often take particular arguments, such as a duplicate action. In the
+simplest and most common case, each session has one task (i.e. one album) to
+deal with. Sometimes, however, one session may have multiple tasks, such as
+when one folder contains files from two albums.
 
-To account for this, we use the TaskMapping type.
-They contain an action to take for each task (mapping a task_id as string to the action), and the default value
-must be None (which means that the session uses the default action for that task, loaded from user config).
+To account for this, we use the TaskMapping type. They contain an action to
+take for each task (mapping a task_id as string to the action), and the
+default value must be None (which means that the session uses the default
+action for that task, loaded from user config).
 
 When no mapping is given, the default action is used for all tasks.
 
@@ -28,7 +30,6 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import Callable
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
@@ -42,7 +43,7 @@ from beets.util import bytestring_path
 
 from beets_flask.config import get_config
 from beets_flask.disk import is_archive_file
-from beets_flask.importer.progress import Progress, ProgressState
+from beets_flask.importer.progress import Progress
 from beets_flask.importer.types import (
     BeetsAlbum,
     BeetsAlbumMatch,
@@ -92,18 +93,21 @@ TaskIdMapping = defaultdict[str, T]
 TaskIdMappingArg = dict[str, T | None] | None
 
 
-def parse_task_id_mapping(mapping: TaskIdMappingArg[T], default: T) -> TaskIdMapping[T]:
-    """Convert the flexible arguments to stricter TaskIdMapping that sessions use internally.
+def parse_task_id_mapping[T](
+    mapping: TaskIdMappingArg[T], default: T
+) -> TaskIdMapping[T]:
+    """Convert flexible arguments to the stricter TaskIdMapping used internally.
 
     Parameters
     ----------
     mapping : TaskIdMappingArg
         For each task_id (key) which action to take (value).
         If None, the default action is used for all tasks.
-        If "*" is used as key, this action is used for all tasks, and only one key-value
-        pair is allowed.
+        If "*" is used as key, this action is used for all tasks, and only
+        one key-value pair is allowed.
     default : T
-        Default value to use for all tasks that are not in the mapping, or "*".
+        Default value to use for all tasks that are not in the mapping,
+        or "*".
 
 
     Note
@@ -119,7 +123,8 @@ def parse_task_id_mapping(mapping: TaskIdMappingArg[T], default: T) -> TaskIdMap
         if "*" in mapping.keys():
             if len(mapping) > 1:
                 raise ValueError(
-                    "If you use '*' as key, you cannot use any other keys in the mapping."
+                    "If you use '*' as key, you cannot use any other keys "
+                    "in the mapping."
                 )
             else:
                 return defaultdict(lambda: mapping["*"] or default)
@@ -183,8 +188,9 @@ class BaseSession(BeetsImportSession, ABC):
         list of album folders to import
     config_overlay : str or dict
         path to a config file to overlay on top of the default config.
-        Note that if `dict`, the lazyconfig notation e.g. `{import.default_action: skip}`
-        wont work reliably. Better nest the dicts: `{import: {default_action: skip}}`
+        Note that if `dict`, the lazyconfig notation e.g.
+        `{import.default_action: skip}` wont work reliably. Better nest the
+        dicts: `{import: {default_action: skip}}`
 
     Note: It's a design choice to require that you manually create and pass the
     `SessionState` object. Usually the states go into the database, which needs explizit
@@ -211,7 +217,7 @@ class BaseSession(BeetsImportSession, ABC):
         if state.path.is_file() and not is_archive_file(state.path):
             raise ValueError(
                 f"Path {state.path} is not an archive file. "
-                 "Importing singletons is not supported yet."
+                "Importing singletons is not supported yet."
             )
 
         # FIXME: This is a super bad convention of the original beets.
@@ -277,8 +283,8 @@ class BaseSession(BeetsImportSession, ABC):
         """Set the progress for a task belonging to the session.
 
         If string is given it is set as the message of the current progress.
-        Note: currently we only implement status on the level of the whole import session,
-        but should eventually do this per selection (task).
+        Note: currently we only implement status on the level of the whole
+        import session, but should eventually do this per selection (task).
         """
 
         task_state = self.state.get_task_state_for_task_raise(task)
@@ -308,7 +314,7 @@ class BaseSession(BeetsImportSession, ABC):
         """
         self.logger.warning(
             "Skipping duplicate resolution. "
-             f"Your session should implement this! -> {self.__class__.__name__}"
+            f"Your session should implement this! -> {self.__class__.__name__}"
         )
         task.set_choice(BeetsImportAction.SKIP)
 
@@ -390,7 +396,8 @@ class BaseSession(BeetsImportSession, ABC):
             assert self.pipeline is not None
             await self.pipeline.run_async()
 
-            # Clear error on successful run (e.g. from a previous run on the same session)
+            # Clear error on successful run (e.g. from a previous run on
+            # the same session)
             self.state.exc = None
         except ImportAbortError:
             log.debug("Interactive import session aborted by user")
@@ -425,12 +432,19 @@ class PreviewSession(BaseSession):
 
         Parameters
         ----------
+        state : SessionState
+            The session state to run on.
+        config_overlay : dict | None
+            Overlay config for this session.
         group_albums : bool | None
-            Whether to create multple tasks, one for each album found in the metadata
-            of the files. Set to true if you have multiple albums in a single folder.
-            If None: get value from beets config.
+            Whether to create multple tasks, one for each album found in the
+            metadata of the files. Set to true if you have multiple albums in
+            a single folder. If None: get value from beets config.
         autotag : bool | None
-            Whether to look up metadata online. If None: get value from beets config.
+            Whether to look up metadata online. If None: get value from beets
+            config.
+        **kwargs
+            Passed through to the parent session class.
 
         """
 
@@ -470,7 +484,7 @@ class PreviewSession(BaseSession):
         task_state = self.state.get_task_state_for_task_raise(task)
 
         for idx, cs in enumerate(
-            task_state.candidate_states + [task_state.asis_candidate]
+            [*task_state.candidate_states, task_state.asis_candidate]
         ):
             # This is a mutable operation i.e. candidate state is modfied here!
             duplicates = cs.identify_duplicates(self.lib)
@@ -587,7 +601,8 @@ class AddCandidatesSession(PreviewSession):
             and self.state.exc["type"] == "NoCandidatesFoundError"
         ):
             log.debug(
-                "Clearing previous NoCandidatesFoundError after finding candidates via search."
+                "Clearing previous NoCandidatesFoundError after finding "
+                "candidates via search."
             )
             self.state.exc = None
 
@@ -600,7 +615,7 @@ class AddCandidatesSession(PreviewSession):
         else:
             log.warning(
                 f"Task {task_state.id} not in initial task states. "
-                 "Cannot restore previous progress."
+                "Cannot restore previous progress."
             )
 
         super().finalize(task)
@@ -626,12 +641,17 @@ class ImportSession(BaseSession):
 
         Parameters
         ----------
+        state : SessionState
+            The session state to run on.
+        config_overlay : dict | None
+            Overlay config for this session.
         candidate_ids : optional
-            Either id of candidate(s) or the import choice. This is used to determine which
-            candidate to import. If a dict is given, the keys are the task ids and the
-            values are the candidate ids. You can also use the import choice enum
-            `ImportChoice.ASIS` or `ImportChoice.BEST` to indicate that you want to
-            import the candidate as-is or the best candidate.
+            Either id of candidate(s) or the import choice. This is used to
+            determine which candidate to import. If a dict is given, the keys
+            are the task ids and the values are the candidate ids. You can
+            also use the import choice enum `ImportChoice.ASIS` or
+            `ImportChoice.BEST` to indicate that you want to import the
+            candidate as-is or the best candidate.
             FIXME: at the moment asis is broken
         duplicate_actions : str
             The action to take if duplicates are found. One of "skip", "keep",
@@ -664,7 +684,7 @@ class ImportSession(BaseSession):
         if self.state.progress == Progress.IMPORT_COMPLETED:
             log.error(
                 f"Cannot run {self.__class__.__name__} from states that already "
-                 f"completed an import. (i.e. other imports) [{self.state.progress}]"
+                f"completed an import. (i.e. other imports) [{self.state.progress}]"
             )
             e = UserError("Cannot redo imports. Try undo and/or retag!")
             self.state.exc = to_serialized_exception(e)
@@ -672,7 +692,7 @@ class ImportSession(BaseSession):
         elif self.state.progress > Progress.PREVIEW_COMPLETED:
             log.warning(
                 f"Resetting state from {self.state.progress} to PREVIEW_COMPLETED for "
-                 f"import session {self.state.id}."
+                f"import session {self.state.id}."
             )
             for task in self.state.task_states:
                 task.set_progress(Progress.PREVIEW_COMPLETED)
@@ -790,7 +810,8 @@ class ImportSession(BaseSession):
         if len(actions) > 0:
             # decide if we can just move past this and ignore the plugins
             raise UserError(
-                f"Plugins returned actions, which is not supported for {self.__class__.__name__}"
+                "Plugins returned actions, which is not supported for "
+                f"{self.__class__.__name__}"
             )
 
         # ASIS
@@ -966,17 +987,19 @@ class AutoImportSession(ImportSession):
     def match_threshold(self, task: BeetsImportTask):
         """Check if the match quality is good enough to import.
 
-        Returns true if candidates were found, and the match quality is better than
-        threshlold.
+        Returns true if candidates were found, and the match quality is
+        better than threshold.
 
-        Note: What stops the pipeline is that we set task.choice to BeetsImportAction.SKIP,
-        or raise an exception.
+        Note: What stops the pipeline is that we set task.choice to
+        BeetsImportAction.SKIP, or raise an exception.
 
-        Currently raising, as we do not have a dedicated progress for "not imported".
+        Currently raising, as we do not have a dedicated progress for
+        "not imported".
 
-        FIXME: Instead of adding a whole new stage, with progress and a session function,
-        we could simply extend the choose_match function. It's defined for the normal
-        import session, and gets called early in user_query.
+        FIXME: Instead of adding a whole new stage, with progress and a
+        session function, we could simply extend the choose_match function.
+        It's defined for the normal import session, and gets called early in
+        user_query.
         (see #78)
         """
         try:
@@ -990,7 +1013,8 @@ class AutoImportSession(ImportSession):
 
         if distance > self.import_threshold:
             log.debug(
-                f"Best candidate was worse than threshold {distance=} {self.import_threshold=}"
+                "Best candidate was worse than threshold "
+                f"{distance=} {self.import_threshold=}"
             )
             d = (1 - distance) * 100
             t = (1 - self.import_threshold) * 100
@@ -999,7 +1023,8 @@ class AutoImportSession(ImportSession):
             task.set_choice(BeetsImportAction.SKIP)
         else:
             log.info(
-                f"Best candidate was better than threshold, importing to library. {distance=} {self.import_threshold=}"
+                "Best candidate was better than threshold, importing to "
+                f"library. {distance=} {self.import_threshold=}"
             )
 
 
@@ -1031,7 +1056,7 @@ class UndoSession(BaseSession):
         if self.state.progress != Progress.IMPORT_COMPLETED:
             log.error(
                 f"Cannot undo import from state {self.state.progress}. "
-                 "Only imports can be undone."
+                "Only imports can be undone."
             )
             e = UserError(
                 "Cannot undo if never imported! You need to import to undo first."
@@ -1046,10 +1071,11 @@ class UndoSession(BaseSession):
         # TODO: support Move operations (currently we only allow copy)
 
         # HACK: To allow an reimport after an undo, we need to use the old
-        # paths of the items. This is a bit hacky, but We did not find
-        # a better way to do this while maintaining the original beets logic.
-        # -> the old_paths attribute of a beets_task is set during task.manipulate_files()
-        # Unfortunately, here task.imported_items() does not work yet (.match not set)
+        # paths of the items. This is a bit hacky, but We did not find a
+        # better way to do this while maintaining the original beets logic.
+        # -> the old_paths attribute of a beets_task is set during
+        #    task.manipulate_files(). Unfortunately, here
+        #    task.imported_items() does not work yet (.match not set)
 
         for t_state in self.state.task_states:
             chosen_candidate = t_state.chosen_candidate_state
@@ -1082,7 +1108,7 @@ class UndoSession(BaseSession):
             self.state.exc = to_serialized_exception(excs[0])
             raise IntegrityError(
                 "Could not delete all items. Some items might be left in the library. "
-                 f"Problematic files were: {pths}"
+                f"Problematic files were: {pths}"
             )
 
         # Update our state and progress

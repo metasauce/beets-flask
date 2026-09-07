@@ -6,7 +6,6 @@ This allows us to keep track of the import state and communicate it to the front
 from __future__ import annotations
 
 import itertools
-from collections.abc import Callable, Generator
 from datetime import datetime
 from functools import wraps
 from inspect import isgenerator
@@ -42,6 +41,8 @@ from .progress import Progress, ProgressState
 from .types import BeetsDuplicateAction, BeetsImportAction, BeetsImportTask
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+
     from beets_flask.importer.session import (
         AutoImportSession,
         BaseSession,
@@ -100,7 +101,8 @@ def skip_until(
             prev_progress = session.state.upsert_task(task).progress
             if prev_progress > progress:
                 log.debug(
-                    f"Skipping {progress} for {task} because task progress {prev_progress=}"
+                    "Skipping "
+                    f"{progress} for {task} because task progress {prev_progress=}"
                 )
                 return task
 
@@ -246,7 +248,7 @@ Task = TypeVar(
 )  # task
 
 
-def stage(
+def stage[*Arg, Task: BeetsImportTask, Ret](
     func: Callable[[*Arg, Task], Ret | None],
 ):
     """Decorate a function to become a simple stage.
@@ -281,15 +283,15 @@ def stage(
                 )  # wait for send to arrive. the first next() always returns None
             # yield task, call func which gives new task, yield new task in next()
             task = cast(Task, task)  # Slightly hacky, but we know task is a Task here
-            task = func(*(args + (task,)))
+            task = func(*((*args, task)))
 
     return coro
 
 
-def mutator_stage(
+def mutator_stage[*Arg, Task: BeetsImportTask, Ret](
     func: Callable[[*Arg, Task], Ret], name: str | None = None
 ) -> Callable[[*Arg], Generator[Ret | Task | None, Task, None]]:
-    """Decorate a function that manipulates items in a coroutine to become a simple stage.
+    """Decorate a mutator function so it becomes a simple stage.
 
     Yields a task and waits until the next task is sent to it.
 
@@ -310,10 +312,11 @@ def mutator_stage(
     ) -> Generator[Ret | Task | None, Task, None]:
         task = None
         while True:
-            task = yield task  # wait for send to arrive. the first next() always returns None
+            # wait for send to arrive. the first next() always returns None
+            task = yield task
             # perform function on task, and in next() send the same, modified task
             # funcs prob. modify task in place?
-            func(*(args + (task,)))
+            func(*((*args, task)))
 
     return coro
 
@@ -599,7 +602,7 @@ def manipulate_files(
         else:
             log.warning(
                 "Beets-flask does not yet support other import modes than 'copy'. "
-                 "Please consider updating your config."
+                "Please consider updating your config."
             )
             operation = MoveOperation.COPY
 

@@ -48,9 +48,9 @@ __all__ = ["MinimalSession", "SessionAPIBlueprint"]
 class MinimalBestCandidateInfo(TypedDict):
     """Minimal best match info.
 
-    Data conciouse representation of the best match for a session, used for chips and minimal session
-    info. This is a subset of the full match state, containing only the most
-    relevant information for quick access.
+    Data conciouse representation of the best match for a session, used for
+    chips and minimal session info. This is a subset of the full match state,
+    containing only the most relevant information for quick access.
     """
 
     data_source: str
@@ -233,10 +233,20 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
                 ).where(best_candidate.c.rn == 1)
                 rows = db_session.execute(stmt).all()
 
-                rows_by_session = {
-                    session_id: (folder_hash, duplicate_ids, distance, data_source)
-                    for session_id, folder_hash, duplicate_ids, distance, data_source in rows
-                }
+                rows_by_session = {}
+                for (
+                    session_id,
+                    folder_hash,
+                    duplicate_ids,
+                    distance,
+                    data_source,
+                ) in rows:
+                    rows_by_session[session_id] = (
+                        folder_hash,
+                        duplicate_ids,
+                        distance,
+                        data_source,
+                    )
 
                 for session_id, folder_hash_org in zip(session_ids, folder_hashes):
                     if session_id is None:
@@ -263,7 +273,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
             return jsonify(data)
 
     async def enqueue(self):
-        """Start a new session for a given folder hash or enqueue a new job for an existing session.
+        """Start a new session or enqueue a job for an existing session.
 
         You need to specify the folder of the album,
         and it has to be a valid album folder.

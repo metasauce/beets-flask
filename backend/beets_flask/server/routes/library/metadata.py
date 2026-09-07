@@ -6,18 +6,19 @@ TODO: Allow to modify metadata or let ppl apply beets changes for a library item
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from beets import util as beets_util
-from quart import Blueprint, g
+from quart import Blueprint
 from tinytag import TinyTag
 
 from beets_flask.server.exceptions import IntegrityError, NotFoundError
 
+from . import g
+
 if TYPE_CHECKING:
     # For type hinting the global g object
-    from . import g
+    from pathlib import Path
 
 
 metadata_bp = Blueprint("metadata", __name__)

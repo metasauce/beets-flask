@@ -71,7 +71,8 @@ class IsolatedBeetsLibraryMixin(ABC):
     def setup_beetslib(
         self,
     ):
-        """Automatically reset the beets library before and after ALL tests in this class."""
+        """Automatically reset the beets library before and after ALL
+        tests in this class."""
         import shutil
         from pathlib import Path
 
@@ -81,7 +82,7 @@ class IsolatedBeetsLibraryMixin(ABC):
             os.remove(os.environ["BEETSDIR"] + "/library.db")
         except OSError:
             pass
-        lib = beets.library.Library(
+        beets.library.Library(
             path=os.environ["BEETSDIR"] + "/library.db",
             directory=os.environ["BEETSDIR"] + "/imported",
         )

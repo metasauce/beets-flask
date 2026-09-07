@@ -10,7 +10,6 @@ from watchdog.observers.polling import PollingObserver
 
 from beets_flask import invoker
 from beets_flask.config import get_config
-from beets_flask.config.schema import InboxFolderSchema
 from beets_flask.database.models.states import SessionStateInDb
 from beets_flask.disk import (
     album_folders_from_track_paths,
@@ -36,7 +35,8 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
     Parameters
     ----------
     timeout: float
-        Timeout for the polling observer in seconds (heartbeat, to recheck file system changes)
+        Timeout for the polling observer in seconds (heartbeat, to recheck
+        file system changes)
     debounce: float
         Debounce window in seconds, to wait before starting tagging operations.
         This is to avoid multiple triggers for changes in the same folder.
@@ -63,7 +63,7 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
         return None
     log.info(
         f"Registering watchdog with debounce of {debounce} seconds for "
-         f"inboxes: {[i.path for i in _inboxes]}"
+        f"inboxes: {[i.path for i in _inboxes]}"
     )
 
     # One observer for all inboxes.
@@ -79,9 +79,11 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
 
     watchdog.start()
 
-    # user would expect autotagging inboxes to automatically scan on first launch
+    # user would expect autotagging inboxes to automatically scan on first
+    # launch
     async def auto_tag_wait_for_workers(f: Path):
-        # HACK: checking if redis is ready was not trivial enough, so we just wait a bit.
+        # HACK: checking if redis is ready was not trivial enough, so we just
+        # wait a bit.
         await asyncio.sleep(10)
         await auto_tag(f)
 
@@ -156,10 +158,11 @@ async def auto_tag(
 
     Parameters
     ----------
-    path: str
+    folder_path : Path
         Full path to the folder or archive file to retag.
-    kind: str, optional
-        If None, the configured autotag kind from the inbox this folder is in will be used.
+    inbox_kind : str, optional
+        If None, the configured autotag kind from the inbox this folder is in
+        will be used.
 
     """
     inbox = get_inbox_for_path(folder_path)

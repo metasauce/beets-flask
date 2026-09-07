@@ -5,9 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from beets import autotag, importer
-from quart.typing import TestClientProtocol as Client
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from beets_flask.database.models.states import FolderInDb, SessionStateInDb
 from beets_flask.importer.states import SessionState

@@ -28,7 +28,7 @@ def test_stage_insert_order():
     stages.append(stage=user_query(dummy_session), name="foo")
 
     assert len(stages) == 3
-    assert list(stages.keys())[0] == "identify_duplicates"
+    assert next(iter(stages.keys())) == "identify_duplicates"
     assert list(stages.keys())[1] == "user_query"
     assert list(stages.keys())[2] == "foo"
 
@@ -44,4 +44,4 @@ def test_stage_insert_order():
     )
 
     assert len(stages) == 5
-    assert list(stages.keys())[0] == "baz"
+    assert next(iter(stages.keys())) == "baz"

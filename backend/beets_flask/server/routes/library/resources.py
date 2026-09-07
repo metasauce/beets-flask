@@ -8,7 +8,6 @@ from __future__ import annotations
 import base64
 import datetime
 import os
-from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from functools import wraps
 from typing import (
@@ -26,7 +25,7 @@ from beets import util as beets_util
 from beets.dbcore import Model, Query, Results
 from beets.dbcore.sort import Sort
 from beets.library import Album, Item, Library, parse_query_string
-from quart import Blueprint, Response, abort, g, json, jsonify, request
+from quart import Blueprint, Response, abort, json, jsonify, request
 
 from beets_flask.config import get_config
 from beets_flask.logger import log
@@ -34,9 +33,11 @@ from beets_flask.server.exceptions import NotFoundError
 from beets_flask.server.routes.exception import InvalidUsageError
 from beets_flask.server.utility import pop_query_param
 
+from . import g
+
 if TYPE_CHECKING:
     # For type hinting the global g object
-    from . import g
+    from collections.abc import Awaitable, Callable, Sequence
 
 
 resource_bp = Blueprint("resource", __name__)
@@ -66,7 +67,7 @@ def minimal_response():
     return request.args.get("minimal") is not None
 
 
-def resource_query(
+def resource_query[T: Item | Album](
     type: type[T], patchable: bool = False
 ) -> Callable[..., Callable[[str], Awaitable[Response]]]:
     """Decorate a function to handle RESTful HTTP queries for resources."""
@@ -118,7 +119,7 @@ def resource_query(
 P = ParamSpec("P")
 
 
-def resource(
+def resource[T: Item | Album](
     type: type[T], patchable: bool = False
 ) -> Callable[..., Callable[P, Awaitable[Response]]]:
     """Decorate a function to handle RESTful HTTP requests for resources."""
@@ -356,8 +357,8 @@ async def all_items(query: str = ""):
     )
 
 
-# Items by artist are handled slightly differently, as they are not a beets model but can be
-# derived from the items.
+# Items by artist are handled slightly differently, as they are not a beets
+# model but can be derived from the items.
 @resource_bp.route("/artist/<path:artist_name>/items", methods=["GET"])
 async def items_by_artist(artist_name: str):
     """Get all items for a specific artist."""
@@ -389,7 +390,7 @@ def delete_entities(entities: Sequence[Item | Album], delete_files=False) -> Non
     [entity.remove(delete=delete_files) for entity in entities]
 
 
-def update_entities(entities: Sequence[T], data: dict) -> Sequence[T]:
+def update_entities[T: Item | Album](entities: Sequence[T], data: dict) -> Sequence[T]:
     """Helper function to update entities."""
     if get_config().data.gui.library.readonly:
         raise ValueError("Library is read-only")
@@ -459,7 +460,8 @@ class Cursor:
             eq_sign = ">"
 
         return (
-            f"({self.order_by_column} {eq_sign} ?) OR ({self.order_by_column} = ? AND id {eq_sign} ?)",
+            f"({self.order_by_column} {eq_sign} ?) OR "
+            f"({self.order_by_column} = ? AND id {eq_sign} ?)",
             (
                 self.last_order_by_value,
                 self.last_order_by_value,
@@ -470,7 +472,10 @@ class Cursor:
     def order_by_clause(self) -> str:
         """Return the order by clause for the query."""
 
-        return f"{self.order_by_column} {self.order_by_direction}, id {self.order_by_direction}"
+        return (
+            f"{self.order_by_column} {self.order_by_direction}, "
+            f"id {self.order_by_direction}"
+        )
 
 
 class PaginatedQuery(Query, Sort):
@@ -803,7 +808,7 @@ def _rep_album(
         keys = ["id", "name", "albumartist", "year", "added"]
     else:
         # Use all keys
-        keys = list(album.keys()) + ["name"]
+        keys = [*list(album.keys()), "name"]
 
         # Parse sources
         out["sources"] = list()

@@ -3,7 +3,6 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-from quart import Quart
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -71,7 +70,8 @@ def db_session_factory(session: Session | None = None):
 
     Makes sure sessions are closed at the end.
     If an existing session is provided, it will not be closed at the end.
-    This allows to wrap multiple `with db_session()` blocks around each other without closing the outer session.
+    This allows to wrap multiple `with db_session()` blocks around each
+    other without closing the outer session.
 
     Example:
     ```

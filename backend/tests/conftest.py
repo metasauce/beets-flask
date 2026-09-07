@@ -5,8 +5,6 @@ import logging
 import os
 import pickle
 import shutil
-from collections.abc import Callable, Generator
-from contextlib import _GeneratorContextManager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,11 +12,7 @@ import pytest
 import yaml
 from beets import autotag
 from beets.autotag import tag_album as _tag_album
-from quart import Quart
-from quart.typing import TestClientProtocol
-from sqlalchemy.orm import Session
 
-from beets_flask.importer.types import BeetsLibrary
 from beets_flask.server.app import create_app
 
 if TYPE_CHECKING:

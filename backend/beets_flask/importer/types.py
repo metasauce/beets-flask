@@ -6,7 +6,6 @@ Also includes and our own derivatives.
 from __future__ import annotations
 
 from abc import ABC
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -35,25 +34,25 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 __all__ = [
-    # Our stuff
-    "MusicInfo",
-    "TrackInfo",
-    "ItemInfo",
+    "BEETS_DB_MULTI_VALUE_DELIMITER",
     "AlbumInfo",
     # Beets stuff
     "BeetsAlbum",
     "BeetsAlbumInfo",
     "BeetsAlbumMatch",
+    "BeetsDistance",
+    "BeetsDuplicateAction",
+    "BeetsImportAction",
+    "BeetsImportSession",
+    "BeetsImportTask",
     "BeetsItem",
+    "BeetsLibrary",
     "BeetsTrackInfo",
     "BeetsTrackMatch",
-    "BeetsLibrary",
-    "BeetsDistance",
-    "BeetsImportAction",
-    "BeetsImportTask",
-    "BeetsImportSession",
-    "BeetsDuplicateAction",
-    "BEETS_DB_MULTI_VALUE_DELIMITER",
+    "ItemInfo",
+    # Our stuff
+    "MusicInfo",
+    "TrackInfo",
 ]
 
 
@@ -81,13 +80,14 @@ class PromptChoice(NamedTuple):
 class MusicInfo(ABC):
     """Shared info for tracks, items and albums.
 
-    Items (music files on disk), tracks (trackinfo), and album info are somewhat similar.
-    They share many fields --- especially once music has been imported.
-    In beets there is no shared baseclass from which the three inherit, but such a common
-    base class helps in the frontend.
+    Items (music files on disk), tracks (trackinfo), and album info are
+    somewhat similar. They share many fields --- especially once music has
+    been imported.
+    In beets there is no shared baseclass from which the three inherit, but
+    such a common base class helps in the frontend.
 
-    This is a minimal version of this, where fields exclsuive to one type are None for the
-    others. (and inconsistent fields could get renamed?)
+    This is a minimal version of this, where fields exclsuive to one type
+    are None for the others. (and inconsistent fields could get renamed?)
 
     @PS: Shouldn't this be an abstract class?
     """
@@ -179,7 +179,8 @@ class AlbumInfo(MusicInfo):
     catalognum: str | None
     albumdisambig: str | None
 
-    # Note: dont add 'tracks' here, our candidate states lift them already from album matches
+    # Note: dont add 'tracks' here, our candidate states lift them already
+    # from album matches
     @classmethod
     def from_beets(cls, info: autotag.AlbumInfo):
         """Helper to convert from beets AlbumInfo to our AlbumInfo."""

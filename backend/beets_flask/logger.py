@@ -2,6 +2,10 @@ import logging
 import logging.config
 import os
 
+LOG_FORMAT = (
+    "[%(levelname)-5s] %(asctime)s %(name)s %(filename)-8s:%(lineno)d %(message)s"
+)
+
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": True,
@@ -10,9 +14,7 @@ LOGGING_CONFIG = {
             # https://docs.python.org/3/library/logging.html#logrecord-attributes
             "format": "[%(levelname)s] %(name)s: %(message)s"
         },
-        "debug": {
-            "format": "[%(levelname)-5s] %(asctime)s %(name)s %(filename)-8s:%(lineno)d %(message)s"
-        },
+        "debug": {"format": LOG_FORMAT},
     },
     "handlers": {
         "console": {
@@ -55,9 +57,7 @@ LOGGING_CONFIG = {
 # On testing only log to console
 if "PYTEST_VERSION" in os.environ:
     # Configure minimal logging for pytest
-    logging.basicConfig(
-        format="[%(levelname)-5s] %(asctime)s %(name)s %(filename)-8s:%(lineno)d %(message)s",
-    )
+    logging.basicConfig(format=LOG_FORMAT)
     logging.getLogger("beets-flask").setLevel(logging.DEBUG)
 else:
     logging.config.dictConfig(LOGGING_CONFIG)

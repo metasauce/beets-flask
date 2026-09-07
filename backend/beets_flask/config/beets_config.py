@@ -237,7 +237,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
                 except OSError:
                     log.info(
                         "Could not create beets_flask_config_example directories, "
-                         "likely because this was not run inside the docker container."
+                        "likely because this was not run inside the docker container."
                     )
 
     # ------------------------------ Utility getters ----------------------------- #
@@ -289,6 +289,8 @@ def get_config(force_reload=False, commit_to_beets=False) -> BeetsFlaskConfig:
     ----------
     force_reload : bool
         Force a refresh of the config object, including the global beets config.
+    commit_to_beets : bool
+        If true, commit the beets-flask config to the global beets config.
 
     """
     global config

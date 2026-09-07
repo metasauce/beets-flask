@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import traceback
-from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import TYPE_CHECKING, NotRequired, ParamSpec, TypedDict, TypeVar
 
@@ -182,7 +181,7 @@ P = ParamSpec("P")  # Parameters
 R = TypeVar("R")  # Return
 
 
-def exception_as_return_value(
+def exception_as_return_value[**P, R](
     f: Callable[P, Awaitable[R]],
 ) -> Callable[P, Awaitable[R | SerializedException]]:
     """Decorator to catch exceptions and return them as a values.

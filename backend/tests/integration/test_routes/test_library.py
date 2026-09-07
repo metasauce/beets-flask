@@ -10,8 +10,6 @@ from unittest import mock
 from urllib.parse import quote_plus
 
 import pytest
-from beets.library import Album
-from quart.typing import TestClientProtocol as Client
 
 from beets_flask.config import get_config
 from tests.conftest import beets_lib_album, beets_lib_item
@@ -109,7 +107,7 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
             assert data[0]["albumartist"] == artist, "Data artist does not match artist"
 
     async def test_separator(self, client: Client):
-        """Test the GET request to retrieve a specific artist with a separator in the name.
+        """Test the GET request to retrieve an artist with a separator in the name.
 
         Should return the artist even if the name contains a separator.
         """
@@ -121,7 +119,8 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
             "Data artist does not match requested artist with separator"
         )
 
-        # Order of the artists should not matter, so we can also test with a different order
+        # Order of the artists should not matter, so we can also test
+        # with a different order
         response = await client.get("/api_v1/library/artists/Foo; Baz")
         data = await response.get_json()
         assert response.status_code == 200, "Response status code is not 200"

@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 import aiohttp
 from quart import Blueprint, make_response, redirect, request
 
-from beets_flask.extensions.art import ArtResult
 from beets_flask.extensions.providers import ART_SOURCES
 from beets_flask.logger import log
 from beets_flask.server.exceptions import InvalidUsageError, NotFoundError

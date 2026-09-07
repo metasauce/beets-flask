@@ -9,7 +9,6 @@ import asyncio
 import os
 import time
 from asyncio.subprocess import PIPE, Process
-from collections.abc import AsyncIterator, Hashable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import aiofiles
@@ -17,16 +16,18 @@ import numpy as np
 from beets import util as beets_util
 from cachetools import Cache, TTLCache
 from cachetools.keys import hashkey
-from quart import Blueprint, Response, g
+from quart import Blueprint, Response
 
 from beets_flask.logger import log
 from beets_flask.server.exceptions import IntegrityError, NotFoundError
+
+from . import g
 
 audio_bp = Blueprint("audio", __name__)
 
 if TYPE_CHECKING:
     # For type hinting the global g object
-    from . import g
+    from collections.abc import AsyncIterator, Hashable
 
 
 transcode_cache: Cache[Hashable, Any] = TTLCache(
@@ -237,7 +238,7 @@ class FFmpegStreamer:
 T = TypeVar("T")
 
 
-async def cached_async_iterator(
+async def cached_async_iterator[T](
     key: Hashable, iterator: AsyncIterator[T], cache: Cache[Hashable, list[T]]
 ) -> AsyncIterator[T]:
     """Cache the results of an async iterator."""

@@ -6,7 +6,6 @@ a preview is finished.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from functools import wraps
 from typing import TYPE_CHECKING, Concatenate, Literal, ParamSpec, TypeVar
@@ -18,7 +17,6 @@ from beets_flask.database import db_session_factory
 from beets_flask.database.models.states import FolderInDb
 from beets_flask.disk import clear_cache
 from beets_flask.importer.progress import FolderStatus
-from beets_flask.invoker.job import JobMeta
 from beets_flask.logger import log
 from beets_flask.server.exceptions import (
     InvalidUsageError,
@@ -158,9 +156,11 @@ def emit_folder_status(
     Parameters
     ----------
     before: FolderStatus, optional
-        The status before the function is called. If none is given, no status update is sent.
+        The status before the function is called. If none is given, no
+        status update is sent.
     after: FolderStatus, optional
-        The status after the function is called. If none is given, no status update is sent.
+        The status after the function is called. If none is given, no
+        status update is sent.
 
     """
 

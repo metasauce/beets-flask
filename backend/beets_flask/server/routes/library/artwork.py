@@ -7,7 +7,6 @@ from mediafile import Image, MediaFile  # comes with the beets install
 from PIL import Image as PILImage
 from quart import (
     Blueprint,
-    g,
     jsonify,
     make_response,
     redirect,
@@ -59,7 +58,8 @@ def parse_art_params() -> tuple[int, tuple[int, int] | None]:
         size = parse_size(size_key)
     except KeyError:
         raise InvalidUsageError(
-            f"Invalid size key '{size_key}' provided. Supported keys: {', '.join(SIZE_PRESETS.keys())}"
+            "Invalid size key "
+            f"'{size_key}' provided. Supported keys: {', '.join(SIZE_PRESETS.keys())}"
         )
     return idx, size
 
@@ -152,7 +152,8 @@ async def album_art(album_id: int):
         art_path = beets_util.syspath(album.artpath)
         if not os.path.exists(art_path):
             raise IntegrityError(
-                f"Album art file '{art_path}' does not exist for album beets_id:'{album_id}'."
+                "Album art file "
+                f"'{art_path}' does not exist for album beets_id:'{album_id}'."
             )
         return await send_image(BytesIO(open(art_path, "rb").read()), size)
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from re import Pattern
 
-from cachetools import Cache
+    from cachetools import Cache
 
 
 def dirhash_c(

@@ -6,17 +6,19 @@ Split artists by separators, and do some basic aggregation.
 import re
 
 import polars as pl
-from quart import Blueprint, Response, g
+from quart import Blueprint, Response
 
 from beets_flask.config import get_config
 from beets_flask.server.exceptions import NotFoundError
+
+from . import g
 
 artists_bp = Blueprint("artists", __name__)
 
 
 # TODOs:
-# Currently artist_sort is completely ignored. Im not even sure what it is supposed to do.
-# Also artistids are not used, but they are in the database.
+# Currently artist_sort is completely ignored. Im not even sure what it is
+# supposed to do. Also artistids are not used, but they are in the database.
 
 
 def artist_separators() -> list[str]:
@@ -180,5 +182,6 @@ async def all_artists(artist_name: str | None = None):
             raise NotFoundError(f"Artist '{artist_name}' not found.")
         else:
             return artists.row(0, named=True), 200
-    # TODO: We serialize as records here it might be better to have a different structure as we send quite a bit of data
+    # TODO: We serialize as records here it might be better to have a
+    # different structure as we send quite a bit of data
     return Response(artists.write_json(), mimetype="application/json")

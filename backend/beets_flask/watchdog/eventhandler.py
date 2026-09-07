@@ -25,7 +25,6 @@ from watchdog.events import (
     FileSystemEventHandler,
 )
 from watchdog.observers import Observer
-from watchdog.observers.api import BaseObserver
 
 from beets_flask import log
 
@@ -108,12 +107,14 @@ class AIOWatchdog:
         for path in paths:
             if not path.exists():
                 log.warning(
-                    f"Path does not exist: {path}. Check your configuration or create it."
+                    "Path does not exist: "
+                    f"{path}. Check your configuration or create it."
                 )
                 continue
             if not path.is_dir() and not path.is_file():
                 log.warning(
-                    f"Path is neither a file nor a directory: {path}. Check your configuration."
+                    "Path is neither a file nor a directory: "
+                    f"{path}. Check your configuration."
                 )
                 continue
             log.debug(f"Adding path to watchdog: {path} (recursive={recursive})")

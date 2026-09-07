@@ -54,7 +54,7 @@ class TestAlembicInitialized:
         assert _alembic_initialized(db_session.bind) is True
 
     def test_returns_false_when_table_exists_but_empty(self, db_session):
-        """Test that _alembic_initialized returns False when table exists but is empty."""
+        """Test that _alembic_initialized returns False when table is empty."""
         db_session.execute(
             text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32))")
         )

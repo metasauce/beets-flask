@@ -1,6 +1,7 @@
 import asyncio
 import os
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -25,9 +26,6 @@ def preview_autotag(tmpdir_factory):
     }
     yield
     config.reload()
-
-
-from unittest import mock
 
 
 @pytest.fixture(scope="function")
@@ -70,7 +68,7 @@ async def test_watchdog(preview_autotag, mp_en):
         "Handler should be an instance of AIOEventHandler"
     )
     await asyncio.sleep(0.12)  # Allow time for the observer to start task
-    task = list(h.debounce.values())[0]
+    task = next(iter(h.debounce.values()))
     assert task is not None, "Debounce should have a task after touching file"
     # Check task is running
     assert not task.done(), "Task should not be done immediately after touching file"
@@ -81,7 +79,7 @@ async def test_watchdog(preview_autotag, mp_en):
     assert task.cancelled(), "Task should be cancelled by new incoming ones"
 
     # Check that the task is not running anymore
-    task_2 = list(h.debounce.values())[0]
+    task_2 = next(iter(h.debounce.values()))
     await asyncio.sleep(1)
     assert task_2.done(), "Task should be done after debounce time"
     assert mp_en[0][0] == (inbox_path / "album").resolve()

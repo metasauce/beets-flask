@@ -118,7 +118,7 @@ class TestDeleteEndpoint(SendStatusMockMixin):
 
         assert response.status_code == 400
         assert data["type"] == "InvalidUsageError"
-        assert (
-            data["message"]
-            == "Folder hash does not match the current folder hash! Please refresh your hashes before deleting!"
+        assert data["message"] == (
+            "Folder hash does not match the current folder hash! "
+            "Please refresh your hashes before deleting!"
         )

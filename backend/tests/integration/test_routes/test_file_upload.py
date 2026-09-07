@@ -152,7 +152,7 @@ class TestFileUploadValidationRoute:
         assert data["status"] == "ok"
 
     async def test_validate_endpoint_missing_headers(self, client):
-        """Test that the validate endpoint raises InvalidUsageError for missing headers."""
+        """Test that validate raises InvalidUsageError for missing headers."""
         response = await client.post(
             "/api_v1/file_upload/validate",
             headers={
@@ -166,7 +166,7 @@ class TestFileUploadValidationRoute:
         assert "Missing header" in data["message"]
 
     async def test_validate_endpoint_invalid_filename(self, client, monkeypatch):
-        """Test that the validate endpoint raises InvalidUsageError for invalid filenames."""
+        """Test that validate raises InvalidUsageError for invalid filenames."""
         # Patch get_inbox_folders to return a known inbox path
         monkeypatch.setattr(
             "beets_flask.server.routes.file_upload.get_inbox_folders",
@@ -186,7 +186,7 @@ class TestFileUploadValidationRoute:
         assert "Invalid filename" in data["message"]
 
     async def test_validate_endpoint_invalid_target_path(self, client, monkeypatch):
-        """Test that the validate endpoint raises InvalidUsageError for invalid target paths."""
+        """Test that validate raises InvalidUsageError for invalid target paths."""
         # Patch get_inbox_folders to return a known inbox path
         monkeypatch.setattr(
             "beets_flask.server.routes.file_upload.get_inbox_folders",

@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, TypeVar
 
@@ -18,7 +17,7 @@ __all__ = ["ModelAPIBlueprint"]
 T = TypeVar("T", bound=Base)
 
 
-class ModelAPIBlueprint(Generic[T]):
+class ModelAPIBlueprint[T: Base]:
     """Generic API blueprint for a model.
 
     Any database model can be used with this blueprint. Allows
@@ -114,7 +113,7 @@ def _cursor_from_string(cursor: str | None) -> tuple[datetime, str] | None:
     return datetime.fromisoformat(c[0]), c[1]
 
 
-def _get_n_with_cursor(
+def _get_n_with_cursor[T: Base](
     model: type[T], cursor: tuple[datetime, str] | None = None, n_items: int = 50
 ):
     """Seek pagination for all items in the database.

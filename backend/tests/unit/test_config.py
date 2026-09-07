@@ -27,7 +27,7 @@ def hide_config():
             p.unlink()
         except FileNotFoundError:
             pass
-        shutil.move(str(p) + "_bak", p)
+        shutil.move(f"{p}_bak", p)
 
 
 class TestConfig:
@@ -112,10 +112,12 @@ class TestConfig:
         invalid_config = tmp_path / "invalid_extra.yaml"
         with open(invalid_config, "w") as f:
             # use an unquoted template function in the paths section
-            f.write("""
-    paths:
-        albumtype:compilation: %if{$test,Albums/$albumartist/,Compilations/}$album%aunique{}/$title
-            """)
+            f.write(
+                "paths:\n"
+                "    albumtype:compilation: "
+                "%if{$test,Albums/$albumartist/,Compilations/}$album"
+                "%aunique{}/$title\n"
+            )
 
         config = get_config(force_reload=True)
 

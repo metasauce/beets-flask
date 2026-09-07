@@ -34,7 +34,8 @@ class DictType(types.TypeDecorator):
         if not len(allowed_types_v) == 0:
             if not all(isinstance(v, allowed_types_v) for v in value.values()):
                 raise ValueError(
-                    f"Value must be a dict with values of type {allowed_types_v}. Got: {value.values()}"
+                    "Value must be a dict with values of type "
+                    f"{allowed_types_v}. Got: {value.values()}"
                 )
 
         if not all(isinstance(k, self.allowed_keys_types) for k in value.keys()):

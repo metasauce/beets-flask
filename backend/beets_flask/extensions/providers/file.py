@@ -4,7 +4,6 @@ import asyncio
 import os
 from typing import TYPE_CHECKING, ClassVar
 
-import aiohttp
 from mediafile import MediaFile
 
 from beets_flask.extensions.art import ArtResult, ArtSource

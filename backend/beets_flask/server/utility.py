@@ -37,7 +37,8 @@ def pop_query_param(
     default : any, optional
         The default value if the parameter is not found, defaults to None.
     convert_func : callable, optional
-        A function to convert the parameter value, defaults to None. Common example, just use the type: `str`, `int` etc.
+        A function to convert the parameter value, defaults to None. Common
+        example, just use the type: `str`, `int` etc.
     error_message : str, optional
         The error message to raise if the conversion fails, defaults to None.
 
@@ -63,13 +64,15 @@ def pop_query_param(
 def pop_extra_meta(params: dict, n_jobs=1) -> list[ExtraJobMeta]:
     """Extract fields that qualify as extra metadata from your request.
 
-    Used for adding metadata to jobs that are not strictly required for the job to run. But
-    are useful for tracking the job in the frontend.
+    Used for adding metadata to jobs that are not strictly required for the
+    job to run. But are useful for tracking the job in the frontend.
 
     Parameters
     ----------
     params : dict
         The request args.
+    n_jobs : int
+        The number of jobs to return metadata for.
 
     """
 
