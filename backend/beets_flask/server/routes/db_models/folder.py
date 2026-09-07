@@ -20,8 +20,7 @@ class FolderAPIBlueprint(ModelAPIBlueprint[FolderInDb]):
         self.blueprint.route("/by_task/<gui_id>", methods=["GET"])(self.get_by_taskid)
 
     async def get_by_taskid(self, gui_id: str):
-        """
-        Get a folder by an import gui id.
+        """Get a folder by an import gui id.
 
         The import gui id is the same as a task id.
         """

@@ -72,8 +72,7 @@ async def refresh():
 
 
 def _serializable(input):
-    """
-    Convert bytes to str in a nested dictionary.
+    """Convert bytes to str in a nested dictionary.
 
     Recursion is used to handle nested dictionaries.
     """

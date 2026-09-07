@@ -36,6 +36,7 @@ def pop_query_param(
         A function to convert the parameter value, defaults to None. Common example, just use the type: `str`, `int` etc.
     error_message : str, optional
         The error message to raise if the conversion fails, defaults to None.
+
     """
     if params is None:
         return default
@@ -65,6 +66,7 @@ def pop_extra_meta(params: dict, n_jobs=1) -> list[ExtraJobMeta]:
     ----------
     params : dict
         The request args.
+
     """
 
     job_refs: list[str] | None = pop_query_param(

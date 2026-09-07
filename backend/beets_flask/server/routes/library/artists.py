@@ -37,6 +37,7 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
     Returns
     -------
         DataFrame with columns ['artist', 'count', 'last_added']
+
     """
     if table == "items":
         query = """
@@ -73,9 +74,9 @@ def get_artists_polars(table: str, artist: str | None = None) -> pl.LazyFrame:
         # If an artist is specified, filter the query
         for i, a in enumerate(artists):
             if i == 0:
-                query += f" WHERE instr(artist, ?) > 0"
+                query += " WHERE instr(artist, ?) > 0"
             else:
-                query += f" AND instr(artist, ?) > 0"
+                query += " AND instr(artist, ?) > 0"
 
     with g.lib.transaction() as tx:
         rows = tx.query(query, artists) if artists else tx.query(query)

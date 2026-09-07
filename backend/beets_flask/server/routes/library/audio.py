@@ -355,12 +355,12 @@ async def audio_peaks(path: str):
 async def chunked_bytes_iterator(
     data: bytes, chunk_size: int = 8192
 ) -> AsyncIterator[bytes]:
-    """
-    Async iterator that yields chunks of bytes data.
+    """Async iterator that yields chunks of bytes data.
 
     Args:
         data: The bytes object to be chunked
         chunk_size: Size of each chunk in bytes (default: 8KB)
+
     """
     for i in range(0, len(data), chunk_size):
         yield data[i : i + chunk_size]

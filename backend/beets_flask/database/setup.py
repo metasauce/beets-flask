@@ -25,9 +25,10 @@ def setup_database(app: Quart | None = None) -> None:
     Args:
         app (Quart): The Quart application instance.
 
-    Returns
+    Returns:
     -------
         None
+
     """
     _setup_factory()
     if get_flask_config()["RESET_DB_ON_START"]:
@@ -79,6 +80,7 @@ def db_session_factory(session: Session | None = None):
         s.merge(tag)
         return tag.to_dict()
     ```
+
     """
     is_outermost = session is None
     if is_outermost:

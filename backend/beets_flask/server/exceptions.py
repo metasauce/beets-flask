@@ -154,6 +154,7 @@ def to_serialized_exception(
     -------
     SerializedException
         The serialized exception.
+
     """
 
     if exception is None:
@@ -203,10 +204,10 @@ def exception_as_return_value(
 
 
 __all__ = [
-    "SerializedException",
     "ApiException",
+    "IntegrityException",
     "InvalidUsageException",
     "NotFoundException",
-    "IntegrityException",
+    "SerializedException",
     "to_serialized_exception",
 ]

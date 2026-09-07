@@ -191,7 +191,7 @@ class TestAlbumsPagination(IsolatedBeetsLibraryMixin):
         nAlbums = 100
         if len(self.beets_lib.albums()) == 0:
             for i in range(nAlbums):
-                artist = "Even" if i % 2 == 0 else f"Odd"
+                artist = "Even" if i % 2 == 0 else "Odd"
                 a = beets_lib_album(albumartist=f"{artist}", album=f"Album {i}")
                 self.beets_lib.add(a)
                 self.beets_lib.add(beets_lib_item(artist=f"{artist}", album_id=a.id))
@@ -297,7 +297,7 @@ class TestAlbumsPagination(IsolatedBeetsLibraryMixin):
             - The returned data contains the expected number of albums.
             - The albums match the query.
         """
-        response = await client.get(f"/api_v1/library/albums/Even?n_items=100")
+        response = await client.get("/api_v1/library/albums/Even?n_items=100")
         data = await response.get_json()
         assert response.status_code == 200, "Response status code is not 200"
         assert "albums" in data, "Items are not provided in the response"
@@ -345,7 +345,7 @@ class TestItemsPagination(IsolatedBeetsLibraryMixin):
         nItems = 100
         if len(self.beets_lib.items()) == 0:
             for i in range(nItems):
-                artist = "Even" if i % 2 == 0 else f"Odd"
+                artist = "Even" if i % 2 == 0 else "Odd"
                 self.beets_lib.add(
                     beets_lib_item(artist=f"{artist}", album=f"Album {i}")
                 )

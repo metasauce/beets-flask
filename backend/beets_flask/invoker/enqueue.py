@@ -56,8 +56,7 @@ if TYPE_CHECKING:
 
 
 def emit_update_on_job_change(job, connection, result, *args, **kwargs):
-    """
-    Callback for rq enqueue functions to emit a job status update via websocket.
+    """Callback for rq enqueue functions to emit a job status update via websocket.
 
     See https://python-rq.org/docs/#success-callback
     """
@@ -135,6 +134,7 @@ class EnqueueKind(Enum):
         ----------
         kind : str
             The string to convert.
+
         """
         try:
             return cls[kind.upper()]
@@ -166,6 +166,7 @@ async def enqueue(
     kwargs : dict
         Additional arguments to pass to the worker functions. Depend on the kind,
         use with care.
+
     """
     if extra_meta is None:
         extra_meta = ExtraJobMeta()
@@ -216,7 +217,7 @@ def enqueue_preview_add_candidates(
     if len(kwargs.keys()) > 0:
         raise InvalidUsageException(
             "EnqueueKind.PREVIEW_ADD_CANDIDATES only accepts the following kwargs: "
-            + "search"
+             "search"
         )
 
     if search is None:
@@ -241,8 +242,7 @@ def enqueue_preview_add_candidates(
 def enqueue_import_candidate(
     hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
 ) -> Job:
-    """
-    Imports a candidate that has been fetched in a preview session.
+    """Imports a candidate that has been fetched in a preview session.
 
     Kwargs
     ------
@@ -265,7 +265,7 @@ def enqueue_import_candidate(
     if len(kwargs.keys()) > 0:
         raise InvalidUsageException(
             "EnqueueKind.IMPORT only accepts the following kwargs: "
-            + "candidate_ids, duplicate_actions."
+             "candidate_ids, duplicate_actions."
         )
 
     # TODO: Validation: lookup candidates exits
@@ -286,7 +286,7 @@ def enqueue_import_candidate(
     except:
         log.info(
             f"No previous session state fround for {hash=} {path=} "
-            + "switching to auto-import"
+             "switching to auto-import"
         )
         return enqueue_import_auto(hash, path, extra_meta)
 
@@ -303,8 +303,7 @@ def enqueue_import_candidate(
 
 
 def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs):
-    """
-    Enqueue an automatic import.
+    """Enqueue an automatic import.
 
     Auto jobs first generate a preview (if needed) and then run an import, which always
     imports the best candidate - but only if the preview is good enough (as specified
@@ -325,7 +324,7 @@ def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
     if len(kwargs.keys()) > 0:
         raise InvalidUsageException(
             "EnqueueKind.IMPORT_AUTO only accepts the following kwargs: "
-            + "group_albums, autotag, import_threshold, duplicate_actions."
+             "group_albums, autotag, import_threshold, duplicate_actions."
         )
 
     # We only assign the on_success callback (likely coming
@@ -362,7 +361,7 @@ def enqueue_import_undo(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
     if len(kwargs.keys()) > 0:
         raise InvalidUsageException(
             "EnqueueKind.IMPORT_UNDO only accepts the following kwargs: "
-            + "delete_files."
+             "delete_files."
         )
 
     job = _enqueue(
@@ -429,6 +428,7 @@ async def run_preview(
         If None: get value from beets config.
     autotag : bool | None
         Whether to look up metadata online. If None: get value from beets config.
+
     """
 
     log.info(f"Preview task on {hash=} {path=}")
@@ -438,7 +438,7 @@ async def run_preview(
         if hash != f_on_disk.hash:
             log.warning(
                 f"Folder content has changed since the job was scheduled for {path}. "
-                + f"Using new content ({f_on_disk.hash}) instead of {hash}"
+                 f"Using new content ({f_on_disk.hash}) instead of {hash}"
             )
 
         # here, in preview, we always want to start from a fresh state
@@ -490,6 +490,7 @@ async def run_preview_add_candidates(
     search : dict[str, Search]
         A dictionary of task ids to search dicts. No value or none skips the search
         for this task.
+
     """
     log.info(f"Add preview candidates task on {hash=}")
 
@@ -527,6 +528,7 @@ async def run_import_candidate(
         If candidate_id is none the best candidate is used.
     duplicate_action : optional
         If duplicate_action is none, the default action from the config is used.
+
     """
     log.info(f"Import task on {hash=} {path=}")
 
@@ -628,7 +630,7 @@ def _get_live_state_by_folder(
     if hash != f_on_disk.hash:
         log.warning(
             f"Folder content has changed since the job was scheduled for {path}. "
-            + f"Using new content ({f_on_disk.hash}) instead of {hash}"
+             f"Using new content ({f_on_disk.hash}) instead of {hash}"
         )
 
     s_state_indb = SessionStateInDb.get_by_hash_and_path(
@@ -647,7 +649,7 @@ def _get_live_state_by_folder(
         # TODO: rq error handling
         raise InvalidUsageException(
             f"No session state found for {path=} {hash=} "
-            + f"fresh_hash_on_disk={f_on_disk}, this should not happen."
+             f"fresh_hash_on_disk={f_on_disk}, this should not happen."
         )
 
     log.debug(f"Using existing session state for {path=}")

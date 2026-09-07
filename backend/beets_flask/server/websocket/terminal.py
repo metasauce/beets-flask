@@ -154,6 +154,7 @@ def _get_scrollback_buffer(lines: int = 500) -> list[str]:
     Returns
     -------
         List of strings representing the scrollback buffer.
+
     """
     try:
         # Capture the last `lines` from scrollback (excluding the current screen)

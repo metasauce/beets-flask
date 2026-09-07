@@ -71,7 +71,7 @@ def _error_parser(e: Exception) -> WebSocketErrorDict:
     return d
 
 
-__all__ = ["sio_catch_exception", "WebSocketErrorDict"]
+__all__ = ["WebSocketErrorDict", "sio_catch_exception"]
 
 
 """Allow to throw the errors in a testing

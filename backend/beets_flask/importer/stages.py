@@ -156,6 +156,7 @@ def set_progress(
     def lookup_candidates(session: BaseSessionNew, task: ImportTask):
         pass
     ```
+
     """
 
     def decorator(
@@ -199,7 +200,7 @@ class StageOrder(dict):
     ):
         """Append a stage to the Order."""
 
-        name = name or str(getattr(stage, "__name__", f"unknown_stage"))
+        name = name or str(getattr(stage, "__name__", "unknown_stage"))
         if name in self.keys():
             raise ValueError(f"Stage with name {name} already exists.")
 
@@ -214,10 +215,10 @@ class StageOrder(dict):
     ):
         """Insert a stage after or before another specific stage."""
 
-        if after is None and before is None or (after and before):
+        if (after is None and before is None) or (after and before):
             raise ValueError("Either `after` or `before` must be specified.")
 
-        name = name or str(getattr(stage, "__name__", f"unknown_stage"))
+        name = name or str(getattr(stage, "__name__", "unknown_stage"))
         if name in self.keys():
             raise ValueError(f"Stage with name {name} already exists.")
 
@@ -330,7 +331,7 @@ def read_tasks(
     Adapted closely from beets, but we do not need/support resuming and skipping
     """
 
-    log.debug(f"Reading files")
+    log.debug("Reading files")
 
     # Our Skip-check usually uses Progress, but here we do not have progress yet
     # We want to catch the case when we resume a session,
@@ -370,8 +371,7 @@ def group_albums(
     session: BaseSession,
     task: ImportTask,
 ) -> beets_pipeline.MultiMessage:
-    """
-    Groups items of the task into albums using their metadata.
+    """Groups items of the task into albums using their metadata.
 
     The groups are identified using artist and album fields.
 
@@ -599,7 +599,7 @@ def manipulate_files(
         else:
             log.warning(
                 "Beets-flask does not yet support other import modes than 'copy'. "
-                + "Please consider updating your config."
+                 "Please consider updating your config."
             )
             operation = MoveOperation.COPY
 
@@ -684,11 +684,11 @@ def _apply_choice(session: ImportSession, task: ImportTask):
 
 
 __all__ = [
-    "read_tasks",
     "group_albums",
-    "lookup_candidates",
     "identify_duplicates",
-    "user_query",
-    "plugin_stage",
+    "lookup_candidates",
     "manipulate_files",
+    "plugin_stage",
+    "read_tasks",
+    "user_query",
 ]

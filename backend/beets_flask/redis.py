@@ -44,6 +44,7 @@ async def wait_for_job_results(
     -------
     Any
         The result of the job.
+
     """
 
     start_time = time.time()
@@ -66,9 +67,9 @@ async def wait_for_job_results(
 
 
 __all__ = [
-    "queues",
     "import_queue",
     "preview_queue",
+    "queues",
     "redis_conn",
     "wait_for_job_results",
 ]

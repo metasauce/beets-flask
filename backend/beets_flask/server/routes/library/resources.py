@@ -264,7 +264,7 @@ async def albums_by_artist(artist_name: str):
 
     with g.lib.transaction() as tx:
         rows = tx.query(
-            f"SELECT id FROM albums WHERE instr(albumartist, ?) > 0",
+            "SELECT id FROM albums WHERE instr(albumartist, ?) > 0",
             (artist_name,),
         )
 
@@ -365,7 +365,7 @@ async def items_by_artist(artist_name: str):
 
     with g.lib.transaction() as tx:
         rows = tx.query(
-            f"SELECT id FROM items WHERE instr(artist, ?) > 0",
+            "SELECT id FROM items WHERE instr(artist, ?) > 0",
             (artist_name,),
         )
 
@@ -439,7 +439,7 @@ class Cursor:
             d = json.loads(bytes.fromhex(s).decode("utf-8"))
             # TODO: Validate the structure of d
             return Cursor(d["c"], d["d"], d.get("v", None), d.get("i", None))
-        except Exception as e:
+        except Exception:
             raise ValueError(f"Invalid cursor string: {s}")
 
     def causes(self) -> tuple[str, Sequence[Any]]:

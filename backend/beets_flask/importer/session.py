@@ -1,5 +1,4 @@
-"""
-Session classes for the import pipeline.
+"""Session classes for the import pipeline.
 
 Sessions often take particular arguments, such as a duplicate action. In the simplest and most common case,
 each session has one task (i.e. one album) to deal with. Sometimes, however, one session may have multiple tasks,
@@ -91,8 +90,7 @@ TaskIdMappingArg = dict[str, T | None] | None
 
 
 def parse_task_id_mapping(mapping: TaskIdMappingArg[T], default: T) -> TaskIdMapping[T]:
-    """
-    Convert the flexible arguments to stricter TaskIdMapping that sessions use internally.
+    """Convert the flexible arguments to stricter TaskIdMapping that sessions use internally.
 
     Parameters
     ----------
@@ -110,6 +108,7 @@ def parse_task_id_mapping(mapping: TaskIdMappingArg[T], default: T) -> TaskIdMap
     TaskIdMappings are defaultdicts, which keeps the lower level logic simpler.
     TaskIdMappingsArgs are just dicts, which are serializable trhough api and redis
     thread bounds.
+
     """
 
     m: TaskIdMapping[T] = defaultdict(lambda: default)
@@ -131,8 +130,7 @@ def parse_task_id_mapping(mapping: TaskIdMappingArg[T], default: T) -> TaskIdMap
 
 
 class CandidateChoiceFallback(Enum):
-    """
-    Type for the candidate choice.
+    """Type for the candidate choice.
 
     Candidate Choices are either a string (the candidate id) or a special case
     (asis candidate, or the best one).
@@ -188,6 +186,7 @@ class BaseSession(BeetsImportSession, ABC):
     Note: It's a design choice to require that you manually create and pass the
     `SessionState` object. Usually the states go into the database, which needs explizit
     handling beyond the session.
+
     """
 
     # attributes needed to create a beetsTag instance for our database
@@ -209,7 +208,7 @@ class BaseSession(BeetsImportSession, ABC):
         if state.path.is_file() and not is_archive_file(state.path):
             raise ValueError(
                 f"Path {state.path} is not an archive file. "
-                + "Importing singletons is not supported yet."
+                 "Importing singletons is not supported yet."
             )
 
         # FIXME: This is a super bad convention of the original beets.
@@ -306,7 +305,7 @@ class BaseSession(BeetsImportSession, ABC):
         """
         self.logger.warning(
             "Skipping duplicate resolution. "
-            + f"Your session should implement this! -> {self.__class__.__name__}"
+             f"Your session should implement this! -> {self.__class__.__name__}"
         )
         task.set_choice(BeetsImportAction.SKIP)
 
@@ -391,7 +390,7 @@ class BaseSession(BeetsImportSession, ABC):
             # Clear error on successful run (e.g. from a previous run on the same session)
             self.state.exc = None
         except ImportAbortError:
-            log.debug(f"Interactive import session aborted by user")
+            log.debug("Interactive import session aborted by user")
         except ApiException as e:
             if e.persist_in_db:
                 log.debug(f"Persisting exception {e} in session state")
@@ -419,8 +418,7 @@ class PreviewSession(BaseSession):
         autotag: bool | None = None,
         **kwargs,
     ):
-        """
-        Create new PreviewSession.
+        """Create new PreviewSession.
 
         Parameters
         ----------
@@ -430,6 +428,7 @@ class PreviewSession(BaseSession):
             If None: get value from beets config.
         autotag : bool | None
             Whether to look up metadata online. If None: get value from beets config.
+
         """
 
         super().__init__(state, config_overlay, **kwargs)
@@ -495,8 +494,7 @@ class PreviewSession(BaseSession):
 
 
 class AddCandidatesSession(PreviewSession):
-    """
-    Preview session that adds a candidate to the ones already fetched.
+    """Preview session that adds a candidate to the ones already fetched.
 
     Can only run on a session state of a preview session that already has
     candidates.
@@ -599,15 +597,14 @@ class AddCandidatesSession(PreviewSession):
         else:
             log.warning(
                 f"Task {task_state.id} not in initial task states. "
-                + "Cannot restore previous progress."
+                 "Cannot restore previous progress."
             )
 
         super().finalize(task)
 
 
 class ImportSession(BaseSession):
-    """
-    Import session that assumes we already have a match-id.
+    """Import session that assumes we already have a match-id.
 
     Needs to run from an already finished Preview Session.
     """
@@ -637,6 +634,7 @@ class ImportSession(BaseSession):
             The action to take if duplicates are found. One of "skip", "keep",
             "remove", "merge", "ask". If None, the default is read from
             the user config and applied to all tasks.
+
         """
 
         config_overlay = {} if config_overlay is None else config_overlay
@@ -663,7 +661,7 @@ class ImportSession(BaseSession):
         if self.state.progress == Progress.IMPORT_COMPLETED:
             log.error(
                 f"Cannot run {self.__class__.__name__} from states that already "
-                + f"completed an import. (i.e. other imports) [{self.state.progress}]"
+                 f"completed an import. (i.e. other imports) [{self.state.progress}]"
             )
             e = UserError("Cannot redo imports. Try undo and/or retag!")
             self.state.exc = to_serialized_exception(e)
@@ -671,7 +669,7 @@ class ImportSession(BaseSession):
         elif self.state.progress > Progress.PREVIEW_COMPLETED:
             log.warning(
                 f"Resetting state from {self.state.progress} to PREVIEW_COMPLETED for "
-                + f"import session {self.state.id}."
+                 f"import session {self.state.id}."
             )
             for task in self.state.task_states:
                 task.set_progress(Progress.PREVIEW_COMPLETED)
@@ -731,8 +729,7 @@ class ImportSession(BaseSession):
         return stages
 
     def finalize(self, task: BeetsImportTask):
-        """
-        Reset previous match threshold exceptions.
+        """Reset previous match threshold exceptions.
 
         Needed because we might run a normal ImportSession manually after
         the AutoImportSession. The AutoImportSession needs to keep an Exception in its
@@ -771,7 +768,7 @@ class ImportSession(BaseSession):
         elif candidate_id == CandidateChoiceFallback.BEST:
             candidate_state = task_state.best_candidate_state
             if candidate_state is None:
-                raise ValueError(f"No candidate found.")
+                raise ValueError("No candidate found.")
         elif candidate_id == CandidateChoiceFallback.ASIS:
             candidate_state = task_state.asis_candidate
         else:
@@ -813,7 +810,7 @@ class ImportSession(BaseSession):
         )
 
         if len(found_duplicates) == 0:
-            log.debug(f"No duplicates found")
+            log.debug("No duplicates found")
             return
 
         task_state = self.state.get_task_state_for_task_raise(task)
@@ -849,8 +846,7 @@ class ImportSession(BaseSession):
 
 
 class BootlegImportSession(ImportSession):
-    """
-    Import session to import without modifying metadata.
+    """Import session to import without modifying metadata.
 
     No preview session required.
 
@@ -875,6 +871,7 @@ class BootlegImportSession(ImportSession):
             "import.group_albums", "import.autotag" and "import.search_ids" are ignored.
         **kwargs
             See `ImportSession`.
+
         """
 
         config_overlay = {} if config_overlay is None else deepcopy(config_overlay)
@@ -945,6 +942,7 @@ class AutoImportSession(ImportSession):
             0 to import only perfect matches, 1 to import everything. Default is 0.04.
         **kwargs
             See `ImportSession`.
+
         """
 
         super().__init__(state, config_overlay, **kwargs)
@@ -1030,7 +1028,7 @@ class UndoSession(BaseSession):
         if self.state.progress != Progress.IMPORT_COMPLETED:
             log.error(
                 f"Cannot undo import from state {self.state.progress}. "
-                + "Only imports can be undone."
+                 "Only imports can be undone."
             )
             e = UserError(
                 "Cannot undo if never imported! You need to import to undo first."
@@ -1081,7 +1079,7 @@ class UndoSession(BaseSession):
             self.state.exc = to_serialized_exception(excs[0])
             raise IntegrityException(
                 "Could not delete all items. Some items might be left in the library. "
-                + f"Problematic files were: {pths}"
+                 f"Problematic files were: {pths}"
             )
 
         # Update our state and progress

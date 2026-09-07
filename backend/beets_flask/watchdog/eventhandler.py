@@ -1,5 +1,4 @@
-"""
-Async event handler for watchdog.
+"""Async event handler for watchdog.
 
 Adapted from https://github.com/biesnecker/hachiko/blob/master/hachiko/hachiko.py
 MIT License

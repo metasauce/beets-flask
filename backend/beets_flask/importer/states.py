@@ -108,12 +108,12 @@ class SessionState(BaseState):
 
     def __repr__(self) -> str:
         return (
-            f"SessionState:\n"
-            + f" * id={self.id}\n"
-            + f" * folder_path={self.folder_path}\n"
-            + f" * folder_hash={self.folder_hash}\n"
-            + f" * task_states={[ts.id for ts in self.task_states]}\n"
-            + f" * progress={self.progress}"
+            "SessionState:\n"
+             f" * id={self.id}\n"
+             f" * folder_path={self.folder_path}\n"
+             f" * folder_hash={self.folder_hash}\n"
+             f" * task_states={[ts.id for ts in self.task_states]}\n"
+             f" * progress={self.progress}"
         )
 
     @property
@@ -267,13 +267,13 @@ class TaskState(BaseState):
 
     def __repr__(self) -> str:
         return (
-            f"TaskState:\n"
-            + f" * id={self.id}\n"
-            + f" * candidate_states={[ts.id for ts in self.candidate_states]}\n"
-            + f" * chosen_candidate_state_id={self.chosen_candidate_state_id}\n"
-            + f" * progress={self.progress}\n"
-            + f" * completed={self.completed}\n"
-            + f" * toppath={self.toppath}\n"
+            "TaskState:\n"
+             f" * id={self.id}\n"
+             f" * candidate_states={[ts.id for ts in self.candidate_states]}\n"
+             f" * chosen_candidate_state_id={self.chosen_candidate_state_id}\n"
+             f" * progress={self.progress}\n"
+             f" * completed={self.completed}\n"
+             f" * toppath={self.toppath}\n"
         )
 
     @property
@@ -426,8 +426,7 @@ class TaskState(BaseState):
 
 @dataclass(init=False)
 class CandidateState(BaseState):
-    """
-    State representation of a single candidate (match) for an import task.
+    """State representation of a single candidate (match) for an import task.
 
     Can represent an album (self.type == "album") or a track (self.type == "track").
     Keeps a reference to the associated SelectionState, so we can access the beets task.
@@ -454,14 +453,14 @@ class CandidateState(BaseState):
 
     def __repr__(self) -> str:
         return (
-            f"CandidateState:\n"
-            + f" * id={self.id}\n"
-            + f" * match={self.match.info.album}\n"
-            + f" * task_state_id={self.task_state.id}\n"
-            + f" * distance={self.distance}\n"
-            + f" * penalties={self.penalties}\n"
-            + f" * {len(self.items)=}\n"
-            + f" * {len(self.tracks)=}\n"
+            "CandidateState:\n"
+             f" * id={self.id}\n"
+             f" * match={self.match.info.album}\n"
+             f" * task_state_id={self.task_state.id}\n"
+             f" * distance={self.distance}\n"
+             f" * penalties={self.penalties}\n"
+             f" * {len(self.items)=}\n"
+             f" * {len(self.tracks)=}\n"
         )
 
     @property
@@ -489,8 +488,7 @@ class CandidateState(BaseState):
 
     @classmethod
     def asis_candidate(cls, task_state: TaskState) -> CandidateState:
-        """
-        Alternate constructor for an asis import option.
+        """Alternate constructor for an asis import option.
 
         We mock the album match to display
         current meta data in the frontend.
@@ -861,10 +859,10 @@ class SerializedCandidateState(SerializedBaseState):
 
 
 __all__ = [
-    "SessionState",
-    "TaskState",
     "CandidateState",
+    "SerializedCandidateState",
     "SerializedSessionState",
     "SerializedTaskState",
-    "SerializedCandidateState",
+    "SessionState",
+    "TaskState",
 ]

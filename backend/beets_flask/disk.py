@@ -283,6 +283,7 @@ def path_to_folder(root_dir: Path | str, subdirs=True) -> Folder:
     Returns
     -------
         dict: The nested dict structure.
+
     """
 
     return Folder.from_path(root_dir, subdirs=subdirs)
@@ -304,6 +305,7 @@ def album_folders_from_track_paths(
     Returns
     -------
         list[str]: album folders
+
     """
 
     folders_to_check: set[Path] = set()
@@ -348,10 +350,11 @@ def is_album_folder(path: Path | str):
     path : Path | str
         The path to check, can be a folder, file or archive.
 
-    Note
+    Note:
     ----
     Except in tests, we dont use this function yet.
     Its logic is duplicated in `all_album_folders`. (We should consolidate.)
+
     """
     if isinstance(path, str):
         path = Path(path).absolute()
@@ -370,8 +373,7 @@ def is_album_folder(path: Path | str):
 
 
 def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]:
-    """
-    Get all album folders from a given root dir.
+    """Get all album folders from a given root dir.
 
     Parameters
     ----------
@@ -384,6 +386,7 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
     Returns
     -------
         list[Path]
+
     """
 
     if isinstance(root_dir, str):
@@ -430,8 +433,7 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
 
 
 def _is_within_multi_dir(path: Path | str) -> bool:
-    """
-    Minimal version of beets heuristic to check if a string matches a multi-disc pattern.
+    """Minimal version of beets heuristic to check if a string matches a multi-disc pattern.
 
     E.g. "My Album CD1" or "Disc 2" will return True
     """
@@ -471,7 +473,7 @@ def dir_files(path: Path) -> int:
     """Count the number of files in a directory."""
     try:
         result = subprocess.run(
-            [f"find {str(path.resolve())} | wc -l"],
+            [f"find {path.resolve()!s} | wc -l"],
             capture_output=True,
             text=True,
             check=True,

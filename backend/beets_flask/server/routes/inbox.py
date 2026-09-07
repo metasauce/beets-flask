@@ -57,6 +57,7 @@ async def get_folder():
     ----------
     folder_path : str
         The path to the folder to get the structure for.
+
     """
     params = await request.get_json()
 
@@ -149,6 +150,7 @@ async def delete():
         The paths to the folders to remove.
     folder_hashes : list[str]
         The hashes of the folders to remove.
+
     """
     params = await request.get_json()
     folder_hashes, folder_paths = pop_folder_params(params, allow_empty=False)
@@ -232,6 +234,7 @@ async def stats_for_all():
     ----------
     folder : str (optional)
         The folder to compute stats for. If not provided, all inbox folders are used.
+
     """
     folders = get_inbox_folders()
     stats = [compute_stats(f) for f in folders]

@@ -8,8 +8,8 @@ from typing import TypedDict
 __all__ = [
     "FolderStatus",
     "Progress",
-    "SerializedProgressState",
     "ProgressState",
+    "SerializedProgressState",
 ]
 
 

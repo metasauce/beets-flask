@@ -26,8 +26,7 @@ from beets_flask.watchdog.eventhandler import AIOEventHandler, AIOWatchdog
 
 
 def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog | None:
-    """
-    Register file system watcher to monitor configured inboxes.
+    """Register file system watcher to monitor configured inboxes.
 
     Parameters
     ----------
@@ -44,6 +43,7 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
     -----
     - This should not be called from uvicorn workers to avoid concurrency issues.
       You only want one watchdog (use separate init script).
+
     """
     _inboxes = get_inboxes()
 
@@ -58,7 +58,7 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
         return None
     log.info(
         f"Registering watchdog with debounce of {debounce} seconds for "
-        + f"inboxes: {[i.path for i in _inboxes]}"
+         f"inboxes: {[i.path for i in _inboxes]}"
     )
 
     # One observer for all inboxes.
@@ -150,6 +150,7 @@ async def auto_tag(
         Full path to the folder or archive file to retag.
     kind: str, optional
         If None, the configured autotag kind from the inbox this folder is in will be used.
+
     """
     inbox = get_inbox_for_path(folder_path)
     if inbox is None:

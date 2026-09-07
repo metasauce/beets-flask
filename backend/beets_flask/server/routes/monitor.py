@@ -9,8 +9,7 @@ monitor_bp = Blueprint("monitor", __name__, url_prefix="/monitor")
 
 @monitor_bp.route("/queues", methods=["GET"])
 async def get_queue_status():
-    """
-    Get the status of the job queues.
+    """Get the status of the job queues.
 
     Returns
     -------
@@ -38,8 +37,7 @@ async def get_queue_status():
 
 @monitor_bp.route("/workers", methods=["GET"])
 async def get_worker_status():
-    """
-    Get the status of the RQ workers.
+    """Get the status of the RQ workers.
 
     Returns
     -------
@@ -63,8 +61,7 @@ async def get_worker_status():
 
 @monitor_bp.route("/jobs", methods=["GET"])
 async def get_job_status():
-    """
-    Get the status of the jobs in the job queues.
+    """Get the status of the jobs in the job queues.
 
     Returns
     -------
@@ -93,8 +90,7 @@ async def get_job_status():
 
 @monitor_bp.route("/debugResetDb", methods=["GET"])
 async def reset_database():
-    """
-    Reset the sql database.
+    """Reset the sql database.
 
     Returns
     -------

@@ -96,8 +96,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         return self
 
     def commit_to_beets(self) -> None:
-        """
-        Insert the current state of self into the native beets config.
+        """Insert the current state of self into the native beets config.
 
         Resets the beets config before inserting the new values.
 
@@ -226,7 +225,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
         # To pass validation checks, we also need the folders shown in the config demo
         # to be present. Otherwise the frontend wont be usable on first start.
         if did_copy:
-            log.info(f"Creating demo inboxes at /music/beets_flask_config_example/")
+            log.info("Creating demo inboxes at /music/beets_flask_config_example/")
             for dir in [
                 "/music/beets_flask_config_example/imported",
                 "/music/beets_flask_config_example/inbox_off",
@@ -238,7 +237,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
                 except OSError:
                     log.info(
                         "Could not create beets_flask_config_example directories, "
-                        + "likely because this was not run inside the docker container."
+                         "likely because this was not run inside the docker container."
                     )
 
     # ------------------------------ Utility getters ----------------------------- #
@@ -264,8 +263,7 @@ class BeetsFlaskConfig(ConfigExtra[BeetsSchema]):
 
     @property
     def ignore_globs(self) -> list[str]:
-        """
-        Get the list of ignore globs from the config.
+        """Get the list of ignore globs from the config.
 
         If user does not set this in their beets flask config, we use whats in beets.
         (We do this via a placeholder string "_use_beets_ignore")

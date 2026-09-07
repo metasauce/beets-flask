@@ -156,6 +156,7 @@ def emit_folder_status(
         The status before the function is called. If none is given, no status update is sent.
     after: FolderStatus, optional
         The status after the function is called. If none is given, no status update is sent.
+
     """
 
     def decorator(
@@ -171,7 +172,7 @@ def emit_folder_status(
                     )
                     if f_on_disk is None:
                         raise InvalidUsageException(
-                            f"If only hash is given, it must be in the db."
+                            "If only hash is given, it must be in the db."
                         )
                     path = f_on_disk.full_path
 

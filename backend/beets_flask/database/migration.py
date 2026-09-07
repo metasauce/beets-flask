@@ -1,5 +1,4 @@
-"""
-Scaffold for initial alembic setup and all future migrations.
+"""Scaffold for initial alembic setup and all future migrations.
 
 Introduced for migration from beets-flask v1.2.1 to v2.0. We use a python wrapper here
 instead of the alembic cli, as this way we get configs and env vars in our usual way.

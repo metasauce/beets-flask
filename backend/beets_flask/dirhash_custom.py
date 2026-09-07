@@ -25,6 +25,7 @@ def dirhash_c(
     filter_regex: re.Pattern, optional
         When calculating checksum contributon for files, only consider
         those that match the provided pattern.
+
     """
     if isinstance(dirname, Path):
         dirname = str(dirname.resolve())
@@ -89,4 +90,4 @@ def archive_hash(
     return hash.digest()
 
 
-__all__ = ["dirhash_c", "archive_hash"]
+__all__ = ["archive_hash", "dirhash_c"]

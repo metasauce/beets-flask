@@ -42,7 +42,7 @@ from beets_flask.server.websocket.status import FolderStatusUpdate, JobStatusUpd
 
 from .base import ModelAPIBlueprint
 
-__all__ = ["SessionAPIBlueprint", "MinimalChipInfo"]
+__all__ = ["MinimalChipInfo", "SessionAPIBlueprint"]
 
 
 class MinimalBestCandidateInfo(TypedDict):
@@ -99,6 +99,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
         folder_path : str (optional)
             Path of the folder to check. Used as a fallback to find sessions for folders
             whose content changed.
+
         """
 
         folder_hash = request.args.get("folder_hash")
@@ -150,6 +151,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
             best match, or null), `distance` (normalized match distance of
             the best match) and `data_source`. Folders without a session are
             omitted.
+
         """
         folder_hashes = request.args.getlist("folder_hash")
         folder_paths = request.args.getlist("folder_path")

@@ -12,17 +12,17 @@ from .logger import log
 
 @deprecated
 def capture_stdout_stderr(func, *args, **kwargs):
-    """
-    beets.ui uses a custom `print_` function to display most console output in a nicely formatted way. This is the easiest way to capture that output.
+    """beets.ui uses a custom `print_` function to display most console output in a nicely formatted way. This is the easiest way to capture that output.
 
     Args:
         func (callable): function to call
         *args: positional arguments to pass to `func`
         **kwargs: keyword arguments to pass to `func`
 
-    Returns
+    Returns:
     -------
         tuple: (str, str, any) -- stdout, stderr, return value of `func`
+
     """
     original_stdout = sys.stdout
     original_stderr = sys.stderr
