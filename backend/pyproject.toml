@@ -87,48 +87,53 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-package = "./beets_flask"
 packages = ["beets_flask"]
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.ruff]
-include = ["pyproject.toml", "beets_flask/**/*.py", "tests/**/*.py"]
-target-version = "py311"
-
-[tool.ruff.lint.per-file-ignores]
-"**/tests/**/*" = ["D"]
-"**/alembic/**/*" = ["D", "I"]
+include = [
+    "pyproject.toml",
+    "beets_flask/**/*.py",
+    "tests/**/*.py",
+]
+target-version = "py312"
 
 [tool.ruff.lint]
+future-annotations = true
 select = [
-    "I",
-    "D",
-    # Augment the convention by requiring an imperative mood for all docstrings.
-    "D401",
-    # Unused imports
-    "F401",
-    # pyupgrade
-    "UP",
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "ISC", # flake8-implicit-str-concat
+    "N",   # pep8-naming
+    "RUF", # ruff
+    "UP",  # pyupgrade
+    "TC",  # flake8-type-checking
+    "D",   # pydocstyle
+    "W",   # pycodestyle
+    # PTH is disabled, it has no working autofixes in current ruff versions
+    # and the remaining issues are not worth the manual churn.
 ]
 ignore = [
     # Ignore req. for public facing functions docstrings
     "D10",
-    "D401",
     "D202",
+    "D401",
+    # Incompatible with D211/D212, which we enforce instead:
+    "D203", # blank line before class docstring (use D211: none)
+    "D213", # summary on second line (use D212: first line)
+    "TC006", # no need to quote 'cast's since we use 'from __future__ import annotations'
 ]
 fixable = ["ALL"]
 
-[tool.ruff.lint.pydocstyle]
-convention = "numpy"
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*" = ["D"]
+"**/alembic/**/*" = ["D", "I"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["beets_flask", "tests"]
 known-third-party = ["alembic", "sqlalchemy"]
 
 [tool.pytest.ini_options]
-# addopts = ["--import-mode=importlib", "--cov=beets_flask"]
 addopts = ["--import-mode=importlib", "--cov=beets_flask", "--cov-report=html"]
 filterwarnings = [
     "error",
@@ -153,6 +158,7 @@ exclude_also = [
 check_untyped_defs = true
 disallow_untyped_decorators = true
 allow_redefinition = true
+warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 # Suppresses error messages about imports that cannot be resolved.
