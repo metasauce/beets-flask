@@ -128,6 +128,9 @@ fixable = ["ALL"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
 "**/alembic/**/*" = ["D", "I"]
+# SQLAlchemy resolves Mapped[...] annotations at runtime, so these imports
+# must stay outside TYPE_CHECKING blocks.
+"**/beets_flask/database/models/*" = ["TC001", "TC002", "TC003"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["beets_flask", "tests"]

@@ -14,9 +14,10 @@ Why not just have State and StateInDb in the same class?
 from __future__ import annotations
 
 import pickle
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from beets.importer import Action
 from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
@@ -30,24 +31,18 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
+from sqlalchemy.sql.elements import ColumnElement
 
 from beets_flask.database.mapper.base import Context
 from beets_flask.database.models.base import Base
 from beets_flask.database.models.match import Distance, Match
 from beets_flask.disk import Archive, Folder
 from beets_flask.importer.progress import Progress
+from beets_flask.importer.states import SessionState
 from beets_flask.logger import log
+from beets_flask.server.exceptions import SerializedException
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from beets.importer import Action
-    from sqlalchemy.sql.elements import ColumnElement
-
-    from beets_flask.importer.states import SessionState
-    from beets_flask.server.exceptions import SerializedException
-
-    from .pending import TaskItem
+from .pending import TaskItem
 
 
 class FolderInDb(Base):
