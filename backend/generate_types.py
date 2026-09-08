@@ -13,14 +13,6 @@ from beets_flask.invoker.enqueue import (
 )
 from beets_flask.server.routes.db_models.session import MinimalSession
 from beets_flask.server.routes.inbox import InboxStats
-from beets_flask.server.routes.library.resources import (
-    AlbumResponse,
-    AlbumResponseExpanded,
-    AlbumResponseMinimal,
-    AlbumResponseMinimalExpanded,
-    ItemResponse,
-    ItemResponseMinimal,
-)
 from beets_flask.server.routes.library.stats import LibraryStats
 from beets_flask.server.websocket.status import (
     FileSystemUpdate,
@@ -68,15 +60,6 @@ builder.add(CandidateChoiceFallback)
 # Stats
 builder.add(LibraryStats)
 
-# Item responses
-builder.add(ItemResponse)
-builder.add(ItemResponseMinimal)
-
-# Album responses
-builder.add(AlbumResponse)
-builder.add(AlbumResponseMinimal)
-builder.add(AlbumResponseExpanded)
-builder.add(AlbumResponseMinimalExpanded)
 
 # ------------------------------ Status updates ------------------------------ #
 
