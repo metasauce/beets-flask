@@ -42,6 +42,7 @@ dependencies = [
     "typing_extensions",
     "polars>=1.36.1",
     "alembic>=1.18.4",
+    "quart-schema[pydantic] @ git+https://github.com/semohr/quart-schema.git@defs_msgspec",
 ]
 
 [dependency-groups]
@@ -88,6 +89,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["beets_flask"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 include = [
@@ -158,6 +162,7 @@ exclude_also = [
 ]
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 check_untyped_defs = true
 disallow_untyped_decorators = true
 allow_redefinition = true
