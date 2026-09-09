@@ -195,6 +195,24 @@ class MultiAlbumDocument(
     """The response of a request that returns multiple albums."""
 
 
+# ---------------------------------- Common ---------------------------------- #
+
+
+class BulkFilterQueryParams(BaseModel):
+    """The filter query parameters for the bulk endpoints."""
+
+    filter_query: str | None = Field(
+        None,
+        description="A beets query string to filter the results, e.g. `year:2020`. For "
+        "more infomration see the [beets query syntax]"
+        "(https://beets.readthedocs.io/en/latest/reference/query.html).",
+    )
+    filter_ids: list[int] | None = Field(
+        None,
+        description="A list of beets ids to filter by, e.g. `1,2,3`.",
+    )
+
+
 # ---------------------------------- Cursor ---------------------------------- #
 
 

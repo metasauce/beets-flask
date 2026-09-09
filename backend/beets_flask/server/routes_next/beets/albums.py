@@ -21,6 +21,7 @@ from ._types import (
     AlbumAttributes,
     AlbumResource,
     AlbumSortField,
+    BulkFilterQueryParams,
     Cursor,
     Direction,
     ItemResource,
@@ -163,7 +164,7 @@ async def delete_album(
 # ----------------------------------- Bulk ----------------------------------- #
 
 
-class BulkGetQueryParams(BaseModel):
+class BulkGetQueryParams(BulkFilterQueryParams):
     """Query params of the albums bulk endpoint.
 
     ``cursor`` is mutually exclusive with ``sort``/the filters; ``include``
@@ -183,22 +184,6 @@ class BulkGetQueryParams(BaseModel):
         ),
         BeforeValidator(
             Cursor[Sort[AlbumSortField]].from_string, json_schema_input_type=str
-        ),
-    ] = None
-    filter_query: Annotated[
-        str | None,
-        Field(
-            description=(
-                "A beets query string, see the "
-                "[beets query syntax]"
-                "(https://beets.readthedocs.io/en/latest/reference/query.html)."
-            ),
-        ),
-    ] = None
-    filter_ids: Annotated[
-        list[int] | None,
-        Field(
-            description="Repeatable, explicit beets library album ids.",
         ),
     ] = None
     sort: Annotated[

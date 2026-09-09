@@ -13,6 +13,7 @@ from beets_flask.server.routes_next.beets._query import PaginatedQuery
 from ..jsonapi import LinkObject, MetaObject, error_responses
 from . import g
 from ._types import (
+    BulkFilterQueryParams,
     Cursor,
     Direction,
     ItemAttributes,
@@ -122,7 +123,7 @@ async def delete_item(
 # ----------------------------------- Bulk ----------------------------------- #
 
 
-class BulkGetQueryParams(BaseModel):
+class BulkGetQueryParams(BulkFilterQueryParams):
     cursor: Annotated[
         Cursor[Sort[ItemSortField]] | None,
         Field(
@@ -132,22 +133,6 @@ class BulkGetQueryParams(BaseModel):
         ),
         BeforeValidator(
             Cursor[Sort[ItemSortField]].from_string, json_schema_input_type=str
-        ),
-    ] = None
-    filter_query: Annotated[
-        str | None,
-        Field(
-            description=(
-                "A beets query string, see the "
-                "[beets query syntax]"
-                "(https://beets.readthedocs.io/en/latest/reference/query.html)."
-            ),
-        ),
-    ] = None
-    filter_ids: Annotated[
-        list[int] | None,
-        Field(
-            description="Repeatable, explicit beets library item ids.",
         ),
     ] = None
     sort: Annotated[
