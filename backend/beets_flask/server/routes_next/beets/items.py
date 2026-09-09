@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
+from pydantic import BaseModel, Field
 from quart import Blueprint
-from quart_schema import validate_request, validate_response
+from quart_schema import validate_querystring, validate_request, validate_response
 
 from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
 
@@ -77,3 +78,35 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
     item.try_sync(True, False)
 
     return SingleItemDocument(data=to_item_resource(item))
+
+
+class DeleteQueryParams(BaseModel):
+    delete_file: Annotated[
+        bool,
+        Field(
+            description="Also delete the item's file from disk",
+        ),
+    ] = False
+
+
+@items_bp.route("/<int:item_id>", methods=["DELETE"])
+@validate_querystring(DeleteQueryParams)
+@validate_response(SingleItemDocument)
+@error_responses(InvalidUsageError, NotFoundError)
+async def delete_item(
+    item_id: int, query_args: DeleteQueryParams
+) -> SingleItemDocument:
+    """Delete item.
+
+    Delete a single item from the beets library. Use ``delete_file=true`` to also remove
+    its file from disk. If the item was the last one of its album, the
+    album is removed as well.
+    """
+    item: BeetsItem | None = g.lib.get_item(item_id)
+    if not item:
+        raise NotFoundError(f"Item with beets_id:{item_id!r} not found in beets db.")
+
+    resource = to_item_resource(item)
+    item.remove(delete=query_args.delete_file, with_album=True)
+
+    return SingleItemDocument(data=resource)

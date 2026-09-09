@@ -114,3 +114,34 @@ async def patch_album(
     )
 
     return SingleAlbumDocument(data=to_album_resource(album, items), included=included)
+
+
+class DeleteQueryParams(BaseModel):
+    delete_files: Annotated[
+        bool,
+        Field(
+            description="Also delete the album's files from disk",
+        ),
+    ] = False
+
+
+@albums_bp.route("/<int:album_id>", methods=["DELETE"])
+@validate_querystring(DeleteQueryParams)
+@validate_response(SingleAlbumDocument)
+@error_responses(InvalidUsageError, NotFoundError)
+async def delete_album(
+    album_id: int, query_args: DeleteQueryParams
+) -> SingleAlbumDocument:
+    """Delete album.
+
+    Delete a single album from the beets library, together with all of its items.
+    Use ``delete_files=true`` to also remove their files from disk.
+    """
+    album: BeetsAlbum | None = g.lib.get_album(album_id)
+    if not album:
+        raise NotFoundError(f"Album with beets_id:{album_id!r} not found in beets db.")
+
+    resource = to_album_resource(album, album.items())
+    album.remove(delete=query_args.delete_files)
+
+    return SingleAlbumDocument(data=resource, included=[])

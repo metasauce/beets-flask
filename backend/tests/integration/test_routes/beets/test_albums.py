@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, ClassVar
 
 import pytest
@@ -208,6 +209,78 @@ class TestPatchAlbum(IsolatedBeetsLibraryMixin):
     async def test_patch_album_not_found(self, client: TestClientProtocol):
         """PATCH a non-existent album -> 404."""
         response = await client.patch(self._url(999999), json={"album": "Album X"})
+        assert response.status_code == 404
+
+        data = await response.get_json()
+        assert data["type"] == "NotFoundError"
+        assert "999999" in data["message"]
+
+
+class TestDeleteAlbum(IsolatedBeetsLibraryMixin):
+    """Tests for ``DELETE /api_v1/beets/albums/<album_id>``."""
+
+    _albums: ClassVar[dict[str, BeetsAlbum]] = {}
+
+    @staticmethod
+    def _url(album_id: int, delete_files: bool | None = None) -> str:
+        """Build the URL for a single album resource."""
+        return f"/api_v1/beets/albums/{album_id}" + (
+            "?delete_files=true" if delete_files else ""
+        )
+
+    @pytest.fixture(scope="class", autouse=True)
+    def albums(self, setup_beetslib):  # type: ignore
+        """Create the albums used by all tests in this class.
+
+        - ``"a"``: album with two items, deleted from the library only
+        - ``"b"``: album with one item, deleted together with its file
+        """
+        a = beets_lib_album(album="Album A", albumartist="Artist One")
+        self.beets_lib.add(a)
+        self.beets_lib.add(beets_lib_item(album_id=a.id, title="Track 1"))
+        self.beets_lib.add(beets_lib_item(album_id=a.id, title="Track 2"))
+
+        b = beets_lib_album(album="Album B", albumartist="Artist Two")
+        self.beets_lib.add(b)
+        self.beets_lib.add(beets_lib_item(album_id=b.id, title="Track 3"))
+
+        self._albums.update(a=a, b=b)
+
+    async def test_delete_album(self, client: TestClientProtocol):
+        """DELETE removes the album and its items from the library."""
+        album = self._albums["a"]
+        item_ids = [item.id for item in album.items()]
+        assert len(item_ids) == 2
+
+        response = await client.delete(self._url(album.id))
+        assert response.status_code == 200
+
+        # The response carries the album as it was before the deletion.
+        document = SingleAlbumDocument.model_validate(await response.get_json())
+        assert document.data.id == str(album.id)
+        assert [r.id for r in document.data.relationships] == [
+            str(id) for id in item_ids
+        ]
+
+        assert self.beets_lib.get_album(album.id) is None
+        for item_id in item_ids:
+            assert self.beets_lib.get_item(item_id) is None
+
+    async def test_delete_album_delete_files(self, client: TestClientProtocol):
+        """DELETE with ``delete_files=true`` also removes the files from disk."""
+        album = self._albums["b"]
+        item_path = os.fsdecode(album.items()[0].path)
+        assert os.path.exists(item_path)
+
+        response = await client.delete(self._url(album.id, delete_files=True))
+        assert response.status_code == 200
+
+        assert self.beets_lib.get_album(album.id) is None
+        assert not os.path.exists(item_path), "Item file still exists on disk"
+
+    async def test_delete_album_not_found(self, client: TestClientProtocol):
+        """DELETE a non-existent album -> 404."""
+        response = await client.delete(self._url(999999))
         assert response.status_code == 404
 
         data = await response.get_json()
