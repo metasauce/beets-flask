@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 from urllib.parse import urlencode
 
 from pydantic import BaseModel, BeforeValidator, Field, model_validator
 from quart import Blueprint, request
 from quart_schema import validate_querystring, validate_request, validate_response
 
+from beets_flask.importer.types import BeetsItem
 from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
-from beets_flask.server.routes_next.beets._query import PaginatedQuery
+from beets_flask.server.routes_next.beets._query import (
+    PaginatedQuery,
+    build_filter_query,
+)
 
 from ..jsonapi import LinkObject, MetaObject, error_responses
 from . import g
 from ._types import (
     BulkFilterQueryParams,
+    BulkResult,
     Cursor,
     Direction,
     ItemAttributes,
@@ -23,9 +28,6 @@ from ._types import (
     SingleItemDocument,
     Sort,
 )
-
-if TYPE_CHECKING:
-    from beets_flask.importer.types import BeetsItem
 
 items_bp = Blueprint("items", __name__, url_prefix="/items")
 
@@ -221,3 +223,35 @@ async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
         links=links,
         meta=MetaObject(total=page.total(g.lib)),
     )
+
+
+@items_bp.route("/", methods=["PATCH"])
+@validate_querystring(BulkFilterQueryParams)
+@validate_request(ItemAttributes)
+@validate_response(BulkResult)
+@error_responses(InvalidUsageError)
+async def patch_items(
+    query_args: BulkFilterQueryParams, data: ItemAttributes
+) -> BulkResult:
+    """Patch items (bulk).
+
+    Update the attributes of all items matching the given filters. The change is applied
+    to the beets library and written to the files' metadata if applicable. Attributes
+    that are not present in the body are left unchanged; an explicit ``null`` clears the
+    field.
+    """
+
+    update_data = data.patch_data()
+    query = build_filter_query(
+        query_args.filter_query, query_args.filter_ids, BeetsItem
+    )
+
+    # Update every matching item in a single transaction
+    total = 0
+    with g.lib.transaction():
+        for item in g.lib.items(query):
+            item.update(update_data)
+            item.try_sync(True, False)
+            total += 1
+
+    return BulkResult(meta=MetaObject(total=total))

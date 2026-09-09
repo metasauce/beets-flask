@@ -13,6 +13,7 @@ from beets_flask import log
 from beets_flask.server.exceptions import InvalidUsageError
 
 from ..jsonapi import (
+    MetaObject,
     MultiResourceDocument,
     MultiResourceDocumentWithIncluded,
     RelResource,
@@ -211,6 +212,19 @@ class BulkFilterQueryParams(BaseModel):
         None,
         description="A list of beets ids to filter by, e.g. `1,2,3`.",
     )
+
+
+class BulkResult(BaseModel):
+    """The result of a bulk operation (e.g. update or delete).
+
+    ``meta.total`` is the number of entities the operation was applied
+    to.
+    """
+
+    meta: Annotated[
+        MetaObject,
+        Field(description="The number of entities the operation was applied to"),
+    ]
 
 
 # ---------------------------------- Cursor ---------------------------------- #

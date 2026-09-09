@@ -7,8 +7,12 @@ from pydantic import BaseModel, BeforeValidator, Field, model_validator
 from quart import Blueprint, request
 from quart_schema import validate_querystring, validate_request, validate_response
 
+from beets_flask.importer.types import BeetsAlbum
 from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
-from beets_flask.server.routes_next.beets._query import PaginatedQuery
+from beets_flask.server.routes_next.beets._query import (
+    PaginatedQuery,
+    build_filter_query,
+)
 
 from ..jsonapi import (
     LinkObject,
@@ -22,6 +26,7 @@ from ._types import (
     AlbumResource,
     AlbumSortField,
     BulkFilterQueryParams,
+    BulkResult,
     Cursor,
     Direction,
     ItemResource,
@@ -34,7 +39,7 @@ from .items import to_item_resource
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from beets_flask.importer.types import BeetsAlbum, BeetsItem
+    from beets_flask.importer.types import BeetsItem
 
 albums_bp = Blueprint("albums", __name__, url_prefix="/albums")
 
@@ -302,3 +307,35 @@ async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
         links=links,
         meta=MetaObject(total=page.total(g.lib)),
     )
+
+
+@albums_bp.route("/", methods=["PATCH"])
+@validate_querystring(BulkFilterQueryParams)
+@validate_request(AlbumAttributes)
+@validate_response(BulkResult)
+@error_responses(InvalidUsageError)
+async def patch_albums(
+    query_args: BulkFilterQueryParams, data: AlbumAttributes
+) -> BulkResult:
+    """Patch albums (bulk).
+
+    Update the attributes of all albums matching the given filters. The change is
+    applied to the beets library and written to the files' metadata if applicable.
+    Attributes that are not present in the body are left unchanged; an explicit ``null``
+    clears the field.
+    """
+
+    update_data = data.patch_data()
+    query = build_filter_query(
+        query_args.filter_query, query_args.filter_ids, BeetsAlbum
+    )
+
+    # Update every matching album in a single transaction
+    total = 0
+    with g.lib.transaction():
+        for album in g.lib.albums(query):
+            album.update(update_data)
+            album.try_sync(True, False)
+            total += 1
+
+    return BulkResult(meta=MetaObject(total=total))

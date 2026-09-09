@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 import pytest
 
 from beets_flask.server.routes_next.beets._types import (
+    BulkResult,
     Cursor,
     Direction,
     ItemSortField,
@@ -462,3 +463,84 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
 
         response = await client.get(self._url(cursor=forged))
         assert response.status_code == 400
+
+
+class TestPatchItems(IsolatedBeetsLibraryMixin):
+    """Tests for ``PATCH /api_v1/beets/items/`` (bulk)."""
+
+    _items: ClassVar[dict[str, BeetsItem]] = {}
+
+    @staticmethod
+    def _url(**params: object) -> str:
+        """Build the URL of the bulk items endpoint from query params."""
+        query = urlencode(params, doseq=True)
+        return "/api_v1/beets/items/" + (f"?{query}" if query else "")
+
+    @pytest.fixture(scope="class", autouse=True)
+    def items(self, setup_beetslib) -> dict[str, BeetsItem]:
+        """Three Tool items and two Radiohead items with distinct titles."""
+        items = {
+            "tool_a": beets_lib_item(title="Tool A", artist="Tool"),
+            "tool_b": beets_lib_item(title="Tool B", artist="Tool"),
+            "tool_c": beets_lib_item(title="Tool C", artist="Tool"),
+            "radio_d": beets_lib_item(title="Radio D", artist="Radiohead"),
+            "radio_e": beets_lib_item(title="Radio E", artist="Radiohead"),
+        }
+        for item in items.values():
+            self.beets_lib.add(item)
+        self._items.update(items)
+        return items
+
+    async def test_patch_items_by_query(self, client: TestClientProtocol):
+        """PATCH updates all items matching ``filter_query``."""
+        response = await client.patch(
+            self._url(filter_query="artist:Tool"), json={"artist": "Tool 2"}
+        )
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 3
+
+        # Persisted; the non-matching items are untouched.
+        for key in ("tool_a", "tool_b", "tool_c"):
+            item = self.beets_lib.get_item(self._items[key].id)
+            assert item is not None and item.artist == "Tool 2"
+            assert item.title == self._items[key].title  # unpatched attr unchanged
+        for key in ("radio_d", "radio_e"):
+            item = self.beets_lib.get_item(self._items[key].id)
+            assert item is not None and item.artist == "Radiohead"
+
+    async def test_patch_items_by_ids(self, client: TestClientProtocol):
+        """PATCH updates only the items named by ``filter_ids``."""
+        ids = [self._items["tool_a"].id, self._items["radio_d"].id]
+        response = await client.patch(
+            self._url(filter_ids=ids), json={"title": "Renamed"}
+        )
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 2
+
+        for key in ("tool_a", "radio_d"):
+            item = self.beets_lib.get_item(self._items[key].id)
+            assert item is not None and item.title == "Renamed"
+        # Untouched items keep their titles.
+        for key in ("tool_b", "radio_e"):
+            item = self.beets_lib.get_item(self._items[key].id)
+            assert item is not None and item.title == self._items[key].title
+
+    async def test_patch_items_no_match(self, client: TestClientProtocol):
+        """A filter matching nothing updates nothing but still succeeds."""
+        response = await client.patch(
+            self._url(filter_query="artist:NoSuchArtist"), json={"title": "X"}
+        )
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 0
+
+        item = self.beets_lib.get_item(self._items["radio_e"].id)
+        assert item is not None and item.title == "Radio E"
+
+    async def test_patch_items_empty_body(self, client: TestClientProtocol):
+        """PATCH without any attributes -> 400."""
+        ids = [self._items["tool_b"].id, self._items["radio_e"].id]
+        response = await client.patch(self._url(filter_ids=ids), json={})
+        assert response.status_code == 400
+
+        data = await response.get_json()
+        assert data["type"] == "InvalidUsageError"

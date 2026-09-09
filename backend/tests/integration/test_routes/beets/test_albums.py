@@ -9,6 +9,7 @@ import pytest
 
 from beets_flask.server.routes_next.beets._types import (
     AlbumSortField,
+    BulkResult,
     Cursor,
     Direction,
     MultiAlbumDocument,
@@ -539,3 +540,91 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
 
         response = await client.get(self._url(cursor=forged))
         assert response.status_code == 400
+
+
+class TestPatchAlbums(IsolatedBeetsLibraryMixin):
+    """Tests for ``PATCH /api_v1/beets/albums/`` (bulk)."""
+
+    _albums: ClassVar[dict[str, BeetsAlbum]] = {}
+
+    @staticmethod
+    def _url(**params: object) -> str:
+        """Build the URL of the bulk albums endpoint from query params."""
+        query = urlencode(params, doseq=True)
+        return "/api_v1/beets/albums/" + (f"?{query}" if query else "")
+
+    @pytest.fixture(scope="class", autouse=True)
+    def albums(self, setup_beetslib) -> dict[str, BeetsAlbum]:
+        """Two Tool albums and two Pink Floyd albums with distinct years."""
+        albums = {
+            "tool_2001": beets_lib_album(
+                album="Album A", albumartist="Tool", year=2001
+            ),
+            "tool_2003": beets_lib_album(
+                album="Album B", albumartist="Tool", year=2003
+            ),
+            "pink_2000": beets_lib_album(
+                album="Album C", albumartist="Pink Floyd", year=2000
+            ),
+            "pink_2004": beets_lib_album(
+                album="Album D", albumartist="Pink Floyd", year=2004
+            ),
+        }
+        for album in albums.values():
+            self.beets_lib.add(album)
+        self._albums.update(albums)
+        return albums
+
+    async def test_patch_albums_by_query(self, client: TestClientProtocol):
+        """PATCH updates all albums matching ``filter_query``."""
+        response = await client.patch(
+            self._url(filter_query="albumartist:Tool"),
+            json={"albumartist": "Tool 2", "year": 1999},
+        )
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 2
+
+        for key in ("tool_2001", "tool_2003"):
+            album = self.beets_lib.get_album(self._albums[key].id)
+            assert album is not None
+            assert album.albumartist == "Tool 2"
+            assert album.year == 1999
+            assert album.album == self._albums[key].album  # unpatched attr unchanged
+        for key in ("pink_2000", "pink_2004"):
+            album = self.beets_lib.get_album(self._albums[key].id)
+            assert album is not None and album.albumartist == "Pink Floyd"
+
+    async def test_patch_albums_by_ids(self, client: TestClientProtocol):
+        """PATCH updates only the albums named by ``filter_ids``."""
+        ids = [self._albums["pink_2000"].id, self._albums["pink_2004"].id]
+        response = await client.patch(self._url(filter_ids=ids), json={"year": 2020})
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 2
+
+        for key in ("pink_2000", "pink_2004"):
+            album = self.beets_lib.get_album(self._albums[key].id)
+            assert album is not None and album.year == 2020
+        # Untouched albums keep their titles.
+        for key in ("tool_2001", "tool_2003"):
+            album = self.beets_lib.get_album(self._albums[key].id)
+            assert album is not None and album.album == self._albums[key].album
+
+    async def test_patch_albums_no_match(self, client: TestClientProtocol):
+        """A filter matching nothing updates nothing but still succeeds."""
+        response = await client.patch(
+            self._url(filter_query="albumartist:NoSuchArtist"), json={"year": 0}
+        )
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 0
+
+        album = self.beets_lib.get_album(self._albums["tool_2001"].id)
+        assert album is not None and album.album == "Album A"
+
+    async def test_patch_albums_empty_body(self, client: TestClientProtocol):
+        """PATCH without any attributes -> 400."""
+        ids = [self._albums["tool_2001"].id, self._albums["pink_2000"].id]
+        response = await client.patch(self._url(filter_ids=ids), json={})
+        assert response.status_code == 400
+
+        data = await response.get_json()
+        assert data["type"] == "InvalidUsageError"
