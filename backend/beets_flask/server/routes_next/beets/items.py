@@ -3,11 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from quart import Blueprint
-from quart_schema import validate_response
+from quart_schema import validate_request, validate_response
 
-from beets_flask.server.exceptions import (
-    NotFoundError,
-)
+from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
 
 from ..jsonapi import error_responses
 from . import g
@@ -54,5 +52,28 @@ async def get_item(item_id: int) -> SingleItemDocument:
     item: BeetsItem | None = g.lib.get_item(item_id)
     if not item:
         raise NotFoundError(f"Item with beets_id:{item_id!r} not found in beets db.")
+
+    return SingleItemDocument(data=to_item_resource(item))
+
+
+@items_bp.route("/<int:item_id>", methods=["PATCH"])
+@validate_request(ItemAttributes)
+@validate_response(SingleItemDocument)
+@error_responses(InvalidUsageError, NotFoundError)
+async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
+    """Patch item.
+
+    Update the attributes of a single item. The change is written back to the beets
+    library and to the metadata of the file (if applicable).
+
+    Attributes that are not present in the body are left unchanged; an
+    explicit ``null`` clears the field.
+    """
+    item: BeetsItem | None = g.lib.get_item(item_id)
+    if not item:
+        raise NotFoundError(f"Item with beets_id:{item_id!r} not found in beets db.")
+
+    item.update(data.patch_data())
+    item.try_sync(True, False)
 
     return SingleItemDocument(data=to_item_resource(item))

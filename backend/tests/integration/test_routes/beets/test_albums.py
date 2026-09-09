@@ -91,3 +91,125 @@ class TestGetAlbum(IsolatedBeetsLibraryMixin):
 
         data = await response.get_json()
         assert data["type"] == "QuerystringValidationError"
+
+
+class TestPatchAlbum(IsolatedBeetsLibraryMixin):
+    """Tests for ``PATCH /api_v1/beets/albums/<album_id>``."""
+
+    _albums: ClassVar[dict[str, BeetsAlbum]] = {}
+
+    @staticmethod
+    def _url(album_id: int) -> str:
+        """Build the URL for a single album resource."""
+        return f"/api_v1/beets/albums/{album_id}"
+
+    @pytest.fixture(scope="class", autouse=True)
+    def albums(self, setup_beetslib):  # type: ignore
+        """Create the albums used by all tests in this class.
+
+        - ``"a"``: album with two items
+        - ``"b"``: album with one item
+        - ``"c"``: album without items, its attributes are cleared with nulls
+        """
+        a = beets_lib_album(album="Album A", albumartist="Artist One")
+        self.beets_lib.add(a)
+        self.beets_lib.add(beets_lib_item(album_id=a.id, title="Track 1"))
+        self.beets_lib.add(beets_lib_item(album_id=a.id, title="Track 2"))
+
+        b = beets_lib_album(album="Album B", albumartist="Artist Two")
+        self.beets_lib.add(b)
+        self.beets_lib.add(beets_lib_item(album_id=b.id, title="Track 3"))
+
+        c = beets_lib_album(album="Album C", albumartist="Artist Three")
+        self.beets_lib.add(c)
+
+        self._albums.update(a=a, b=b, c=c)
+
+    async def test_patch_album(self, client: TestClientProtocol):
+        """PATCH updates the given attributes and persists them in the library."""
+        album_id = self._albums["a"].id
+        updates = {
+            "album": "Album A Updated",
+            "albumartist": "Artist One Updated",
+            "year": 2020,
+        }
+
+        response = await client.patch(self._url(album_id), json=updates)
+        assert response.status_code == 200
+
+        document = SingleAlbumDocument.model_validate(await response.get_json())
+        assert document.data.id == str(album_id)
+        assert document.data.attributes.model_dump() == updates
+
+        album = self.beets_lib.get_album(album_id)
+        assert album is not None
+        assert album.album == updates["album"]
+        assert album.albumartist == updates["albumartist"]
+        assert album.year == updates["year"]
+
+    async def test_patch_album_partial(self, client: TestClientProtocol):
+        """PATCH only the given attributes; absent ones are left unchanged."""
+        album_id = self._albums["b"].id
+
+        response = await client.patch(self._url(album_id), json={"album": "Album B2"})
+        assert response.status_code == 200
+
+        document = SingleAlbumDocument.model_validate(await response.get_json())
+        attributes = document.data.attributes.model_dump()
+        assert attributes["album"] == "Album B2"
+        assert attributes["albumartist"] == "Artist Two", (
+            "Unpatched attribute was changed"
+        )
+        assert attributes["year"] == 1, "Unpatched attribute was changed"
+
+        album = self.beets_lib.get_album(album_id)
+        assert album is not None
+        assert album.album == "Album B2"
+        assert album.albumartist == "Artist Two"
+        assert album.year == 1
+
+    async def test_patch_album_null_clears_attribute(self, client: TestClientProtocol):
+        """PATCH with an explicit ``null`` clears the attribute.
+
+        Beets fixed fields cannot hold NULL: ``None`` is normalized to the
+        field's empty value on store (``''`` for strings, ``0`` for numbers).
+        """
+        album_id = self._albums["c"].id
+
+        response = await client.patch(
+            self._url(album_id), json={"album": None, "year": None}
+        )
+        assert response.status_code == 200
+
+        document = SingleAlbumDocument.model_validate(await response.get_json())
+        attributes = document.data.attributes.model_dump()
+
+        # The null value normilization is a bit weird!
+        # We might need to change this in beets!
+        assert attributes["album"] == ""
+        assert attributes["year"] == 0
+        assert attributes["albumartist"] == "Artist Three", (
+            "Unpatched attribute was changed"
+        )
+
+        album = self.beets_lib.get_album(album_id)
+        assert album is not None
+        assert album.album == ""
+        assert album.year == 0
+
+    async def test_patch_album_no_attributes(self, client: TestClientProtocol):
+        """PATCH without any attributes -> 400."""
+        response = await client.patch(self._url(self._albums["a"].id), json={})
+        assert response.status_code == 400
+
+        data = await response.get_json()
+        assert data["type"] == "InvalidUsageError"
+
+    async def test_patch_album_not_found(self, client: TestClientProtocol):
+        """PATCH a non-existent album -> 404."""
+        response = await client.patch(self._url(999999), json={"album": "Album X"})
+        assert response.status_code == 404
+
+        data = await response.get_json()
+        assert data["type"] == "NotFoundError"
+        assert "999999" in data["message"]
