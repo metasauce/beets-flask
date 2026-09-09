@@ -255,3 +255,39 @@ async def patch_items(
             total += 1
 
     return BulkResult(meta=MetaObject(total=total))
+
+
+class BulkDeleteQueryParams(BulkFilterQueryParams):
+    delete_files: Annotated[
+        bool,
+        Field(
+            description="Also delete the item files on disk",
+        ),
+    ] = False
+
+
+@items_bp.route("/", methods=["DELETE"])
+@validate_querystring(BulkDeleteQueryParams)
+@validate_response(BulkResult)
+@error_responses(InvalidUsageError)
+async def delete_items(query_args: BulkDeleteQueryParams) -> BulkResult:
+    """Delete items (bulk).
+
+    Delete all items matching the given filters. The items are removed
+    from the library database. Pass ``delete_file=true`` to also remove
+    their files from disk. If an item was the last one of its album,
+    the album is removed as well.
+    """
+
+    query = build_filter_query(
+        query_args.filter_query, query_args.filter_ids, BeetsItem
+    )
+
+    # Delete every matching item in a single transaction
+    total = 0
+    with g.lib.transaction():
+        for item in g.lib.items(query):
+            item.remove(delete=query_args.delete_files)
+            total += 1
+
+    return BulkResult(meta=MetaObject(total=total))

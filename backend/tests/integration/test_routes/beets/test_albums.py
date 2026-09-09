@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from quart.typing import TestClientProtocol
 
-    from beets_flask.importer.types import BeetsAlbum
+    from beets_flask.importer.types import BeetsAlbum, BeetsItem
 
 
 class TestGetAlbum(IsolatedBeetsLibraryMixin):
@@ -628,3 +628,69 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
 
         data = await response.get_json()
         assert data["type"] == "InvalidUsageError"
+
+
+class TestDeleteAlbums(IsolatedBeetsLibraryMixin):
+    """Tests for ``DELETE /api_v1/beets/albums/`` (bulk)."""
+
+    _albums: ClassVar[dict[str, BeetsAlbum]] = {}
+    _album_items: ClassVar[dict[str, BeetsItem]] = {}
+
+    @staticmethod
+    def _url(**params: object) -> str:
+        """Build the URL of the bulk albums endpoint from query params."""
+        query = urlencode(params, doseq=True)
+        return "/api_v1/beets/albums/" + (f"?{query}" if query else "")
+
+    @pytest.fixture(scope="class", autouse=True)
+    def albums(self, setup_beetslib) -> dict[str, BeetsAlbum]:
+        """Each test deletes its own group; the survivor never matches."""
+        albums = {
+            "tool_a": beets_lib_album(album="Album A", albumartist="Tool", year=2001),
+            "tool_b": beets_lib_album(album="Album B", albumartist="Tool", year=2003),
+            "pink_c": beets_lib_album(
+                album="Album C", albumartist="Pink Floyd", year=2000
+            ),
+            "pink_d": beets_lib_album(
+                album="Album D", albumartist="Pink Floyd", year=2004
+            ),
+            "survivor": beets_lib_album(
+                album="Album E", albumartist="Solo Artist", year=2002
+            ),
+        }
+        for album in albums.values():
+            self.beets_lib.add(album)
+        track_of = {
+            "tool_a": beets_lib_item(album_id=albums["tool_a"].id, title="A Track"),
+            "pink_c": beets_lib_item(album_id=albums["pink_c"].id, title="C Track"),
+        }
+        for item in track_of.values():
+            self.beets_lib.add(item)
+
+        self._albums.update(albums)
+        self._album_items.update(track_of)
+        return albums
+
+    async def _assert_deleted(self, keys: list[str]):
+        for key in keys:
+            assert self.beets_lib.get_album(self._albums[key].id) is None
+            # Deleting an album removes its items as well.
+            item = self._album_items.get(key)
+            if item is not None:
+                assert self.beets_lib.get_item(item.id) is None
+        assert self.beets_lib.get_album(self._albums["survivor"].id) is not None
+
+    async def test_delete_albums_by_query(self, client: TestClientProtocol):
+        """DELETE removes all albums matching ``filter_query``."""
+        response = await client.delete(self._url(filter_query="albumartist:Tool"))
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 2
+        await self._assert_deleted(["tool_a", "tool_b"])
+
+    async def test_delete_albums_by_ids(self, client: TestClientProtocol):
+        """DELETE removes only the albums named by ``filter_ids``."""
+        ids = [self._albums["pink_c"].id, self._albums["pink_d"].id, 999999]
+        response = await client.delete(self._url(filter_ids=ids))
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 2
+        await self._assert_deleted(["pink_c", "pink_d"])

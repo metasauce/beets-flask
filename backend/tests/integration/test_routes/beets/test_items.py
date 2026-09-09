@@ -544,3 +544,51 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
 
         data = await response.get_json()
         assert data["type"] == "InvalidUsageError"
+
+
+class TestDeleteItems(IsolatedBeetsLibraryMixin):
+    """Tests for ``DELETE /api_v1/beets/items/`` (bulk)."""
+
+    _items: ClassVar[dict[str, BeetsItem]] = {}
+
+    @staticmethod
+    def _url(**params: object) -> str:
+        """Build the URL of the bulk items endpoint from query params."""
+        query = urlencode(params, doseq=True)
+        return "/api_v1/beets/items/" + (f"?{query}" if query else "")
+
+    @pytest.fixture(scope="class", autouse=True)
+    def items(self, setup_beetslib) -> dict[str, BeetsItem]:
+        """Each test deletes its own group; the survivor never matches."""
+        items = {
+            "tool_a": beets_lib_item(title="Tool A", artist="Tool"),
+            "tool_b": beets_lib_item(title="Tool B", artist="Tool"),
+            "tool_c": beets_lib_item(title="Tool C", artist="Tool"),
+            "radio_d": beets_lib_item(title="Radio D", artist="Radiohead"),
+            "radio_e": beets_lib_item(title="Radio E", artist="Radiohead"),
+            "survivor": beets_lib_item(title="Solo S", artist="Solo Artist"),
+        }
+        for item in items.values():
+            self.beets_lib.add(item)
+        self._items.update(items)
+        return items
+
+    async def _assert_deleted(self, keys: list[str]):
+        for key in keys:
+            assert self.beets_lib.get_item(self._items[key].id) is None
+        assert self.beets_lib.get_item(self._items["survivor"].id) is not None
+
+    async def test_delete_items_by_query(self, client: TestClientProtocol):
+        """DELETE removes all items matching ``filter_query``."""
+        response = await client.delete(self._url(filter_query="artist:Tool"))
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 3
+        await self._assert_deleted(["tool_a", "tool_b", "tool_c"])
+
+    async def test_delete_items_by_ids(self, client: TestClientProtocol):
+        """DELETE removes only the items named by ``filter_ids``."""
+        ids = [self._items["radio_d"].id, self._items["radio_e"].id, 999999]
+        response = await client.delete(self._url(filter_ids=ids))
+        assert response.status_code == 200
+        assert BulkResult.model_validate(await response.get_json()).meta.total == 2
+        await self._assert_deleted(["radio_d", "radio_e"])
