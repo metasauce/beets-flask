@@ -1,4 +1,9 @@
+from __future__ import annotations
+
+import base64
+import json
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import cache
 from typing import Annotated, Literal
 
@@ -8,6 +13,8 @@ from beets_flask import log
 from beets_flask.server.exceptions import InvalidUsageError
 
 from ..jsonapi import (
+    MultiResourceDocument,
+    MultiResourceDocumentWithIncluded,
     RelResource,
     Resource,
     SingleResourceDocument,
@@ -85,6 +92,73 @@ class ItemAttributes(BaseAttributes):
     artist: Annotated[str | None, Field(description="The artist of the item")] = None
 
 
+class Direction(StrEnum):
+    """The direction of sorting."""
+
+    ASC = "+"
+    DESC = "-"
+
+
+class ItemSortField(StrEnum):
+    """The fields that items can be sorted by in the bulk endpoints.
+
+    Single source of truth for the sortable fields: the ``sort`` query
+    parameter of the items bulk endpoints accepts these fields,
+    optionally prefixed with ``+`` (ascending) or ``-`` (descending);
+    :class:`ItemSortField` parametrizes :class:`Sort` for the items
+    endpoint, :meth:`values` provides the
+    bare names, and the frontend type is generated from it via py2ts.
+    """
+
+    ADDED = "added"
+    YEAR = "year"
+    TITLE = "title"
+    ARTIST = "artist"
+    ALBUMARTIST = "albumartist"
+    ALBUM = "album"
+    TRACK = "track"
+    DISC = "disc"
+    LENGTH = "length"
+    BITRATE = "bitrate"
+
+    @classmethod
+    def values(cls) -> list[str]:
+        """The bare sortable field names, e.g. ``["added", "year", …]``."""
+        return [field.value for field in cls]
+
+
+class Sort[F: StrEnum](BaseModel):
+    """Base of the endpoint sort models, parametrized over the sort-field enum.
+
+    E.g. ``Sort[ItemSortField]`` sorts the items of the items endpoint.
+    :meth:`from_str` parses the ``+field`` / ``-field`` ``sort`` query
+    parameter into a sort instance.
+    """
+
+    field: F
+    direction: Direction = Direction.ASC
+
+    @classmethod
+    def from_str(cls, s: str) -> Sort:
+        """Parse a sort string like ``+title`` or ``-artist``."""
+        if not s:
+            raise ValueError("Sort string cannot be empty")
+
+        direction = Direction.ASC
+        if s[0] in (Direction.ASC, Direction.DESC):
+            direction = Direction(s[0])
+            s = s[1:]
+
+        # The sort-field enum of the parametrization, e.g. ItemSortField.
+        field_enum = cls.model_fields["field"].annotation
+        try:
+            field = field_enum(s)
+        except ValueError:
+            raise ValueError(f"Invalid sort field: {s!r}")
+
+        return cls(field=field, direction=direction)
+
+
 class ItemResource(Resource[ItemAttributes, Literal["item"]]):
     """An item (track) of your music library.
 
@@ -95,6 +169,10 @@ class ItemResource(Resource[ItemAttributes, Literal["item"]]):
 
 class SingleItemDocument(SingleResourceDocument[ItemResource]):
     """The response of a request that returns a single item."""
+
+
+class MultiItemDocument(MultiResourceDocument[ItemResource]):
+    """The response of a request that returns multiple items."""
 
 
 # ----------------------------------- Album ---------------------------------- #
@@ -130,3 +208,68 @@ class SingleAlbumDocument(
     ``data.relationships``. Pass ``include=items`` to also embed the
     items in full in the ``included`` section.
     """
+
+
+class MultiAlbumDocument(
+    MultiResourceDocumentWithIncluded[AlbumResource, ItemResource]
+):
+    """The response of a request that returns multiple albums."""
+
+
+# ---------------------------------- Cursor ---------------------------------- #
+
+
+class Cursor[S: Sort](BaseModel):
+    """Keyset cursor that encodes the full query state.
+
+    Carries the page's ``sort`` (a sort model parametrized over the
+    endpoint's field enum, e.g. ``Sort[ItemSortField]``), the filters,
+    and the last seen row
+    (``last_value``/``last_id``) anchoring the next page. An unanchored
+    cursor (without ``last_value``/``last_id``) returns the first page.
+
+    The token format is the model itself: :meth:`to_string` dumps the model
+    (``exclude_none``) to an opaque base64 token; :meth:`from_string`
+    validates it back into ``Cursor[...]``, so tampered tokens (e.g. an
+    unknown sort field) are rejected by pydantic.
+    """
+
+    sort: S
+    filter_query: str | None = None
+    filter_ids: list[int] | None = None
+    last_value: str | None = None
+    last_id: int | None = None
+
+    def next(self, last_value: str | None, last_id: int) -> Cursor:
+        """The anchored cursor for the page after ``last_value``/``last_id``."""
+        return self.model_copy(update={"last_value": last_value, "last_id": last_id})
+
+    def to_string(self) -> str:
+        """Serialize the cursor to an opaque, URL-safe base64 token."""
+        return self._b64encode(self.model_dump_json(exclude_none=True).encode())
+
+    @classmethod
+    def from_string(cls, token: str) -> Cursor:
+        """Deserialize a token produced by :meth:`to_string`.
+
+        Raises
+        ------
+        ValueError
+            If the token is not valid base64/JSON.
+
+        """
+        try:
+            payload = json.loads(cls._b64decode(token))
+        except Exception as exc:
+            raise ValueError(f"Invalid cursor string: {token}") from exc
+        return cls.model_validate(payload)
+
+    @staticmethod
+    def _b64encode(raw: bytes) -> str:
+        """URL-safe base64 without padding."""
+        return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+    @staticmethod
+    def _b64decode(token: str) -> bytes:
+        """Decode URL-safe base64, tolerating missing padding."""
+        return base64.urlsafe_b64decode(token.encode() + b"=" * (-len(token) % 4))

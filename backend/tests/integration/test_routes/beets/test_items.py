@@ -1,15 +1,26 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING, ClassVar
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
 
-from beets_flask.server.routes_next.beets._types import SingleItemDocument
+from beets_flask.server.routes_next.beets._types import (
+    Cursor,
+    Direction,
+    ItemSortField,
+    MultiItemDocument,
+    SingleItemDocument,
+    Sort,
+)
 from tests.conftest import beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     from quart.typing import TestClientProtocol
 
     from beets_flask.importer.types import BeetsAlbum, BeetsItem
@@ -238,3 +249,216 @@ class TestDeleteItem(IsolatedBeetsLibraryMixin):
         data = await response.get_json()
         assert data["type"] == "NotFoundError"
         assert "999999" in data["message"]
+
+
+class TestGetItems(IsolatedBeetsLibraryMixin):
+    """Tests for ``GET /api_v1/beets/items/`` (bulk)."""
+
+    _items: ClassVar[dict[str, BeetsItem]] = {}
+
+    @staticmethod
+    def _url(**params: object) -> str:
+        """Build the URL of the bulk items endpoint from query params."""
+        query = urlencode(params, doseq=True)
+        return "/api_v1/beets/items/" + (f"?{query}" if query else "")
+
+    @staticmethod
+    def _titles(document: MultiItemDocument) -> list[str | None]:
+        return [resource.attributes.title for resource in document.data]
+
+    @staticmethod
+    def _next_url(document: MultiItemDocument) -> str | None:
+        """Path+query of the typed ``links.next``, or ``None`` on the last page."""
+        if document.links is None or document.links.next is None:
+            return None
+        url = urlsplit(document.links.next)
+        return url.path + "?" + url.query
+
+    @staticmethod
+    def _cursor_of(document: MultiItemDocument) -> str:
+        """The ``cursor`` query param of the typed ``links.next``."""
+        assert document.links is not None and document.links.next is not None
+        return parse_qs(urlsplit(document.links.next).query)["cursor"][0]
+
+    @pytest.fixture(scope="class", autouse=True)
+    def items(self, setup_beetslib) -> dict[str, BeetsItem]:
+        """Create the items used by all tests in this class.
+
+        Five items with distinct years and two artists, so sorting and
+        filtering are deterministic (``year`` is not exposed in the item
+        attributes, but the titles encode the sort order):
+
+        - Tool A (2001), Tool B (2003), Tool C (2002)
+        - Pink 0 (2000), Pink 4 (2004)
+        """
+        tool_a = beets_lib_item(title="Tool A", year=2001, artist="Tool")
+        pink_0 = beets_lib_item(title="Pink 0", year=2000, artist="Pink Floyd")
+        tool_b = beets_lib_item(title="Tool B", year=2003, artist="Tool")
+        pink_4 = beets_lib_item(title="Pink 4", year=2004, artist="Pink Floyd")
+        tool_c = beets_lib_item(title="Tool C", year=2002, artist="Tool")
+        for item in (tool_a, pink_0, tool_b, pink_4, tool_c):
+            self.beets_lib.add(item)
+
+        self._items.update(
+            tool_a=tool_a,
+            pink_2000=pink_0,
+            tool_b=tool_b,
+            pink_2004=pink_4,
+            tool_c=tool_c,
+        )
+        return self._items
+
+    async def _walk(
+        self, client: TestClientProtocol, expected_total: int, **params: object
+    ) -> AsyncGenerator[MultiItemDocument, None]:
+        """Walk ``links.next`` until exhausted, yielding each page's document.
+
+        Asserts on every page: valid document, stable ``meta.total`` and a
+        present ``links.self``. Termination proves that ``links.next`` is
+        absent on the last page and that the next links echo the page size
+        (otherwise the walk would never terminate or would skip rows).
+        """
+        url = self._url(**params)
+        while url is not None:
+            response = await client.get(url)
+            assert response.status_code == 200
+            document = MultiItemDocument.model_validate(await response.get_json())
+            assert document.meta is not None and document.meta.total == expected_total
+            assert document.links is not None and document.links.self
+
+            yield document
+            url = self._next_url(document)
+
+    @pytest.mark.parametrize(
+        "sort, expected",
+        [
+            ("year", ["Pink 0", "Tool A", "Tool C", "Tool B", "Pink 4"]),
+            ("-year", ["Pink 4", "Tool B", "Tool C", "Tool A", "Pink 0"]),
+            # Absent sort falls back to ``-added`` (newest first = reverse ids).
+            ("-added", ["Tool C", "Pink 4", "Tool B", "Pink 0", "Tool A"]),
+        ],
+        ids=["asc", "desc", "newest_first"],
+    )
+    async def test_get_items_walk(
+        self, client: TestClientProtocol, sort: str, expected: list[str]
+    ):
+        """Walking ``links.next`` yields every item exactly once, in sort order."""
+        titles = [
+            title
+            async for document in self._walk(
+                client, expected_total=5, sort=sort, limit=2
+            )
+            for title in self._titles(document)
+        ]
+        assert titles == expected
+
+    async def test_get_items_cursor_keeps_filters(self, client: TestClientProtocol):
+        """Pages after the first keep the filters of the original request."""
+        titles = [
+            title
+            async for document in self._walk(
+                client,
+                expected_total=3,
+                sort="year",
+                limit=2,
+                filter_query="artist:Tool",
+            )
+            for title in self._titles(document)
+        ]
+        assert titles == ["Tool A", "Tool C", "Tool B"]
+
+    async def test_get_items_bare_request(self, client: TestClientProtocol):
+        """A bare request applies the defaults (``-added``, limit 100)."""
+        response = await client.get(self._url())
+        assert response.status_code == 200
+
+        document = MultiItemDocument.model_validate(await response.get_json())
+        assert document.meta is not None and document.meta.total == 5
+        assert len(document.data) == 5  # limit 100: single page
+        assert self._titles(document) == [
+            "Tool C",
+            "Pink 4",
+            "Tool B",
+            "Pink 0",
+            "Tool A",
+        ]
+        assert document.links is not None and document.links.next is None
+
+    async def test_get_items_filter_ids(self, client: TestClientProtocol):
+        """``filter_ids`` selects explicit items, even if some ids are unknown."""
+        known = self._items["tool_a"].id
+        response = await client.get(self._url(filter_ids=[known, 999999], sort="year"))
+        assert response.status_code == 200
+
+        document = MultiItemDocument.model_validate(await response.get_json())
+        assert document.meta is not None and document.meta.total == 1
+        assert self._titles(document) == ["Tool A"]
+
+    async def test_get_items_no_match(self, client: TestClientProtocol):
+        """Filters matching nothing return an empty first and last page."""
+        response = await client.get(self._url(filter_query="artist:NoSuchArtist"))
+        assert response.status_code == 200
+
+        document = MultiItemDocument.model_validate(await response.get_json())
+        assert document.meta is not None and document.meta.total == 0
+        assert document.data == []
+        assert document.links is not None and document.links.next is None
+
+    @pytest.mark.parametrize(
+        "params",
+        [
+            {"sort": "bogus"},
+            {"limit": 0},
+            {"limit": 1001},
+            {"cursor": "zznotbase64"},
+            {"filter_query": "year:notanumber"},
+            {"filter_ids": ["abc", "def"]},
+        ],
+        ids=[
+            "bad_sort",
+            "limit_zero",
+            "limit_too_big",
+            "bad_cursor",
+            "bad_filter",
+            "non_int_filter_ids",
+        ],
+    )
+    async def test_get_items_invalid_params(
+        self, client: TestClientProtocol, params: dict[str, object]
+    ):
+        """Malformed query parameters -> 400."""
+        response = await client.get(self._url(**params))
+        assert response.status_code == 400
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            pytest.param({"sort": "year"}, id="sort"),
+            pytest.param({"filter_query": "artist:Tool"}, id="filter_query"),
+            pytest.param({"filter_ids": [1, 2]}, id="filter_ids"),
+        ],
+    )
+    async def test_get_items_cursor_exclusive(
+        self, client: TestClientProtocol, extra: dict[str, object]
+    ):
+        """A cursor cannot be combined with ``sort`` or the filters."""
+        response = await client.get(self._url(limit=1))
+        assert response.status_code == 200
+        document = MultiItemDocument.model_validate(await response.get_json())
+        cursor = self._cursor_of(document)
+
+        response = await client.get(self._url(cursor=cursor, **extra))
+        assert response.status_code == 400
+
+    async def test_get_items_unknown_cursor_field(self, client: TestClientProtocol):
+        """A cursor token with a forged sort field -> 400."""
+        # Re-encode a valid cursor with a sort field outside ItemSortField.
+        token = Cursor[Sort[ItemSortField]](
+            sort=Sort[ItemSortField](field=ItemSortField.ADDED, direction=Direction.ASC)
+        ).to_string()
+        data = json.loads(Cursor._b64decode(token))
+        data["sort"]["field"] = "path"
+        forged = Cursor._b64encode(json.dumps(data, separators=(",", ":")).encode())
+
+        response = await client.get(self._url(cursor=forged))
+        assert response.status_code == 400

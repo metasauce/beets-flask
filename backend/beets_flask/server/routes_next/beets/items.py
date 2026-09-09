@@ -1,19 +1,26 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated
+from urllib.parse import urlencode
 
-from pydantic import BaseModel, Field
-from quart import Blueprint
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
+from quart import Blueprint, request
 from quart_schema import validate_querystring, validate_request, validate_response
 
 from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
+from beets_flask.server.routes_next.beets._query import PaginatedQuery
 
-from ..jsonapi import error_responses
+from ..jsonapi import LinkObject, MetaObject, error_responses
 from . import g
 from ._types import (
+    Cursor,
+    Direction,
     ItemAttributes,
     ItemResource,
+    ItemSortField,
+    MultiItemDocument,
     SingleItemDocument,
+    Sort,
 )
 
 if TYPE_CHECKING:
@@ -110,3 +117,122 @@ async def delete_item(
     item.remove(delete=query_args.delete_file, with_album=True)
 
     return SingleItemDocument(data=resource)
+
+
+# ----------------------------------- Bulk ----------------------------------- #
+
+
+class BulkGetQueryParams(BaseModel):
+    cursor: Annotated[
+        Cursor[Sort[ItemSortField]] | None,
+        Field(
+            description=(
+                "Pagination cursor from the ``links.next`` of a previous response. "
+            ),
+        ),
+        BeforeValidator(
+            Cursor[Sort[ItemSortField]].from_string, json_schema_input_type=str
+        ),
+    ] = None
+    filter_query: Annotated[
+        str | None,
+        Field(
+            description=(
+                "A beets query string, see the "
+                "[beets query syntax]"
+                "(https://beets.readthedocs.io/en/latest/reference/query.html)."
+            ),
+        ),
+    ] = None
+    filter_ids: Annotated[
+        list[int] | None,
+        Field(
+            description="Repeatable, explicit beets library item ids.",
+        ),
+    ] = None
+    sort: Annotated[
+        Sort[ItemSortField] | None,
+        Field(
+            description=(
+                "Sort the results by one of: "
+                + ", ".join(f"``{name}``" for name in ItemSortField.values())
+                + ". Prefix ``-`` for descending or ``+`` "
+                "for ascending."
+            ),
+        ),
+        BeforeValidator(Sort[ItemSortField].from_str, json_schema_input_type=str),
+    ] = None
+    limit: Annotated[
+        int,
+        Field(description="Page size min 1, max 1000.", ge=1, le=1000),
+    ] = 100
+
+    @model_validator(mode="after")
+    def _cursor_is_exclusive(self) -> BulkGetQueryParams:
+        """Cursor tokens are self-contained; reject combined filter/sort args."""
+        if self.cursor and self.model_fields_set & {
+            "filter_query",
+            "filter_ids",
+            "sort",
+        }:
+            raise ValueError(
+                "cursor cannot be combined with filter_query, filter_ids or sort"
+            )
+        return self
+
+    def to_cursor(self) -> Cursor[Sort[ItemSortField]]:
+        """Derive the page's cursor from the query params.
+
+        Follow-up pages carry a decoded, self-contained ``cursor``; for the first
+        page the cursor is built from ``sort`` (default ``-added``) and the
+        filters.
+        """
+        if self.cursor is not None:
+            return self.cursor
+
+        # Default: newest first (``-added``).
+        sort = self.sort or Sort(field=ItemSortField.ADDED, direction=Direction.DESC)
+        return Cursor(
+            sort=sort,
+            filter_query=self.filter_query,
+            filter_ids=self.filter_ids,
+        )
+
+
+@items_bp.route("/", methods=["GET"])
+@validate_querystring(BulkGetQueryParams)
+@validate_response(MultiItemDocument)
+@error_responses(InvalidUsageError)
+async def get_items(query_args: BulkGetQueryParams) -> MultiItemDocument:
+    """Get items (bulk).
+
+    Retrieve beets items filtered query or by ids.
+
+    Use ``filter_query``/``filter_ids`` for the initial request and the self-contained
+    ``cursor`` from ``links.next`` for the following pages.
+
+    Cursor and filters are mutually exclusive.
+    """
+    cursor = query_args.to_cursor()
+    limit = query_args.limit
+
+    page = PaginatedQuery(cursor, table="items")
+    rows = list(g.lib.items(page, page, limit=limit + 1))
+
+    items = rows[:limit]
+    links = LinkObject(self=request.url)
+    if len(rows) > limit:
+        last_item = items[-1]
+        last_value = getattr(last_item, cursor.sort.field.value, None)
+        token = cursor.next(
+            None if last_value is None else str(last_value), last_item.id
+        ).to_string()
+        links.next = (
+            request.base_url + "?" + urlencode({"cursor": token, "limit": limit})
+        )
+
+    return MultiItemDocument(
+        data=[to_item_resource(item) for item in items],
+        links=links,
+        meta=MetaObject(total=page.total(g.lib)),
+    )
