@@ -16,7 +16,7 @@ from beets_flask.server.routes_next.beets._types import (
     SingleAlbumDocument,
     Sort,
 )
-from tests.conftest import beets_lib_album, beets_lib_item
+from tests.conftest import beets_id, beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
 if TYPE_CHECKING:
@@ -79,10 +79,10 @@ class TestGetAlbum(IsolatedBeetsLibraryMixin):
         n_included: int,
     ):
         """GET a single album, with or without its items included."""
-        album = self.beets_lib.get_album(self._albums[album_key].id)
+        album = self.beets_lib.get_album(beets_id(self._albums[album_key]))
         assert album is not None
 
-        response = await client.get(self._url(album.id, include))
+        response = await client.get(self._url(beets_id(album), include))
         assert response.status_code == 200
 
         data = SingleAlbumDocument.model_validate(await response.get_json())
@@ -99,7 +99,7 @@ class TestGetAlbum(IsolatedBeetsLibraryMixin):
 
     async def test_get_album_invalid_include(self, client: TestClientProtocol):
         """GET with an unsupported ``include`` value -> 400."""
-        response = await client.get(self._url(self._albums["a"].id, "bogus"))
+        response = await client.get(self._url(beets_id(self._albums["a"]), "bogus"))
         assert response.status_code == 400
 
         data = await response.get_json()
@@ -140,7 +140,7 @@ class TestPatchAlbum(IsolatedBeetsLibraryMixin):
 
     async def test_patch_album(self, client: TestClientProtocol):
         """PATCH updates the given attributes and persists them in the library."""
-        album_id = self._albums["a"].id
+        album_id = beets_id(self._albums["a"])
         updates = {
             "album": "Album A Updated",
             "albumartist": "Artist One Updated",
@@ -162,7 +162,7 @@ class TestPatchAlbum(IsolatedBeetsLibraryMixin):
 
     async def test_patch_album_partial(self, client: TestClientProtocol):
         """PATCH only the given attributes; absent ones are left unchanged."""
-        album_id = self._albums["b"].id
+        album_id = beets_id(self._albums["b"])
 
         response = await client.patch(self._url(album_id), json={"album": "Album B2"})
         assert response.status_code == 200
@@ -187,7 +187,7 @@ class TestPatchAlbum(IsolatedBeetsLibraryMixin):
         Beets fixed fields cannot hold NULL: ``None`` is normalized to the
         field's empty value on store (``''`` for strings, ``0`` for numbers).
         """
-        album_id = self._albums["c"].id
+        album_id = beets_id(self._albums["c"])
 
         response = await client.patch(
             self._url(album_id), json={"album": None, "year": None}
@@ -212,7 +212,7 @@ class TestPatchAlbum(IsolatedBeetsLibraryMixin):
 
     async def test_patch_album_no_attributes(self, client: TestClientProtocol):
         """PATCH without any attributes -> 400."""
-        response = await client.patch(self._url(self._albums["a"].id), json={})
+        response = await client.patch(self._url(beets_id(self._albums["a"])), json={})
         assert response.status_code == 400
 
         data = await response.get_json()
@@ -261,10 +261,10 @@ class TestDeleteAlbum(IsolatedBeetsLibraryMixin):
     async def test_delete_album(self, client: TestClientProtocol):
         """DELETE removes the album and its items from the library."""
         album = self._albums["a"]
-        item_ids = [item.id for item in album.items()]
+        item_ids = [beets_id(item) for item in album.items()]
         assert len(item_ids) == 2
 
-        response = await client.delete(self._url(album.id))
+        response = await client.delete(self._url(beets_id(album)))
         assert response.status_code == 200
 
         # The response carries the album as it was before the deletion.
@@ -274,7 +274,7 @@ class TestDeleteAlbum(IsolatedBeetsLibraryMixin):
             str(id) for id in item_ids
         ]
 
-        assert self.beets_lib.get_album(album.id) is None
+        assert self.beets_lib.get_album(beets_id(album)) is None
         for item_id in item_ids:
             assert self.beets_lib.get_item(item_id) is None
 
@@ -284,10 +284,10 @@ class TestDeleteAlbum(IsolatedBeetsLibraryMixin):
         item_path = os.fsdecode(album.items()[0].path)
         assert os.path.exists(item_path)
 
-        response = await client.delete(self._url(album.id, delete_files=True))
+        response = await client.delete(self._url(beets_id(album), delete_files=True))
         assert response.status_code == 200
 
-        assert self.beets_lib.get_album(album.id) is None
+        assert self.beets_lib.get_album(beets_id(album)) is None
         assert not os.path.exists(item_path), "Item file still exists on disk"
 
     async def test_delete_album_not_found(self, client: TestClientProtocol):
@@ -327,7 +327,11 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
 
     @staticmethod
     def _names(document: MultiAlbumDocument) -> list[str]:
-        return [resource.attributes.album for resource in document.data]
+        return [
+            name
+            for resource in document.data
+            if (name := resource.attributes.album) is not None
+        ]
 
     @pytest.fixture(scope="class", autouse=True)
     def albums(self, setup_beetslib) -> dict[str, BeetsAlbum]:
@@ -449,7 +453,9 @@ class TestGetAlbums(IsolatedBeetsLibraryMixin):
             document = MultiAlbumDocument.model_validate(await response.get_json())
             names.extend(self._names(document))
             included.extend(
-                resource.attributes.title for resource in (document.included or [])
+                title
+                for resource in (document.included or [])
+                if (title := resource.attributes.title) is not None
             )
             if document.links is not None and document.links.next is not None:
                 assert "include=items" in document.links.next
@@ -585,13 +591,13 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
         assert BulkResult.model_validate(await response.get_json()).meta.total == 2
 
         for key in ("tool_2001", "tool_2003"):
-            album = self.beets_lib.get_album(self._albums[key].id)
+            album = self.beets_lib.get_album(beets_id(self._albums[key]))
             assert album is not None
             assert album.albumartist == "Tool 2"
             assert album.year == 1999
             assert album.album == self._albums[key].album  # unpatched attr unchanged
         for key in ("pink_2000", "pink_2004"):
-            album = self.beets_lib.get_album(self._albums[key].id)
+            album = self.beets_lib.get_album(beets_id(self._albums[key]))
             assert album is not None and album.albumartist == "Pink Floyd"
 
     async def test_patch_albums_by_ids(self, client: TestClientProtocol):
@@ -602,11 +608,11 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
         assert BulkResult.model_validate(await response.get_json()).meta.total == 2
 
         for key in ("pink_2000", "pink_2004"):
-            album = self.beets_lib.get_album(self._albums[key].id)
+            album = self.beets_lib.get_album(beets_id(self._albums[key]))
             assert album is not None and album.year == 2020
         # Untouched albums keep their titles.
         for key in ("tool_2001", "tool_2003"):
-            album = self.beets_lib.get_album(self._albums[key].id)
+            album = self.beets_lib.get_album(beets_id(self._albums[key]))
             assert album is not None and album.album == self._albums[key].album
 
     async def test_patch_albums_no_match(self, client: TestClientProtocol):
@@ -617,7 +623,7 @@ class TestPatchAlbums(IsolatedBeetsLibraryMixin):
         assert response.status_code == 200
         assert BulkResult.model_validate(await response.get_json()).meta.total == 0
 
-        album = self.beets_lib.get_album(self._albums["tool_2001"].id)
+        album = self.beets_lib.get_album(beets_id(self._albums["tool_2001"]))
         assert album is not None and album.album == "Album A"
 
     async def test_patch_albums_empty_body(self, client: TestClientProtocol):
@@ -673,12 +679,12 @@ class TestDeleteAlbums(IsolatedBeetsLibraryMixin):
 
     async def _assert_deleted(self, keys: list[str]):
         for key in keys:
-            assert self.beets_lib.get_album(self._albums[key].id) is None
+            assert self.beets_lib.get_album(beets_id(self._albums[key])) is None
             # Deleting an album removes its items as well.
             item = self._album_items.get(key)
             if item is not None:
-                assert self.beets_lib.get_item(item.id) is None
-        assert self.beets_lib.get_album(self._albums["survivor"].id) is not None
+                assert self.beets_lib.get_item(beets_id(item)) is None
+        assert self.beets_lib.get_album(beets_id(self._albums["survivor"])) is not None
 
     async def test_delete_albums_by_query(self, client: TestClientProtocol):
         """DELETE removes all albums matching ``filter_query``."""

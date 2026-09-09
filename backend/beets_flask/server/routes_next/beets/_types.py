@@ -261,6 +261,7 @@ class Sort[F: StrEnum](BaseModel):
 
         # The sort-field enum of the parametrization, e.g. ItemSortField.
         field_enum = cls.model_fields["field"].annotation
+        assert field_enum is not None
         try:
             field = field_enum(s)
         except ValueError:

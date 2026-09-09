@@ -16,7 +16,7 @@ from beets_flask.server.routes_next.beets._types import (
     SingleItemDocument,
     Sort,
 )
-from tests.conftest import beets_lib_album, beets_lib_item
+from tests.conftest import beets_id, beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
 
 if TYPE_CHECKING:
@@ -46,10 +46,10 @@ class TestGetItem(IsolatedBeetsLibraryMixin):
 
     async def test_get_item(self, client: TestClientProtocol):
         """GET a single item."""
-        item = self.beets_lib.get_item(self._items["a"].id)
+        item = self.beets_lib.get_item(beets_id(self._items["a"]))
         assert item is not None
 
-        response = await client.get(self._url(item.id))
+        response = await client.get(self._url(beets_id(item)))
         assert response.status_code == 200
 
         SingleItemDocument.model_validate(await response.get_json())
@@ -95,7 +95,7 @@ class TestPatchItem(IsolatedBeetsLibraryMixin):
 
     async def test_patch_item(self, client: TestClientProtocol):
         """PATCH updates the given attributes and persists them in the library."""
-        item_id = self._items["a"].id
+        item_id = beets_id(self._items["a"])
         updates = {"title": "Item A Updated", "artist": "Artist One Updated"}
 
         response = await client.patch(self._url(item_id), json=updates)
@@ -112,7 +112,7 @@ class TestPatchItem(IsolatedBeetsLibraryMixin):
 
     async def test_patch_item_partial(self, client: TestClientProtocol):
         """PATCH only the given attributes; absent ones are left unchanged."""
-        item_id = self._items["b"].id
+        item_id = beets_id(self._items["b"])
 
         response = await client.patch(self._url(item_id), json={"title": "Item B2"})
         assert response.status_code == 200
@@ -133,7 +133,7 @@ class TestPatchItem(IsolatedBeetsLibraryMixin):
         Beets fixed fields cannot hold NULL: ``None`` is normalized to the
         field's empty value on store (``''`` for strings, ``0`` for numbers).
         """
-        item_id = self._items["c"].id
+        item_id = beets_id(self._items["c"])
 
         response = await client.patch(self._url(item_id), json={"title": None})
         assert response.status_code == 200
@@ -152,7 +152,7 @@ class TestPatchItem(IsolatedBeetsLibraryMixin):
 
     async def test_patch_item_no_attributes(self, client: TestClientProtocol):
         """PATCH without any attributes -> 400."""
-        response = await client.patch(self._url(self._items["a"].id), json={})
+        response = await client.patch(self._url(beets_id(self._items["a"])), json={})
         assert response.status_code == 400
 
         data = await response.get_json()
@@ -205,7 +205,7 @@ class TestDeleteItem(IsolatedBeetsLibraryMixin):
 
     async def test_delete_item(self, client: TestClientProtocol):
         """DELETE removes the item from the library."""
-        item_id = self._items["a"].id
+        item_id = beets_id(self._items["a"])
 
         response = await client.delete(self._url(item_id))
         assert response.status_code == 200
@@ -222,13 +222,15 @@ class TestDeleteItem(IsolatedBeetsLibraryMixin):
     ):
         """DELETE the last item of an album removes the album as well."""
         album = self._albums["solo"]
-        item_id = self._items["c"].id
+        item_id = beets_id(self._items["c"])
 
         response = await client.delete(self._url(item_id))
         assert response.status_code == 200
 
         assert self.beets_lib.get_item(item_id) is None
-        assert self.beets_lib.get_album(album.id) is None, "Album was not removed"
+        assert self.beets_lib.get_album(beets_id(album)) is None, (
+            "Album was not removed"
+        )
 
     async def test_delete_item_delete_file(self, client: TestClientProtocol):
         """DELETE with ``delete_file=true`` also removes the file from disk."""
@@ -236,10 +238,10 @@ class TestDeleteItem(IsolatedBeetsLibraryMixin):
         item_path = os.fsdecode(item.path)
         assert os.path.exists(item_path)
 
-        response = await client.delete(self._url(item.id, delete_file=True))
+        response = await client.delete(self._url(beets_id(item), delete_file=True))
         assert response.status_code == 200
 
-        assert self.beets_lib.get_item(item.id) is None
+        assert self.beets_lib.get_item(beets_id(item)) is None
         assert not os.path.exists(item_path), "Item file still exists on disk"
 
     async def test_delete_item_not_found(self, client: TestClientProtocol):
@@ -264,8 +266,12 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
         return "/api_v1/beets/items/" + (f"?{query}" if query else "")
 
     @staticmethod
-    def _titles(document: MultiItemDocument) -> list[str | None]:
-        return [resource.attributes.title for resource in document.data]
+    def _titles(document: MultiItemDocument) -> list[str]:
+        return [
+            title
+            for resource in document.data
+            if (title := resource.attributes.title) is not None
+        ]
 
     @staticmethod
     def _next_url(document: MultiItemDocument) -> str | None:
@@ -387,7 +393,7 @@ class TestGetItems(IsolatedBeetsLibraryMixin):
 
     async def test_get_items_filter_ids(self, client: TestClientProtocol):
         """``filter_ids`` selects explicit items, even if some ids are unknown."""
-        known = self._items["tool_a"].id
+        known = beets_id(self._items["tool_a"])
         response = await client.get(self._url(filter_ids=[known, 999999], sort="year"))
         assert response.status_code == 200
 
@@ -501,11 +507,11 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
 
         # Persisted; the non-matching items are untouched.
         for key in ("tool_a", "tool_b", "tool_c"):
-            item = self.beets_lib.get_item(self._items[key].id)
+            item = self.beets_lib.get_item(beets_id(self._items[key]))
             assert item is not None and item.artist == "Tool 2"
             assert item.title == self._items[key].title  # unpatched attr unchanged
         for key in ("radio_d", "radio_e"):
-            item = self.beets_lib.get_item(self._items[key].id)
+            item = self.beets_lib.get_item(beets_id(self._items[key]))
             assert item is not None and item.artist == "Radiohead"
 
     async def test_patch_items_by_ids(self, client: TestClientProtocol):
@@ -518,11 +524,11 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
         assert BulkResult.model_validate(await response.get_json()).meta.total == 2
 
         for key in ("tool_a", "radio_d"):
-            item = self.beets_lib.get_item(self._items[key].id)
+            item = self.beets_lib.get_item(beets_id(self._items[key]))
             assert item is not None and item.title == "Renamed"
         # Untouched items keep their titles.
         for key in ("tool_b", "radio_e"):
-            item = self.beets_lib.get_item(self._items[key].id)
+            item = self.beets_lib.get_item(beets_id(self._items[key]))
             assert item is not None and item.title == self._items[key].title
 
     async def test_patch_items_no_match(self, client: TestClientProtocol):
@@ -533,7 +539,7 @@ class TestPatchItems(IsolatedBeetsLibraryMixin):
         assert response.status_code == 200
         assert BulkResult.model_validate(await response.get_json()).meta.total == 0
 
-        item = self.beets_lib.get_item(self._items["radio_e"].id)
+        item = self.beets_lib.get_item(beets_id(self._items["radio_e"]))
         assert item is not None and item.title == "Radio E"
 
     async def test_patch_items_empty_body(self, client: TestClientProtocol):
@@ -575,8 +581,8 @@ class TestDeleteItems(IsolatedBeetsLibraryMixin):
 
     async def _assert_deleted(self, keys: list[str]):
         for key in keys:
-            assert self.beets_lib.get_item(self._items[key].id) is None
-        assert self.beets_lib.get_item(self._items["survivor"].id) is not None
+            assert self.beets_lib.get_item(beets_id(self._items[key])) is None
+        assert self.beets_lib.get_item(beets_id(self._items["survivor"])) is not None
 
     async def test_delete_items_by_query(self, client: TestClientProtocol):
         """DELETE removes all items matching ``filter_query``."""
