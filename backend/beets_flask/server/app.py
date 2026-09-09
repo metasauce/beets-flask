@@ -45,9 +45,11 @@ def create_app(config: str | ServerConfig | None = None) -> Quart:
     # Register different blueprints & websocket routes
     # In production, we use the frontend.py route to deliver vite's dist folder
     from .routes import register_routes
+    from .routes_next import register_routes as register_routes_next
     from .websocket import register_socketio
 
     register_routes(app)
+    register_routes_next(app)
     register_socketio(app)
 
     log.debug("Quart app created!")
