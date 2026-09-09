@@ -1,19 +1,32 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Literal
+from urllib.parse import urlencode
 
-from pydantic import BaseModel, Field
-from quart import Blueprint
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
+from quart import Blueprint, request
 from quart_schema import validate_querystring, validate_request, validate_response
 
 from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
+from beets_flask.server.routes_next.beets._query import PaginatedQuery
 
-from ..jsonapi import ResourceIdentifier, error_responses
+from ..jsonapi import (
+    LinkObject,
+    MetaObject,
+    ResourceIdentifier,
+    error_responses,
+)
 from . import g
 from ._types import (
     AlbumAttributes,
     AlbumResource,
+    AlbumSortField,
+    Cursor,
+    Direction,
+    ItemResource,
+    MultiAlbumDocument,
     SingleAlbumDocument,
+    Sort,
 )
 from .items import to_item_resource
 
@@ -145,3 +158,162 @@ async def delete_album(
     album.remove(delete=query_args.delete_files)
 
     return SingleAlbumDocument(data=resource, included=[])
+
+
+# ----------------------------------- Bulk ----------------------------------- #
+
+
+class BulkGetQueryParams(BaseModel):
+    """Query params of the albums bulk endpoint.
+
+    ``cursor`` is mutually exclusive with ``sort``/the filters; ``include``
+    is orthogonal and carried over by ``links.next``.
+    """
+
+    cursor: Annotated[
+        Cursor[Sort[AlbumSortField]] | None,
+        Field(
+            description=(
+                "Pagination cursor from the ``links.next`` of a previous response. "
+                "The cursor is self-contained: it encodes the sort and the filters "
+                "of the original request, so the following pages only need the "
+                "cursor (plus an optional ``limit``). Cannot be combined with "
+                "``sort``, ``filter_query`` or ``filter_ids``."
+            ),
+        ),
+        BeforeValidator(
+            Cursor[Sort[AlbumSortField]].from_string, json_schema_input_type=str
+        ),
+    ] = None
+    filter_query: Annotated[
+        str | None,
+        Field(
+            description=(
+                "A beets query string, see the "
+                "[beets query syntax]"
+                "(https://beets.readthedocs.io/en/latest/reference/query.html)."
+            ),
+        ),
+    ] = None
+    filter_ids: Annotated[
+        list[int] | None,
+        Field(
+            description="Repeatable, explicit beets library album ids.",
+        ),
+    ] = None
+    sort: Annotated[
+        Sort[AlbumSortField] | None,
+        Field(
+            description=(
+                "Sort the results by one of: "
+                + ", ".join(f"``{name}``" for name in AlbumSortField.values())
+                + ". Prefix ``-`` for descending (default ``-added``) or ``+`` "
+                "for ascending."
+            ),
+        ),
+        BeforeValidator(Sort[AlbumSortField].from_str, json_schema_input_type=str),
+    ] = None
+    limit: Annotated[
+        int,
+        Field(description="Page size min 1, max 1000.", ge=1, le=1000),
+    ] = 100
+    include: Annotated[
+        Literal["items"] | None,
+        Field(
+            description=(
+                "Each album's items are embedded in the ``included`` section "
+                "of the response."
+            ),
+        ),
+    ] = None
+
+    @model_validator(mode="after")
+    def _cursor_is_exclusive(self) -> BulkGetQueryParams:
+        """Cursor tokens are self-contained; reject combined filter/sort args."""
+        if self.cursor and self.model_fields_set & {
+            "filter_query",
+            "filter_ids",
+            "sort",
+        }:
+            raise ValueError(
+                "cursor cannot be combined with filter_query, filter_ids or sort"
+            )
+        return self
+
+    def to_cursor(self) -> Cursor[Sort[AlbumSortField]]:
+        """Derive the page's cursor from the query params.
+
+        Follow-up pages carry a decoded, self-contained ``cursor``; for the
+        first page the cursor is built from ``sort`` (default ``-added``)
+        and the filters.
+        """
+        if self.cursor is not None:
+            return self.cursor
+
+        # Default: newest first (``-added``).
+        sort = self.sort or Sort[AlbumSortField](
+            field=AlbumSortField.ADDED, direction=Direction.DESC
+        )
+        return Cursor(
+            sort=sort,
+            filter_query=self.filter_query,
+            filter_ids=self.filter_ids,
+        )
+
+
+@albums_bp.route("/", methods=["GET"])
+@validate_querystring(BulkGetQueryParams)
+@validate_response(MultiAlbumDocument)
+@error_responses(InvalidUsageError)
+async def get_albums(query_args: BulkGetQueryParams) -> MultiAlbumDocument:
+    """Get albums (bulk).
+
+    Retrieve beets albums filtered by ``filter_query``/``filter_ids`` (first
+    page) or by the self-contained ``cursor`` from ``links.next`` (following
+    pages); cursor and filters are mutually exclusive. Pass ``include=items``
+    to embed each album's items in the ``included`` section.
+
+    E.g. the 50 most recently added albums by Tool:
+    ``GET /api_v1/beets/albums/?filter_query=albumartist:Tool&limit=50``
+    """
+    cursor = query_args.to_cursor()
+    limit = query_args.limit
+
+    # Fetch limit + 1 rows to detect whether a next page exists.
+    page = PaginatedQuery(cursor, table="albums")
+    rows = list(g.lib.albums(page, page, limit=limit + 1))
+    has_next = len(rows) > limit
+    albums = rows[:limit]
+
+    # Create pagination links. The "next" link is only present if there
+    # are more albums to fetch.
+    include_items = query_args.include is not None
+    links = LinkObject(self=request.url)
+    if has_next:
+        last_album = albums[-1]
+        last_value = getattr(last_album, cursor.sort.field.value, None)
+        next_cursor = cursor.next(
+            None if last_value is None else str(last_value), last_album.id
+        )
+        next_params: dict[str, str | int] = {
+            "cursor": next_cursor.to_string(),
+            "limit": limit,
+        }
+        if include_items:
+            next_params["include"] = "items"
+        links.next = request.base_url + "?" + urlencode(next_params)
+
+    data: list[AlbumResource] = []
+    included: list[ItemResource] = []
+    for album in albums:
+        items = album.items()
+        data.append(to_album_resource(album, items))
+        if include_items:
+            included.extend(to_item_resource(item) for item in items)
+
+    return MultiAlbumDocument(
+        data=data,
+        included=included or None,
+        links=links,
+        meta=MetaObject(total=page.total(g.lib)),
+    )

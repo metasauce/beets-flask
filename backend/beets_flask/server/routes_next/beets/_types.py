@@ -92,13 +92,6 @@ class ItemAttributes(BaseAttributes):
     artist: Annotated[str | None, Field(description="The artist of the item")] = None
 
 
-class Direction(StrEnum):
-    """The direction of sorting."""
-
-    ASC = "+"
-    DESC = "-"
-
-
 class ItemSortField(StrEnum):
     """The fields that items can be sorted by in the bulk endpoints.
 
@@ -125,38 +118,6 @@ class ItemSortField(StrEnum):
     def values(cls) -> list[str]:
         """The bare sortable field names, e.g. ``["added", "year", …]``."""
         return [field.value for field in cls]
-
-
-class Sort[F: StrEnum](BaseModel):
-    """Base of the endpoint sort models, parametrized over the sort-field enum.
-
-    E.g. ``Sort[ItemSortField]`` sorts the items of the items endpoint.
-    :meth:`from_str` parses the ``+field`` / ``-field`` ``sort`` query
-    parameter into a sort instance.
-    """
-
-    field: F
-    direction: Direction = Direction.ASC
-
-    @classmethod
-    def from_str(cls, s: str) -> Sort:
-        """Parse a sort string like ``+title`` or ``-artist``."""
-        if not s:
-            raise ValueError("Sort string cannot be empty")
-
-        direction = Direction.ASC
-        if s[0] in (Direction.ASC, Direction.DESC):
-            direction = Direction(s[0])
-            s = s[1:]
-
-        # The sort-field enum of the parametrization, e.g. ItemSortField.
-        field_enum = cls.model_fields["field"].annotation
-        try:
-            field = field_enum(s)
-        except ValueError:
-            raise ValueError(f"Invalid sort field: {s!r}")
-
-        return cls(field=field, direction=direction)
 
 
 class ItemResource(Resource[ItemAttributes, Literal["item"]]):
@@ -190,6 +151,24 @@ class AlbumAttributes(BaseAttributes):
     )
 
 
+class AlbumSortField(StrEnum):
+    """The fields that albums can be sorted by in the bulk endpoint.
+
+    Parametrizes :class:`Sort` for the albums endpoint; ``added`` is the
+    default sort (newest first).
+    """
+
+    ADDED = "added"
+    ALBUM = "album"
+    ALBUMARTIST = "albumartist"
+    YEAR = "year"
+
+    @classmethod
+    def values(cls) -> list[str]:
+        """The bare sortable field names."""
+        return [field.value for field in cls]
+
+
 class AlbumResource(RelResource[AlbumAttributes, Literal["album"], Literal["item"]]):
     """An album of your music library.
 
@@ -217,6 +196,45 @@ class MultiAlbumDocument(
 
 
 # ---------------------------------- Cursor ---------------------------------- #
+
+
+class Direction(StrEnum):
+    """The direction of sorting."""
+
+    ASC = "+"
+    DESC = "-"
+
+
+class Sort[F: StrEnum](BaseModel):
+    """Base of the endpoint sort models, parametrized over the sort-field enum.
+
+    E.g. ``Sort[ItemSortField]`` sorts the items of the items endpoint.
+    :meth:`from_str` parses the ``+field`` / ``-field`` ``sort`` query
+    parameter into a sort instance.
+    """
+
+    field: F
+    direction: Direction = Direction.ASC
+
+    @classmethod
+    def from_str(cls, s: str) -> Sort:
+        """Parse a sort string like ``+title`` or ``-artist``."""
+        if not s:
+            raise ValueError("Sort string cannot be empty")
+
+        direction = Direction.ASC
+        if s[0] in (Direction.ASC, Direction.DESC):
+            direction = Direction(s[0])
+            s = s[1:]
+
+        # The sort-field enum of the parametrization, e.g. ItemSortField.
+        field_enum = cls.model_fields["field"].annotation
+        try:
+            field = field_enum(s)
+        except ValueError:
+            raise ValueError(f"Invalid sort field: {s!r}")
+
+        return cls(field=field, direction=direction)
 
 
 class Cursor[S: Sort](BaseModel):
