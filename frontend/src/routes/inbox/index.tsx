@@ -14,6 +14,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { Action, useConfig } from '@/api/config';
 import { inboxQueryOptions, walkFolder } from '@/api/inbox';
 import { ensureMinimalSessions, ensureStatuses } from '@/api/session';
+import { AuthRequiredBanner } from '@/components/auth/AuthRequiredBanner';
 import { MatchChip, StyledChip } from '@/components/common/chips';
 import { Dialog } from '@/components/common/dialogs';
 import {
@@ -99,6 +100,7 @@ function RouteComponent() {
                     flexDirection: 'column',
                 }}
             >
+                <AuthRequiredBanner />
                 <FileUploadProvider>
                     {inboxes.map((folder) => (
                         <FolderSelectionProvider key={folder.full_path}>
