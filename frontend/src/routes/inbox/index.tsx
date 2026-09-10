@@ -52,22 +52,35 @@ export const Route = createFileRoute('/inbox/')({
                 }
             }
         }
+
+        const batchSize = 100;
+        const batches: Array<Array<Folder | Archive>> = [];
+
+        for (
+            let start = 0;
+            start < prefetch_folders.length;
+            start += batchSize
+        ) {
+            batches.push(
+                prefetch_folders.slice(start, start + batchSize)
+            );
+        }
+
         // Prefetch minimal information for all sessions within the top level inbox
-        // folders. This prevents waterfall loading states
-        await Promise.all([
-            ensureStatuses(
-                prefetch_folders.map((f) => ({
-                    hash: f.hash,
-                    path: f.full_path,
-                }))
-            ),
-            ensureMinimalSessions(
-                prefetch_folders.map((f) => ({
-                    hash: f.hash,
-                    path: f.full_path,
-                }))
-            ),
-        ]);
+        // folders. This prevents waterfall loading states.
+        await Promise.all(
+            batches.map((currentBatch) => {
+                const folders = currentBatch.map((folder) => ({
+                    hash: folder.hash,
+                    path: folder.full_path,
+                }));
+
+                return Promise.all([
+                    ensureStatuses(folders),
+                    ensureMinimalSessions(folders),
+                ]);
+            })
+        );
     },
 });
 
