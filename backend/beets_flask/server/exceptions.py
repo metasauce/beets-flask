@@ -197,7 +197,7 @@ def exception_as_return_value[**P, R](
             return await f(*args, **kwargs)
         # Some exceptions are not serializable, so we need to convert them to a
         # serialized format. E.g. OSErrors
-        except ApiError as e:
+        except (ApiError, UserError) as e:
             log.info(e)
             return to_serialized_exception(e)
         except Exception as e:
