@@ -453,10 +453,8 @@ def _is_within_multi_dir(path: Path | str) -> bool:
     if isinstance(path, str):
         path = Path(path)
 
-    path_str = path.name  # Use pathlib to get the basename
-
     for marker_pat in MULTIDISC_PATTERNS:
-        match = marker_pat.match(path_str.encode("utf-8"))
+        match = marker_pat.match(path.name)
         if match:
             return True
     return False

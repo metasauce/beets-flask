@@ -691,7 +691,8 @@ class CandidateState(BaseState):
                 duplicates.append(album)
 
         # Write duplicates information!
-        self.duplicate_ids = [d.id for d in duplicates]
+        # TODO: Me should migrate duplicate ids from str to int
+        self.duplicate_ids = [str(d.id) for d in duplicates if d.id is not None]
 
         return duplicates
 

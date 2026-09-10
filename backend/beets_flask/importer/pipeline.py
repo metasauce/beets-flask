@@ -74,7 +74,7 @@ class AsyncPipeline[Task: Any, R]:
             await _next_resolve_async(stage)
 
         async for task in self.start_tasks:
-            msgs: list[Task] = _allmsgs(task)  # returns a list of tasks
+            msgs: list[Task] = _allmsgs(task)  # type: ignore[assignment]  # returns a list of tasks
 
             for stage in self.stages:
                 next_coros: list[Coroutine] = [
