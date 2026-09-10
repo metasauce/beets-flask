@@ -30,8 +30,8 @@ dependencies = [
     "uvloop>=0.22.1",
     # beets plugin dependencies
     "pylast>=5.2.0",
-    "python2ts>=0.6.1",
-    "eyconf>=0.5.0",
+    "python2ts>=0.7.2",
+    "eyconf[pydantic]>=0.8.0",
     #"scantree>=0.0.4",
     "natsort",
     "tinytag",
@@ -171,3 +171,6 @@ follow_untyped_imports = true
 
 [tool.uv]
 exclude-newer = "3 days"
+# python2ts is maintained alongside this project; skip the supply-chain
+# quarantine delay so new releases can be picked up immediately.
+exclude-newer-package = { python2ts = false }
