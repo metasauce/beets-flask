@@ -11,7 +11,6 @@ from uuid import uuid4 as uuid
 
 from beets import importer
 from beets.ui import _open_library
-from beets.ui.commands.import_.display import show_change
 from beets.util import bytestring_path, get_most_common_tags
 from deprecated import deprecated
 
@@ -22,7 +21,6 @@ from beets_flask.importer.progress import (
     ProgressState,
     SerializedProgressState,
 )
-from beets_flask.utility import capture_stdout_stderr
 
 from .types import (
     AlbumInfo,
@@ -475,20 +473,6 @@ class CandidateState(BaseState):
             return "track"
         else:
             raise ValueError("Unknown type")
-
-    @property
-    def diff_preview(self) -> str:
-        """Diff preview of the match to the current meta data."""
-        out, err, _ = capture_stdout_stderr(
-            show_change,
-            self.task_state.task.cur_artist,
-            self.task_state.task.cur_album,
-            self.match,
-        )
-        res = out.lstrip("\n")
-        if len(err) > 0:
-            res += f"\n\nError: {err}"
-        return res
 
     @classmethod
     def asis_candidate(cls, task_state: TaskState) -> CandidateState:

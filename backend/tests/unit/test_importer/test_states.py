@@ -135,12 +135,6 @@ class TestCandidateState(StateTest):
         assert asis_candidate.id.startswith("asis")
         assert asis_candidate.type == "album"
 
-    def test_diff_preview(self):
-        candidate = self.candidates[0]
-        diff_preview = candidate.diff_preview
-        assert isinstance(diff_preview, str)
-        assert "match album" in diff_preview
-
     def test_identify_duplicates(
         self,
     ):
