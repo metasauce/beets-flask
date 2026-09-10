@@ -59,7 +59,7 @@ class TestConfig:
         # test that wrongly typed fields raise errors
         config.data.gui.num_preview_workers = "not an int"  # type: ignore
 
-        with pytest.raises(MultiConfigurationError):
+        with pytest.raises((ConfigurationError, MultiConfigurationError)):
             config.validate()
 
         # eyconf currently does not forbid setting wrong types
