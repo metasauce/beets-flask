@@ -6,7 +6,7 @@ from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 from uuid import uuid4 as uuid
 
 from beets import importer
@@ -386,9 +386,9 @@ class TaskState(BaseState):
         """Current metadata of the task.
 
         This is the metadata of the music files on disk.
-        (In a beets context, cur_artist and cur_album)
+        TODO: We should migrate to use likelies directly since it is typed now.
         """
-        likelies, _ = get_most_common_tags(self.items)
+        likelies = get_most_common_tags(self.items)
         return Metadata(**{k: str(v) for k, v in likelies.items()})  # type: ignore[typeddict-item]
 
     # ---------------------------------------------------------------------------- #
@@ -485,10 +485,9 @@ class CandidateState(BaseState):
         items: list[BeetsItem] = task_state.task.items
 
         # FIXME: we do this lookup twice, once here and once in current_metadata
+        info: dict[str, Any] = {}
         if len(items) > 0:
-            info, _ = get_most_common_tags(items)
-        else:
-            info = {}
+            info = get_most_common_tags(items)
         info["data_source"] = "asis"
         info["data_url"] = f"file://{task_state.toppath}"
 
