@@ -403,8 +403,8 @@ class TaskState(BaseState):
             candidates=[c.serialize() for c in self.candidate_states],
             asis_candidate=self.asis_candidate.serialize(),
             current_metadata=self.current_metadata,
-            # TODO: maybe we can merge current_metadata (which is cur_artist/album in
-            # old beets) into the asis_candidate
+            # TODO: maybe we can merge current_metadata (which is derived from
+            # `task.source`) into the asis_candidate
             chosen_candidate_id=self.chosen_candidate_state_id,
             duplicate_action=self.duplicate_action,
             completed=self.completed,
@@ -546,22 +546,6 @@ class CandidateState(BaseState):
         return candidate
 
     # --------------------- Helper to lift / unnset from match to -------------------- #
-    @property
-    def cur_artist(self) -> str:
-        """Current artist, usually the meta data of the music files.
-
-        Named to be consistent with beets.
-        """
-        return str(self.task_state.task.cur_artist)
-
-    @property
-    def cur_album(self) -> str:
-        """Current album, usually the meta data of the music files.
-
-        Named to be consistent with beets.
-        """
-        return str(self.task_state.task.cur_album)
-
     @property
     def artist(self) -> str | None:
         """Artist of the match."""

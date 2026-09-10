@@ -120,8 +120,6 @@ class TestCandidateState(StateTest):
         assert candidate.match == task.candidates[0]
         assert candidate.task_state == self.task_state
         assert candidate.type == "album"
-        assert candidate.cur_artist == str(task.cur_artist)
-        assert candidate.cur_album == str(task.cur_album)
         assert candidate.items == task.items
         assert candidate.tracks == candidate.match.info.tracks
         assert candidate.distance == candidate.match.distance

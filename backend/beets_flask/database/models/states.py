@@ -410,12 +410,6 @@ class TaskStateInDb(Base):
     )
     choice_flag: Mapped[Action | None]
 
-    # To allow for continue we need to store the current artist and album
-    # TODO: REMOVE this is not needed!! We can look at the asis candidate for this!
-    # E.g. frontend component to compare two candidates
-    cur_artist: Mapped[str | None]
-    cur_album: Mapped[str | None]
-
     progress: Mapped[Progress]
 
     def __init__(
@@ -429,8 +423,6 @@ class TaskStateInDb(Base):
         chosen_candidate_id: str | None = None,
         progress: Progress = Progress.NOT_STARTED,
         choice_flag: Action | None = None,
-        cur_artist: str | None = None,
-        cur_album: str | None = None,
     ):
         super().__init__(id)
         self.toppath = toppath
@@ -442,8 +434,6 @@ class TaskStateInDb(Base):
         self.chosen_candidate_id = chosen_candidate_id
         self.progress = progress
         self.choice_flag = choice_flag
-        self.cur_artist = cur_artist
-        self.cur_album = cur_album
 
 
 class CandidateStateInDb(Base):

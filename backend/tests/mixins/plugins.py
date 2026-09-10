@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 from abc import ABC
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 from unittest import mock
 
 import pytest
-from beets.plugins import EventType, send
+from beets.plugins import send
+
+if TYPE_CHECKING:
+    from beets.events import EventType
 
 
 class PluginEventsMixin(ABC):
