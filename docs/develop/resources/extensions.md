@@ -31,4 +31,5 @@ modular and make individual capabilities easy to extend.
 :maxdepth: 1
 
 extensions/art.md
+extensions/auth.md
 ```
