@@ -11,18 +11,18 @@ Our hope is that this will help others who want to contribute PRs to judge if th
 If you are not sure, just open an issue to pitch your idea.
 
 
-- **Improved Backend API**
-    - Document and stabilize the library API. [#280][issue-280], [#345][pr-345]
-
 - **Plistsync v1.0**
     - Our other awesome music Project.
       We are close to the first major release.
       Go check it out ([click](https://github.com/metasauce/plistsync)).
 
-- **Inbox UX Improvements**
-    - Pagination. [#164][issue-164], [#351][issue-351], [#352][issue-352]
-    - UX to select and action multiple or all albums. [#200][issue-200], [#201][issue-201], [#210][issue-210]
-    - Filtering. [#209][issue-209]
+- **Improved Backend API**
+    - Document and stabilize the _beets library_ API. [#280][issue-280], [PR #345][pr-345]
+    - Adapt this new format to our session endpoints.
+
+- **Library Editor**
+    - Edit info for already imported items, write back to beets and file meta data.
+    - [#306][issue-306], [#332][issue-332], [#230][issue-230], [#319][issue-319]
 
 - **Performance Tweaks**
     - Rewrite Terminal.
@@ -32,23 +32,27 @@ If you are not sure, just open an issue to pitch your idea.
       Currently runs quite a large copy of the full beetsflask.
       A simpler design could only monitor file changes, and ping the main app via api or redis. Then, the main thread handles the core logic. [#244][issue-244], [#202][issue-202]
 
-- **Library Editor**
-    - Edit info for already imported items, write back to beets and file meta data.
-    - [#306][issue-306], [#332][issue-332], [#230][issue-230], [#319][issue-319]
+- **Extension System**
+    - Better support for beets plugins (via a new beetsflask extension system)
+    - e.g. Authentication Providers [PR #339][pr-339], [PR #341][pr-341]
+
+- **Inbox UX Improvements**
+    - Improve initial setup for non-beets libraries. Currently, beetsflask struggles to deal with 50+ albums in the inbox.
+      This makes it hard to use for new users who want to port an existing library. However, this is mainly an onboarding issue (and therefore low on our prio list :P - we have been running this day to day very happily) [#175][issue-175], [#164][issue-164], [#193][issue-193], [#344][issue-344]
+    - Pagination. [#164][issue-164], [#351][issue-351], [#352][issue-352]
+    - UX to select and action multiple or all albums. [#200][issue-200], [#201][issue-201], [#210][issue-210]
+    - Filtering. [#209][issue-209]
 
 - **Session Overview**
-    - Similar to the inbox, but for sessions.
+    - Similar to the inbox, but for sessions. Will also help with the onboarding library imports.
     - Shows folders that are identified as albums, and have (not) been imported or tagged.
     - [#193][issue-193]
 
 
-- **Initial setup for non-beets libraries**
-    - Currently, beetsflask struggles to deal with 50+ albums in the inbox.
-      This makes it hard to use for new users who want to port an existing library.
-    - [#175][issue-175], [#164][issue-164], [#193][issue-193], [#344][issue-344]
-
 
 <!-- PR links -->
+[pr-339]: https://github.com/metasauce/beets-flask/pull/339
+[pr-341]: https://github.com/metasauce/beets-flask/pull/341
 [pr-345]: https://github.com/metasauce/beets-flask/pull/345
 
 <!-- Issue links -->
