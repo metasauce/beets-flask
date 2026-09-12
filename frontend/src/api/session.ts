@@ -439,6 +439,14 @@ async function waitForJobUpdate({
 
 /* ----------------------------- Session status ----------------------------- */
 
+function batchFolders(items: Array<{ hash: string; path: string }>, batchSize: number): Array<Array<{ hash: string; path: string }>> {
+    const batches: Array<Array<{ hash: string; path: string }>> = [];
+    for (let start = 0; start < items.length; start += batchSize) {
+        batches.push(items.slice(start, start + batchSize));
+    }
+    return batches;
+}
+
 /** Canonical per-folder cache entry for a folder's status.
  *
  * Prefer hydrating this via `ensureStatuses` (single batch request);
@@ -481,30 +489,38 @@ export async function ensureStatuses(
         return;
     }
 
-    const params = new URLSearchParams();
-    missing.forEach((folder) => {
-        params.append('folder_hash', folder.hash);
-        params.append('folder_path', folder.path);
-    });
-    const response = await fetch(`/session/status?${params.toString()}`);
-    const statuses = (await response.json()) as FolderStatusUpdate[];
-    const byHash = new Map<string, FolderStatusUpdate>();
-    const byPath = new Map<string, FolderStatusUpdate>();
-    for (const status of statuses) {
-        if (!byHash.has(status.hash)) {
-            byHash.set(status.hash, status);
-        }
-        if (!byPath.has(status.path)) {
-            byPath.set(status.path, status);
-        }
-    }
+    const batches = batchFolders(missing, 50);
 
-    for (const folder of missing) {
-        queryClient.setQueryData<FolderStatusUpdate | null>(
-            statusQueryOptions(folder.hash, folder.path).queryKey,
-            byHash.get(folder.hash) ?? byPath.get(folder.path) ?? null
-        );
-    }
+    await Promise.all(
+        batches.map((currentBatch) => {
+            const params = new URLSearchParams();
+            currentBatch.forEach((folder) => {
+                params.append('folder_hash', folder.hash);
+                params.append('folder_path', folder.path);
+            });
+            return fetch(`/session/status?${params.toString()}`)
+                .then((response) => response.json())
+                .then((statuses: FolderStatusUpdate[]) => {
+                    const byHash = new Map<string, FolderStatusUpdate>();
+                    const byPath = new Map<string, FolderStatusUpdate>();
+                    for (const status of statuses) {
+                        if (!byHash.has(status.hash)) {
+                            byHash.set(status.hash, status);
+                        }
+                        if (!byPath.has(status.path)) {
+                            byPath.set(status.path, status);
+                        }
+                    }
+
+                    for (const folder of currentBatch) {
+                        queryClient.setQueryData<FolderStatusUpdate | null>(
+                            statusQueryOptions(folder.hash, folder.path).queryKey,
+                            byHash.get(folder.hash) ?? byPath.get(folder.path) ?? null
+                        );
+                    }
+                });
+        })
+    );
 }
 
 /* -------------------------- Minimal session info -------------------------- */
@@ -544,6 +560,8 @@ export const minimalSessionQueryOptions = (
     },
 });
 
+
+
 /**
  * Fetch minimal chip info for many folders in one request and populate their
  * canonical cache entries. Skips cached folders; caches null for folders
@@ -561,20 +579,27 @@ export async function ensureMinimalSessions(
 
     if (missing.length === 0) {
         return;
-    }
+    }       
 
-    const params = new URLSearchParams();
-    missing.forEach((folder) => {
-        params.append('folder_hash', folder.hash);
-        params.append('folder_path', folder.path);
-    });
-    const response = await fetch(`/session/minimal?${params.toString()}`);
-    const res = (await response.json()) as Record<string, MinimalSession>;
+    const batches = batchFolders(missing, 50);
 
-    missing.forEach((folder) => {
-        queryClient.setQueryData<MinimalSession | null>(
-            minimalSessionQueryOptions(folder.hash, folder.path).queryKey,
-            res[folder.hash] ?? null
-        );
-    });
+    await Promise.all(
+        batches.map((currentBatch) => {
+            const params = new URLSearchParams();
+            currentBatch.forEach((folder) => {
+                params.append('folder_hash', folder.hash);
+                params.append('folder_path', folder.path);
+            });
+            return fetch(`/session/minimal?${params.toString()}`)
+                .then((response) => response.json())
+                .then((res: Record<string, MinimalSession>) => {
+                    currentBatch.forEach((folder) => {
+                        queryClient.setQueryData<MinimalSession | null>(
+                            minimalSessionQueryOptions(folder.hash, folder.path).queryKey,
+                            res[folder.hash] ?? null
+                        );
+                    });
+                });
+        })
+    );
 }

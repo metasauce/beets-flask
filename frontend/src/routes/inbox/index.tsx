@@ -46,41 +46,28 @@ export const Route = createFileRoute('/inbox/')({
         // Filter: all top level folders/archives in inboxes
         const prefetch_folders: Array<Folder | Archive> = [];
         for (const inbox of inboxes) {
-            for (const child of walkFolder(inbox)) {
+            for (const child of walkFolder(inbox, 1)) {
                 if (child.type === 'directory' || child.type === 'archive') {
                     prefetch_folders.push(child);
                 }
             }
         }
-
-        const batchSize = 50;
-        const batches: Array<Array<Folder | Archive>> = [];
-
-        for (
-            let start = 0;
-            start < prefetch_folders.length;
-            start += batchSize
-        ) {
-            batches.push(
-                prefetch_folders.slice(start, start + batchSize)
-            );
-        }
-
         // Prefetch minimal information for all sessions within the top level inbox
-        // folders. This prevents waterfall loading states.
-        await Promise.all(
-            batches.map((currentBatch) => {
-                const folders = currentBatch.map((folder) => ({
-                    hash: folder.hash,
-                    path: folder.full_path,
-                }));
-
-                return Promise.all([
-                    ensureStatuses(folders),
-                    ensureMinimalSessions(folders),
-                ]);
-            })
-        );
+        // folders. This prevents waterfall loading states
+        await Promise.all([
+            ensureStatuses(
+                prefetch_folders.map((f) => ({
+                    hash: f.hash,
+                    path: f.full_path,
+                }))
+            ),
+            ensureMinimalSessions(
+                prefetch_folders.map((f) => ({
+                    hash: f.hash,
+                    path: f.full_path,
+                }))
+            ),
+        ]);
     },
 });
 
