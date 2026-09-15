@@ -15,7 +15,7 @@ classifiers = [
 dependencies = [
     "quart>=0.20.0",
     "confuse>=2.0.1",
-    "beets==2.13.1",
+    "beets==2.14.0",
     "sqlalchemy>=2.0.35",
     "rq>=2.0.0",
     "watchdog>=5.0.3",
@@ -171,6 +171,6 @@ follow_untyped_imports = true
 
 [tool.uv]
 exclude-newer = "3 days"
-# python2ts is maintained alongside this project; skip the supply-chain
+# maintained alongside this project; skip the supply-chain
 # quarantine delay so new releases can be picked up immediately.
-exclude-newer-package = { python2ts = false }
+exclude-newer-package = { python2ts = false, beets = false }

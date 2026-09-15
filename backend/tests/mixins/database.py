@@ -39,7 +39,7 @@ class IsolatedDBMixin(ABC):
         _reset_database()
 
     @pytest.fixture(autouse=True, scope="class")
-    def setup_database(self):
+    def setup_database(self, db_session_factory):
         """
         Automatically reset the database before and after ALL tests in this class.
 

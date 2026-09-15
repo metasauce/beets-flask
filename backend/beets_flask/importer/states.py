@@ -6,12 +6,11 @@ from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 from uuid import uuid4 as uuid
 
 from beets import importer
 from beets.ui import _open_library
-from beets.ui.commands.import_.display import show_change
 from beets.util import bytestring_path, get_most_common_tags
 from deprecated import deprecated
 
@@ -22,7 +21,6 @@ from beets_flask.importer.progress import (
     ProgressState,
     SerializedProgressState,
 )
-from beets_flask.utility import capture_stdout_stderr
 
 from .types import (
     AlbumInfo,
@@ -388,9 +386,9 @@ class TaskState(BaseState):
         """Current metadata of the task.
 
         This is the metadata of the music files on disk.
-        (In a beets context, cur_artist and cur_album)
+        TODO: We should migrate to use likelies directly since it is typed now.
         """
-        likelies, _ = get_most_common_tags(self.items)
+        likelies = get_most_common_tags(self.items)
         return Metadata(**{k: str(v) for k, v in likelies.items()})  # type: ignore[typeddict-item]
 
     # ---------------------------------------------------------------------------- #
@@ -403,8 +401,8 @@ class TaskState(BaseState):
             candidates=[c.serialize() for c in self.candidate_states],
             asis_candidate=self.asis_candidate.serialize(),
             current_metadata=self.current_metadata,
-            # TODO: maybe we can merge current_metadata (which is cur_artist/album in
-            # old beets) into the asis_candidate
+            # TODO: maybe we can merge current_metadata (which is derived from
+            # `task.source`) into the asis_candidate
             chosen_candidate_id=self.chosen_candidate_state_id,
             duplicate_action=self.duplicate_action,
             completed=self.completed,
@@ -476,20 +474,6 @@ class CandidateState(BaseState):
         else:
             raise ValueError("Unknown type")
 
-    @property
-    def diff_preview(self) -> str:
-        """Diff preview of the match to the current meta data."""
-        out, err, _ = capture_stdout_stderr(
-            show_change,
-            self.task_state.task.cur_artist,
-            self.task_state.task.cur_album,
-            self.match,
-        )
-        res = out.lstrip("\n")
-        if len(err) > 0:
-            res += f"\n\nError: {err}"
-        return res
-
     @classmethod
     def asis_candidate(cls, task_state: TaskState) -> CandidateState:
         """Alternate constructor for an asis import option.
@@ -501,10 +485,9 @@ class CandidateState(BaseState):
         items: list[BeetsItem] = task_state.task.items
 
         # FIXME: we do this lookup twice, once here and once in current_metadata
+        info: dict[str, Any] = {}
         if len(items) > 0:
-            info, _ = get_most_common_tags(items)
-        else:
-            info = {}
+            info = get_most_common_tags(items)
         info["data_source"] = "asis"
         info["data_url"] = f"file://{task_state.toppath}"
 
@@ -546,22 +529,6 @@ class CandidateState(BaseState):
         return candidate
 
     # --------------------- Helper to lift / unnset from match to -------------------- #
-    @property
-    def cur_artist(self) -> str:
-        """Current artist, usually the meta data of the music files.
-
-        Named to be consistent with beets.
-        """
-        return str(self.task_state.task.cur_artist)
-
-    @property
-    def cur_album(self) -> str:
-        """Current album, usually the meta data of the music files.
-
-        Named to be consistent with beets.
-        """
-        return str(self.task_state.task.cur_album)
-
     @property
     def artist(self) -> str | None:
         """Artist of the match."""
