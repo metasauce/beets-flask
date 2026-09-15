@@ -439,6 +439,16 @@ async function waitForJobUpdate({
 
 /* ----------------------------- Session status ----------------------------- */
 
+function batchItems<T>(items: T[], batchSize: number): T[][] {
+    const batches: T[][] = [];
+
+    for (let start = 0; start < items.length; start += batchSize) {
+        batches.push(items.slice(start, start + batchSize));
+    }
+
+    return batches;
+}
+
 /** Canonical per-folder cache entry for a folder's status.
  *
  * Prefer hydrating this via `ensureStatuses` (single batch request);
@@ -481,13 +491,22 @@ export async function ensureStatuses(
         return;
     }
 
-    const params = new URLSearchParams();
-    missing.forEach((folder) => {
-        params.append('folder_hash', folder.hash);
-        params.append('folder_path', folder.path);
-    });
-    const response = await fetch(`/session/status?${params.toString()}`);
-    const statuses = (await response.json()) as FolderStatusUpdate[];
+    const statuses = (
+        await Promise.all(
+            batchItems(missing, 50).map(async (currentBatch) => {
+                const params = new URLSearchParams();
+                currentBatch.forEach((folder) => {
+                    params.append('folder_hash', folder.hash);
+                    params.append('folder_path', folder.path);
+                });
+                const response = await fetch(
+                    `/session/status?${params.toString()}`
+                );
+                return (await response.json()) as FolderStatusUpdate[];
+            })
+        )
+    ).flat();
+
     const byHash = new Map<string, FolderStatusUpdate>();
     const byPath = new Map<string, FolderStatusUpdate>();
     for (const status of statuses) {
@@ -563,18 +582,32 @@ export async function ensureMinimalSessions(
         return;
     }
 
-    const params = new URLSearchParams();
-    missing.forEach((folder) => {
-        params.append('folder_hash', folder.hash);
-        params.append('folder_path', folder.path);
-    });
-    const response = await fetch(`/session/minimal?${params.toString()}`);
-    const res = (await response.json()) as Record<string, MinimalSession>;
+    const results = await Promise.all(
+        batchItems(missing, 50).map(async (currentBatch) => {
+            const params = new URLSearchParams();
+            currentBatch.forEach((folder) => {
+                params.append('folder_hash', folder.hash);
+                params.append('folder_path', folder.path);
+            });
+            const response = await fetch(
+                `/session/minimal?${params.toString()}`
+            );
+            return (await response.json()) as Record<string, MinimalSession>;
+        })
+    );
 
-    missing.forEach((folder) => {
+    const byHash = new Map<string, MinimalSession>();
+
+    for (const result of results) {
+        for (const [hash, session] of Object.entries(result)) {
+            byHash.set(hash, session);
+        }
+    }
+
+    for (const folder of missing) {
         queryClient.setQueryData<MinimalSession | null>(
             minimalSessionQueryOptions(folder.hash, folder.path).queryKey,
-            res[folder.hash] ?? null
+            byHash.get(folder.hash) ?? null
         );
-    });
+    }
 }
