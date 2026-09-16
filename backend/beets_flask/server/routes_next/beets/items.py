@@ -64,7 +64,9 @@ async def get_item(item_id: int) -> SingleItemDocument:
     if not item:
         raise NotFoundError(f"Item with beets_id:{item_id!r} not found in beets db.")
 
-    return SingleItemDocument(data=to_item_resource(item))
+    return SingleItemDocument(
+        data=to_item_resource(item), links=LinkObject(self=request.url)
+    )
 
 
 @items_bp.route("/<int:item_id>", methods=["PATCH"])
@@ -87,7 +89,9 @@ async def patch_item(item_id: int, data: ItemAttributes) -> SingleItemDocument:
     item.update(data.patch_data())
     item.try_sync(True, False)
 
-    return SingleItemDocument(data=to_item_resource(item))
+    return SingleItemDocument(
+        data=to_item_resource(item), links=LinkObject(self=request.url)
+    )
 
 
 class DeleteQueryParams(BaseModel):
@@ -119,7 +123,7 @@ async def delete_item(
     resource = to_item_resource(item)
     item.remove(delete=query_args.delete_file, with_album=True)
 
-    return SingleItemDocument(data=resource)
+    return SingleItemDocument(data=resource, links=LinkObject(self=request.url))
 
 
 # ----------------------------------- Bulk ----------------------------------- #

@@ -99,7 +99,11 @@ async def get_album(album_id: int, query_args: GetQueryParams) -> SingleAlbumDoc
         else []
     )
 
-    return SingleAlbumDocument(data=to_album_resource(album, items), included=included)
+    return SingleAlbumDocument(
+        data=to_album_resource(album, items),
+        included=included,
+        links=LinkObject(self=request.url),
+    )
 
 
 @albums_bp.route("/<int:album_id>", methods=["PATCH"])
@@ -132,7 +136,11 @@ async def patch_album(
         else []
     )
 
-    return SingleAlbumDocument(data=to_album_resource(album, items), included=included)
+    return SingleAlbumDocument(
+        data=to_album_resource(album, items),
+        included=included,
+        links=LinkObject(self=request.url),
+    )
 
 
 class DeleteQueryParams(BaseModel):
@@ -163,7 +171,9 @@ async def delete_album(
     resource = to_album_resource(album, album.items())
     album.remove(delete=query_args.delete_files)
 
-    return SingleAlbumDocument(data=resource, included=[])
+    return SingleAlbumDocument(
+        data=resource, included=[], links=LinkObject(self=request.url)
+    )
 
 
 # ----------------------------------- Bulk ----------------------------------- #

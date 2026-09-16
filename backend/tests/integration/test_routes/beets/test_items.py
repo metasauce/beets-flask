@@ -52,7 +52,8 @@ class TestGetItem(IsolatedBeetsLibraryMixin):
         response = await client.get(self._url(beets_id(item)))
         assert response.status_code == 200
 
-        SingleItemDocument.model_validate(await response.get_json())
+        document = SingleItemDocument.model_validate(await response.get_json())
+        assert document.links.self.endswith(self._url(beets_id(item)))
 
     async def test_get_item_not_found(self, client: TestClientProtocol):
         """GET a non-existent item -> 404."""

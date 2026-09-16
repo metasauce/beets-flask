@@ -86,6 +86,7 @@ class TestGetAlbum(IsolatedBeetsLibraryMixin):
         assert response.status_code == 200
 
         data = SingleAlbumDocument.model_validate(await response.get_json())
+        assert data.links.self.endswith(self._url(beets_id(album), include))
         assert len(data.included or []) == n_included
 
     async def test_get_album_not_found(self, client: TestClientProtocol):

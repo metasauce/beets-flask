@@ -112,9 +112,7 @@ class SingleResourceDocument[R: Resource](BaseModel):
     """Response containing a single resource."""
 
     data: Annotated[R, Field(description="The resource itself")]
-    links: Annotated[
-        LinkObject | None, Field(description="Pagination links of the response")
-    ] = None
+    links: Annotated[LinkObject, Field(description="Links of the response")]
     meta: Annotated[
         MetaObject | None,
         Field(description="Additional information about the response"),
@@ -144,9 +142,7 @@ class MultiResourceDocument[R: Resource](BaseModel):
     """Response containing a list of resources."""
 
     data: Annotated[list[R], Field(description="The resources themselves")]
-    links: Annotated[
-        LinkObject | None, Field(description="Pagination links of the response")
-    ] = None
+    links: Annotated[LinkObject, Field(description="Pagination links of the response")]
     meta: Annotated[
         MetaObject | None,
         Field(description="Additional information about the response"),
