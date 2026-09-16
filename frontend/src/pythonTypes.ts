@@ -3,7 +3,44 @@
  * For more information, see:
  * https://github.com/semohr/py2ts
  */
+export type SingleItemDocument = SingleResourceDocument<ItemResource>;
+
+export type SingleArtistDocument = SingleResourceDocument<ArtistResource>;
+
+export type SingleAlbumDocument = SingleResourceDocumentWithIncluded<
+    AlbumResource,
+    ItemResource
+>;
+
+export type MultiItemDocument = MultiResourceDocument<ItemResource>;
+
+export type MultiArtistDocument = MultiResourceDocument<ArtistResource>;
+
+export type MultiAlbumDocument = MultiResourceDocumentWithIncluded<
+    AlbumResource,
+    ItemResource
+>;
+
+export type ItemResource = Resource<ItemAttributes, 'item'>;
+
 export type File = FileSystemItem;
+
+export type ArtistResource = Resource<ArtistAttributes, 'artist'>;
+
+export type AlbumResource = RelResource<AlbumAttributes, 'album', 'item'>;
+
+export interface SingleResourceDocumentWithIncluded<
+    R extends Resource = Resource,
+    R_I extends Resource = Resource,
+> extends SingleResourceDocument<R> {
+    included: Array<R_I> | null;
+}
+
+export interface SingleResourceDocument<R extends Resource = Resource> {
+    data: R;
+    links: LinkObject;
+    meta: MetaObject | null;
+}
 
 export interface SerializedSessionState {
     id: string;
@@ -28,6 +65,49 @@ export interface Search {
     search_name: null | string;
 }
 
+export interface ResourceIdentifier<T extends string = string> {
+    type: T;
+    id: string;
+}
+
+export interface Resource<A = unknown, T extends string = string> {
+    type: T;
+    id: string;
+    attributes: A;
+}
+
+export interface RelResource<
+    A = unknown,
+    T extends string = string,
+    T_I extends string = string,
+> extends Resource<A, T> {
+    relationships: Array<ResourceIdentifier<T_I>>;
+}
+
+export interface MusicInfo {
+    type: 'album' | 'item' | 'track';
+    artist: null | string;
+    album: null | string;
+    data_url: null | string;
+    data_source: null | string;
+    year: null | number;
+    genres: Array<string> | null;
+    media: null | string;
+}
+
+export interface MultiResourceDocumentWithIncluded<
+    R extends Resource = Resource,
+    R_I extends Resource = Resource,
+> extends MultiResourceDocument<R> {
+    included: Array<R_I> | null;
+}
+
+export interface MultiResourceDocument<R extends Resource = Resource> {
+    data: Array<R>;
+    links: LinkObject;
+    meta: MetaObject | null;
+}
+
 export interface MinimalSession {
     session_id: string;
     folder_hash: string;
@@ -38,6 +118,11 @@ export interface MinimalBestCandidateInfo {
     data_source: string;
     distance: number;
     duplicates: Array<number>;
+}
+
+export interface LinkObject {
+    self: string;
+    next: null | string;
 }
 
 export interface LibraryStats {
@@ -59,6 +144,11 @@ export interface JobStatusUpdate {
     job_metas: Array<JobMeta>;
     exc: SerializedException | null;
     event: 'job_status_update';
+}
+
+export interface ItemAttributes {
+    title: null | string;
+    artist: null | string;
 }
 
 export interface InboxStats {
@@ -86,6 +176,10 @@ export interface Folder extends FileSystemItem {
 export interface FileSystemUpdate {
     exc: SerializedException | null;
     event: 'file_system_update';
+}
+
+export interface BulkResult {
+    meta: MetaObject;
 }
 
 export interface MatchSectionSchema {
@@ -138,54 +232,24 @@ export interface BeetsFlaskSchema {
     num_preview_workers: number;
 }
 
+export interface ArtistAttributes {
+    artist: string;
+    album_count: number;
+    item_count: number;
+    first_item_added: Date | null;
+    last_item_added: Date | null;
+    first_album_added: Date | null;
+    last_album_added: Date | null;
+}
+
 export interface Archive extends FileSystemItem {
     is_album: boolean;
 }
 
-export interface AlbumResponseMinimalExpanded {
-    id: number;
-    name: string;
-    albumartist: string;
-    year: number;
-    added: Date;
-    items: Array<ItemResponseMinimal>;
-    gui_import_id?: string;
-    gui_import_date?: string;
-    albumtype?: string;
-}
-
-export interface AlbumResponseMinimal {
-    id: number;
-    name: string;
-    albumartist: string;
-    year: number;
-    added: Date;
-}
-
-export interface AlbumResponseExpanded {
-    id: number;
-    name: string;
-    albumartist: string;
-    year: number;
-    added: Date;
-    genres: Array<string>;
-    label: string;
-    sources: Array<AlbumSource>;
-    items: Array<ItemResponse>;
-    gui_import_id?: string;
-    gui_import_date?: string;
-    albumtype?: string;
-}
-
-export interface AlbumResponse {
-    id: number;
-    name: string;
-    albumartist: string;
-    year: number;
-    added: Date;
-    genres: Array<string>;
-    label: string;
-    sources: Array<AlbumSource>;
+export interface AlbumAttributes {
+    album: null | string;
+    albumartist: null | string;
+    year: null | number;
 }
 
 export enum Progress {
@@ -204,6 +268,19 @@ export enum Progress {
     MANIPULATING_FILES = 35,
     IMPORT_COMPLETED = 40,
     DELETING = 50,
+}
+
+export enum ItemSortField {
+    ADDED = 'added',
+    YEAR = 'year',
+    TITLE = 'title',
+    ARTIST = 'artist',
+    ALBUMARTIST = 'albumartist',
+    ALBUM = 'album',
+    TRACK = 'track',
+    DISC = 'disc',
+    LENGTH = 'length',
+    BITRATE = 'bitrate',
 }
 
 export enum FolderStatus {
@@ -235,6 +312,19 @@ export enum CandidateChoiceFallback {
     BEST = 2,
 }
 
+export enum ArtistSortField {
+    ARTIST = 'artist',
+    ALBUM_COUNT = 'album_count',
+    ITEM_COUNT = 'item_count',
+}
+
+export enum AlbumSortField {
+    ADDED = 'added',
+    ALBUM = 'album',
+    ALBUMARTIST = 'albumartist',
+    YEAR = 'year',
+}
+
 export interface SerializedException {
     type: string;
     message: string;
@@ -247,6 +337,10 @@ export interface InboxFolderSchema {
     name: string;
     auto_threshold: null | number;
     autotag: 'auto' | 'bootleg' | 'off' | 'preview';
+}
+
+export interface MetaObject {
+    total: number;
 }
 
 export interface Metadata {
@@ -300,68 +394,6 @@ export interface JobMeta {
     job_frontend_ref?: null | string;
 }
 
-export interface ItemResponseMinimal {
-    id: number;
-    name: string;
-    path: string;
-    artist: string;
-    year: number;
-    album: string;
-    albumartist: string;
-    album_id: number;
-    isrc?: string;
-    size: number;
-}
-
-export interface ItemSource {
-    source: string;
-    track_id: string;
-    album_id?: string;
-    artist_id?: string;
-    extra?: Record<string, Array<string> | string>;
-}
-
-export interface ItemResponse {
-    id: number;
-    name: string;
-    path: string;
-    artist: string;
-    year: number;
-    album: string;
-    albumartist: string;
-    album_id: number;
-    isrc?: string;
-    size: number;
-    genres: Array<string>;
-    label: string;
-    samplerate: number;
-    bitrate: number;
-    bpm: number;
-    bitdepth: number;
-    channels: number;
-    format: string;
-    encoder_info: string;
-    encoder_settings: string;
-    initial_key: string;
-    length: number;
-    track: number;
-    tracktotal: number;
-    added: number;
-    catalognum: string;
-    sources: Array<ItemSource>;
-}
-
-export interface MusicInfo {
-    type: 'album' | 'item' | 'track';
-    artist: null | string;
-    album: null | string;
-    data_url: null | string;
-    data_source: null | string;
-    year: null | number;
-    genres: Array<string> | null;
-    media: null | string;
-}
-
 export interface ItemInfo extends MusicInfo {
     title: null | string;
     length: null | number;
@@ -377,13 +409,6 @@ export interface FileSystemItem {
     full_path: string;
     hash: string;
     is_album: boolean;
-}
-
-export interface AlbumSource {
-    source: string;
-    album_id: string;
-    artist_id?: string;
-    extra?: Record<string, string>;
 }
 
 export interface TrackInfo extends MusicInfo {

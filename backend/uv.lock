@@ -362,7 +362,7 @@ requires-dist = [
     { name = "pydub" },
     { name = "pylast", specifier = ">=5.2.0" },
     { name = "python-socketio", specifier = ">=5.11.4" },
-    { name = "python2ts", specifier = ">=0.7.2" },
+    { name = "python2ts", specifier = ">=0.7.3" },
     { name = "quart", specifier = ">=0.20.0" },
     { name = "quart-schema", extras = ["pydantic"], git = "https://github.com/semohr/quart-schema.git?rev=defs_msgspec" },
     { name = "requests", specifier = ">=2.32.3" },
@@ -1892,14 +1892,14 @@ wheels = [
 
 [[package]]
 name = "python2ts"
-version = "0.7.2"
+version = "0.7.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/17/c1/798f4f89a58634695cec8bc46ac3fc0f6091415eb19e06446958a6fb1f68/python2ts-0.7.2.tar.gz", hash = "sha256:e2d70cd165aa1152342a037756887d1781f01a758e70994b67f4ff41b8d09b0c", size = 214015, upload-time = "2026-09-10T13:54:34.203Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/c7/bccea7e81b738a90f5bfd8aa1bbe8de4df51fb4dfa0d6306e63a364b4f8d/python2ts-0.7.3.tar.gz", hash = "sha256:490de4fa6ef3e2159071abc6ddf733040f615bbb67d6dd87844ec15ac9e73d90", size = 216191, upload-time = "2026-09-17T10:30:59.787Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/cb/1a86292dcff5c0c71288510ff4f0b5234a615e150854ca81d43837ec0798/python2ts-0.7.2-py3-none-any.whl", hash = "sha256:694a82a4cbded788649eb3c4a2329101fc129a340c353d2ec725856af95293fe", size = 28861, upload-time = "2026-09-10T13:54:32.664Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/d4/4ccf7491a43ee59aa55d317f12d473cdf367ab3cf2ddbe2c83ae4653725f/python2ts-0.7.3-py3-none-any.whl", hash = "sha256:b0772463a24decf072f238714217e90579962c33ed9e3b034055753faa796988", size = 29888, upload-time = "2026-09-17T10:30:58.514Z" },
 ]
 
 [[package]]

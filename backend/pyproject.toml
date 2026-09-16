@@ -30,7 +30,7 @@ dependencies = [
     "uvloop>=0.22.1",
     # beets plugin dependencies
     "pylast>=5.2.0",
-    "python2ts>=0.7.2",
+    "python2ts>=0.7.3",
     "eyconf[pydantic]>=0.8.0",
     #"scantree>=0.0.4",
     "natsort",
