@@ -6,6 +6,8 @@
   the keyset pagination predicate from a :class:`Cursor`.
 - :class:`PaginatedQuery`: combines filters, keyset predicate and page
   limit into a single beets query + sort that fetches one page.
+- :class:`PaginatedArtists`: the in-memory counterpart used by the derived
+  artists resource, which only exists after splitting and aggregating.
 """
 
 from __future__ import annotations
@@ -13,18 +15,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from beets.dbcore.query import AndQuery, InQuery, Query
-from beets.dbcore.sort import Sort
+from beets.dbcore.sort import Sort as BeetsSort
 from beets.library import LibModel, parse_query_string
 
 from beets_flask.importer.types import BeetsAlbum, BeetsItem, BeetsLibrary
 from beets_flask.server.exceptions import InvalidUsageError
 
-from ._types import Direction
+from ._types import ArtistSortField, Direction
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from ._types import Cursor
+    from ._types import ArtistAttributes, Cursor, Sort
 
 # The model class of each paginated table, used to parse the filter
 # query string with the correct field set.
@@ -85,7 +87,7 @@ def keyset_where_clause(cursor: Cursor) -> tuple[str, Sequence[Any]]:
     return clause, (cursor.last_value, cursor.last_value, cursor.last_id)
 
 
-class PaginatedQuery(Query, Sort):
+class PaginatedQuery(Query, BeetsSort):
     """A beets query and sort that fetches a single page.
 
     Combines the :class:`Cursor`'s filters and keyset predicate and
@@ -156,3 +158,49 @@ class PaginatedQuery(Query, Sort):
                 list(filter_params),
             )[0]
         return row[0]
+
+
+class PaginatedArtists:
+    """Keyset pagination over the derived artists of the library.
+
+    The in-memory counterpart of :class:`PaginatedQuery`: artists are not a
+    beets model and only exist after splitting and aggregating, so sorting and
+    the keyset filter happen on the aggregated records instead of in SQL. The
+    cursor semantics are identical; the artist name is the unique tiebreaker,
+    taking the place of the row id.
+    """
+
+    def __init__(
+        self, cursor: Cursor[Sort[ArtistSortField]], records: list[ArtistAttributes]
+    ) -> None:
+        self.cursor = cursor
+        self.records = records
+
+    def _key(self, record: ArtistAttributes) -> tuple[Any, str]:
+        return getattr(record, self.cursor.sort.field.value), record.artist
+
+    def fetch(self, limit: int) -> list[ArtistAttributes]:
+        """The next ``limit`` records after the cursor's anchor."""
+        descending = self.cursor.sort.direction == Direction.DESC
+        records = sorted(self.records, key=self._key, reverse=descending)
+
+        if self.cursor.last_value is not None and self.cursor.last_id is not None:
+            value: int | str = (
+                int(self.cursor.last_value)
+                if self.cursor.sort.field
+                # The artist sort fields holding numeric values. Cursor anchors store
+                # the last value as a string, so these have to be converted back.
+                in {ArtistSortField.ALBUM_COUNT, ArtistSortField.ITEM_COUNT}
+                else self.cursor.last_value
+            )
+            anchor = (value, str(self.cursor.last_id))
+            if descending:
+                records = [record for record in records if self._key(record) < anchor]
+            else:
+                records = [record for record in records if self._key(record) > anchor]
+
+        return records[:limit]
+
+    def total(self) -> int:
+        """The total number of artists, independent of the page."""
+        return len(self.records)

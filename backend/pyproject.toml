@@ -129,6 +129,11 @@ ignore = [
 ]
 fixable = ["ALL"]
 
+[tool.ruff.lint.flake8-type-checking]
+# pydantic resolves model annotations at runtime, so these imports must stay
+# outside TYPE_CHECKING blocks.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
 "**/alembic/**/*" = ["D", "I"]

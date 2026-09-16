@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from functools import cache
 from typing import Annotated, Literal
@@ -196,6 +197,74 @@ class MultiAlbumDocument(
     """The response of a request that returns multiple albums."""
 
 
+# ---------------------------------- Artist --------------------------------- #
+
+
+class ArtistAttributes(BaseModel):
+    """The aggregated attributes of an artist.
+
+    Artists are not a beets entity: they are derived from the library by
+    splitting the ``artist``/``albumartist`` fields on the configured
+    artist separators and aggregating the matching items and albums.
+    """
+
+    artist: Annotated[str, Field(description="The name of the artist")]
+    album_count: Annotated[int, Field(description="The number of albums of the artist")]
+    item_count: Annotated[
+        int, Field(description="The number of items (tracks) of the artist")
+    ]
+    first_item_added: Annotated[
+        datetime | None,
+        Field(description="When the artist's first item was added"),
+    ] = None
+    last_item_added: Annotated[
+        datetime | None,
+        Field(description="When the artist's most recent item was added"),
+    ] = None
+    first_album_added: Annotated[
+        datetime | None,
+        Field(description="When the artist's first album was added"),
+    ] = None
+    last_album_added: Annotated[
+        datetime | None,
+        Field(description="When the artist's most recent album was added"),
+    ] = None
+
+
+class ArtistSortField(StrEnum):
+    """The fields that artists can be sorted by in the bulk endpoint.
+
+    Parametrizes :class:`Sort` for the artists endpoint; ``artist`` is the
+    default sort (ascending).
+    """
+
+    ARTIST = "artist"
+    ALBUM_COUNT = "album_count"
+    ITEM_COUNT = "item_count"
+
+    @classmethod
+    def values(cls) -> list[str]:
+        """The bare sortable field names."""
+        return [field.value for field in cls]
+
+
+class ArtistResource(Resource[ArtistAttributes, Literal["artist"]]):
+    """An artist of your music library.
+
+    Artists are not a beets entity, so ``id`` is the artist's name and
+    ``attributes`` contain aggregate counts and timestamps derived from
+    the artist's items and albums.
+    """
+
+
+class SingleArtistDocument(SingleResourceDocument[ArtistResource]):
+    """The response of a request that returns a single artist."""
+
+
+class MultiArtistDocument(MultiResourceDocument[ArtistResource]):
+    """The response of a request that returns multiple artists."""
+
+
 # ---------------------------------- Common ---------------------------------- #
 
 
@@ -279,6 +348,10 @@ class Cursor[S: Sort](BaseModel):
     (``last_value``/``last_id``) anchoring the next page. An unanchored
     cursor (without ``last_value``/``last_id``) returns the first page.
 
+    ``last_id`` is the row's ``id`` for the beets entities; for derived
+    resources without an id (e.g. artists) it holds the unique tiebreaker
+    of the sort (the artist's name).
+
     The token format is the model itself: :meth:`to_string` dumps the model
     (``exclude_none``) to an opaque base64 token; :meth:`from_string`
     validates it back into ``Cursor[...]``, so tampered tokens (e.g. an
@@ -289,9 +362,9 @@ class Cursor[S: Sort](BaseModel):
     filter_query: str | None = None
     filter_ids: list[int] | None = None
     last_value: str | None = None
-    last_id: int | None = None
+    last_id: int | str | None = None
 
-    def next(self, last_value: str | None, last_id: int) -> Cursor:
+    def next(self, last_value: str | None, last_id: int | str | None) -> Cursor:
         """The anchored cursor for the page after ``last_value``/``last_id``."""
         return self.model_copy(update={"last_value": last_value, "last_id": last_id})
 

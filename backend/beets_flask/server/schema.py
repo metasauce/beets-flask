@@ -224,6 +224,29 @@ quart_schema = QuartSchema(
             name="albums",
             description="Retrieve and modify albums in your beets library.",
         ),
+        Tag(
+            name="artists",
+            description=textwrap.dedent(
+                """
+                Artists in your beets library.
+
+                Artists are not a first-class citizen in beets: there is no
+                artist table. They are derived by splitting the
+                ``artists``/``albumartists`` fields of items and albums (on
+                beets' multi-value delimiter and the configured
+                ``gui.library.artist_separators``) and aggregating the
+                matches. Caveats:
+
+                - an artist is identified by its name, there is no numeric id
+                - the endpoints are read-only, there is no ``PATCH``/``DELETE``
+                - ``item_count``/``album_count`` and the
+                  ``first_*``/``last_*_added`` timestamps are aggregates over
+                  the artist's items and albums
+                - the list is paginated with the same
+                  ``sort``/``limit``/``cursor`` semantics as items and albums
+                """
+            ).strip(),
+        ),
     ],
     conversion_preference="pydantic",
     info=Info(
