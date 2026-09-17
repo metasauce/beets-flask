@@ -7,6 +7,7 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P3D"
 
 [options.exclude-newer-package]
+beets = false
 python2ts = false
 
 [[package]]
@@ -237,7 +238,7 @@ wheels = [
 
 [[package]]
 name = "beets"
-version = "2.13.1"
+version = "2.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
@@ -254,9 +255,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unidecode" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/01/a8fe84c3df610e63569f51ee846d442ea7d89ef4dfc834378cebd46bfd5a/beets-2.13.1.tar.gz", hash = "sha256:ea11e0963299c1c0f728884b2896cc554747696c3ddd73d98a70cc6196ae845b", size = 2447541, upload-time = "2026-07-29T10:46:45.742Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/3b/359d68ce968214ffec8f55d9babe6de82794a846b5e02027f013456ef988/beets-2.14.0.tar.gz", hash = "sha256:f412c9072ddc0bed04d843546a4222fcd24c9fe64cf233517ddcdb40190feea8", size = 2481050, upload-time = "2026-09-07T20:24:53.814Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/22/c78c08bc1764b84d139a89692103015e574506493d664f9ceccc1dd67233/beets-2.13.1-py3-none-any.whl", hash = "sha256:6d74a610b934c8e7b86dc651ec9953b62bd5ec9c47beea10cc32ede41ea9d488", size = 625666, upload-time = "2026-07-29T10:46:44.198Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/f5/491bd9b9e22265e538c461e90b9efc7185a493e93c6df6a6bf28244639e3/beets-2.14.0-py3-none-any.whl", hash = "sha256:270cdce1f0c441dcdb7dc9bc367b51b4a54f055e62662b3f7509aa04838d7f84", size = 650498, upload-time = "2026-09-07T20:24:51.532Z" },
 ]
 
 [[package]]
@@ -276,12 +277,12 @@ dependencies = [
     { name = "natsort" },
     { name = "numpy" },
     { name = "pillow" },
-    { name = "polars" },
     { name = "pydub" },
     { name = "pylast" },
     { name = "python-socketio" },
     { name = "python2ts" },
     { name = "quart" },
+    { name = "quart-schema", extra = ["pydantic"] },
     { name = "requests" },
     { name = "rq" },
     { name = "sqlalchemy" },
@@ -349,7 +350,7 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "alembic", specifier = ">=1.18.4" },
-    { name = "beets", specifier = "==2.13.1" },
+    { name = "beets", specifier = "==2.14.0" },
     { name = "cachetools", specifier = ">=5.3.3" },
     { name = "confuse", specifier = ">=2.0.1" },
     { name = "deprecated", specifier = ">=1.2.18" },
@@ -358,12 +359,12 @@ requires-dist = [
     { name = "natsort" },
     { name = "numpy" },
     { name = "pillow", specifier = ">=10.4.0" },
-    { name = "polars", specifier = ">=1.36.1" },
     { name = "pydub" },
     { name = "pylast", specifier = ">=5.2.0" },
     { name = "python-socketio", specifier = ">=5.11.4" },
-    { name = "python2ts", specifier = ">=0.7.2" },
+    { name = "python2ts", specifier = ">=0.7.3" },
     { name = "quart", specifier = ">=0.20.0" },
+    { name = "quart-schema", extras = ["pydantic"], git = "https://github.com/semohr/quart-schema.git?rev=defs_msgspec" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "rq", specifier = ">=2.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.35" },
@@ -1553,34 +1554,6 @@ wheels = [
 ]
 
 [[package]]
-name = "polars"
-version = "1.44.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "polars-runtime-32" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/26/73/258a1fe17bb2744a507199566ed712663144fdd0811b615b59a47dfa38d2/polars-1.44.1.tar.gz", hash = "sha256:ef3c89e9ebbbe8eb343c06873f1945683f8b6f97a1bdf001c60551c6c5e3cda1", size = 765660, upload-time = "2026-08-26T07:09:12.704Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/f1/59154659081930fbde291ea6225607956b500a71b0ce45d88217b7d32da2/polars-1.44.1-py3-none-any.whl", hash = "sha256:1fa62fc1c88fba77a68b28291b5aabdd69e5f38b34e59721a064ae3169b59bb5", size = 865208, upload-time = "2026-08-26T07:07:44.646Z" },
-]
-
-[[package]]
-name = "polars-runtime-32"
-version = "1.44.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fd/b2/2a76415d047a45df05489f2334c91ff120a274cf655d4ca030c7f54a8743/polars_runtime_32-1.44.1.tar.gz", hash = "sha256:abd10a54ed1caff42228610fcba0f93251f9870bd7cffb0c78bc26f5e0718ce4", size = 3171156, upload-time = "2026-08-26T07:09:14.243Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/93/ef9344dcec16757cf21027dc907ef989197e50742cfe4407f2e87edb0a7f/polars_runtime_32-1.44.1-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:1dfccb2b52aa50468a7d28e3e61c8338a13fb5bffc8646e388a649f5bdc6b463", size = 53962370, upload-time = "2026-08-26T07:07:47.21Z" },
-    { url = "https://files.pythonhosted.org/packages/10/da/38b32b7901af33f1fee2172ceaa39e9159825657920064298917392d78fa/polars_runtime_32-1.44.1-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:0580807dc3eed258f0db70bb65d905dd43f0135392119ec25308033ae24258fb", size = 48620468, upload-time = "2026-08-26T07:07:50.436Z" },
-    { url = "https://files.pythonhosted.org/packages/49/51/185af877d1d2236671493cf72bd3327a6046240eeea69c0696d1af2a5acb/polars_runtime_32-1.44.1-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0627f9aa82cb869725235e5188f698862fd9ada0c8c1cf65c3dc5a49a4a0ec26", size = 52455947, upload-time = "2026-08-26T07:07:53.776Z" },
-    { url = "https://files.pythonhosted.org/packages/fc/0a/0858f60cb5a6f8f73ec4cdd73eccd9f748d66bfc23304c5c23fa3468094a/polars_runtime_32-1.44.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:eea4283be8e60822d890dbda20588fe59b4172b508bd5ebf3471e531ca9f50d7", size = 58561262, upload-time = "2026-08-26T07:07:57.508Z" },
-    { url = "https://files.pythonhosted.org/packages/73/08/de4774b5612d7c8739f89ac01b601486b4f057b1da35a5b876bf9276fd95/polars_runtime_32-1.44.1-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:04e2c0f46e7a9906fffb1897f18f23b079b74f83c56b50060bace9e7b9b49b1a", size = 52636064, upload-time = "2026-08-26T07:08:06.337Z" },
-    { url = "https://files.pythonhosted.org/packages/98/ac/769c598dd106e2a6647798da3ed25ddeee67f2d12c04f5da316cb3da6360/polars_runtime_32-1.44.1-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:0956f0cae632d8fad3a04b4315bf2bb69b56d10c83c79a75c2c4c5a13b9ce5cc", size = 56447612, upload-time = "2026-08-26T07:08:12.36Z" },
-    { url = "https://files.pythonhosted.org/packages/b2/ee/98408296e15388020b6183323fdbe78ccab4f72c20d8e0d7092c062d3ad2/polars_runtime_32-1.44.1-cp310-abi3-win_amd64.whl", hash = "sha256:159334184e6fbb074c9f4692221ea19970a5e2bed2a479f9d7bdb00b7f3eedb9", size = 53702970, upload-time = "2026-08-26T07:08:15.398Z" },
-    { url = "https://files.pythonhosted.org/packages/e9/9d/8b17e075aac73c881a50b6c1f690d20df46db2f3bcabc99f600ecdee1290/polars_runtime_32-1.44.1-cp310-abi3-win_arm64.whl", hash = "sha256:3ba28d638d0513e0b4afbcdab5c0059a85021e5f81d62b5f793e7e23badb2cf7", size = 47281050, upload-time = "2026-08-26T07:08:18.43Z" },
-]
-
-[[package]]
 name = "pre-commit"
 version = "4.6.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1919,14 +1892,14 @@ wheels = [
 
 [[package]]
 name = "python2ts"
-version = "0.7.2"
+version = "0.7.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/17/c1/798f4f89a58634695cec8bc46ac3fc0f6091415eb19e06446958a6fb1f68/python2ts-0.7.2.tar.gz", hash = "sha256:e2d70cd165aa1152342a037756887d1781f01a758e70994b67f4ff41b8d09b0c", size = 214015, upload-time = "2026-09-10T13:54:34.203Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/c7/bccea7e81b738a90f5bfd8aa1bbe8de4df51fb4dfa0d6306e63a364b4f8d/python2ts-0.7.3.tar.gz", hash = "sha256:490de4fa6ef3e2159071abc6ddf733040f615bbb67d6dd87844ec15ac9e73d90", size = 216191, upload-time = "2026-09-17T10:30:59.787Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d2/cb/1a86292dcff5c0c71288510ff4f0b5234a615e150854ca81d43837ec0798/python2ts-0.7.2-py3-none-any.whl", hash = "sha256:694a82a4cbded788649eb3c4a2329101fc129a340c353d2ec725856af95293fe", size = 28861, upload-time = "2026-09-10T13:54:32.664Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/d4/4ccf7491a43ee59aa55d317f12d473cdf367ab3cf2ddbe2c83ae4653725f/python2ts-0.7.3-py3-none-any.whl", hash = "sha256:b0772463a24decf072f238714217e90579962c33ed9e3b034055753faa796988", size = 29888, upload-time = "2026-09-17T10:30:58.514Z" },
 ]
 
 [[package]]
@@ -1987,6 +1960,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/82/8a/13962df31309fa024b1811102981577b1702916779d3f17067bbf1f7691d/quart-0.22.0.tar.gz", hash = "sha256:6ba567bb29e0ea66f7c0a0297c2b6225bb531e37dbf9b75dbf4a6e1713c4c934", size = 65475, upload-time = "2026-08-19T19:53:30.212Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/80/0159d6fe2fc76915f2354e5b9187082987f7d648f0298d49770320c086ef/quart-0.22.0-py3-none-any.whl", hash = "sha256:bb659545f1a8a287a14df9434b9225a3d4738362a3ed170744d0e03bb9447b50", size = 78912, upload-time = "2026-08-19T19:53:28.961Z" },
+]
+
+[[package]]
+name = "quart-schema"
+version = "0.25.0"
+source = { git = "https://github.com/semohr/quart-schema.git?rev=defs_msgspec#9d4e15cc4a60995d9bfcb7cf363008034889056e" }
+dependencies = [
+    { name = "quart" },
+]
+
+[package.optional-dependencies]
+pydantic = [
+    { name = "pydantic" },
 ]
 
 [[package]]

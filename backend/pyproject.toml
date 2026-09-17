@@ -15,7 +15,7 @@ classifiers = [
 dependencies = [
     "quart>=0.20.0",
     "confuse>=2.0.1",
-    "beets==2.13.1",
+    "beets==2.14.0",
     "sqlalchemy>=2.0.35",
     "rq>=2.0.0",
     "watchdog>=5.0.3",
@@ -30,7 +30,7 @@ dependencies = [
     "uvloop>=0.22.1",
     # beets plugin dependencies
     "pylast>=5.2.0",
-    "python2ts>=0.7.2",
+    "python2ts>=0.7.3",
     "eyconf[pydantic]>=0.8.0",
     #"scantree>=0.0.4",
     "natsort",
@@ -40,8 +40,8 @@ dependencies = [
     "aiofiles",
     "numpy",
     "typing_extensions",
-    "polars>=1.36.1",
     "alembic>=1.18.4",
+    "quart-schema[pydantic] @ git+https://github.com/semohr/quart-schema.git@defs_msgspec",
 ]
 
 [dependency-groups]
@@ -89,6 +89,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["beets_flask"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.ruff]
 include = [
     "pyproject.toml",
@@ -125,6 +128,11 @@ ignore = [
 ]
 fixable = ["ALL"]
 
+[tool.ruff.lint.flake8-type-checking]
+# pydantic resolves model annotations at runtime, so these imports must stay
+# outside TYPE_CHECKING blocks.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**/*" = ["D"]
 "**/alembic/**/*" = ["D", "I"]
@@ -158,6 +166,7 @@ exclude_also = [
 ]
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 check_untyped_defs = true
 disallow_untyped_decorators = true
 allow_redefinition = true
@@ -171,6 +180,6 @@ follow_untyped_imports = true
 
 [tool.uv]
 exclude-newer = "3 days"
-# python2ts is maintained alongside this project; skip the supply-chain
+# maintained alongside this project; skip the supply-chain
 # quarantine delay so new releases can be picked up immediately.
-exclude-newer-package = { python2ts = false }
+exclude-newer-package = { python2ts = false, beets = false }

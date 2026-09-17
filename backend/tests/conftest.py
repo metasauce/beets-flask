@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 import yaml
 from beets import autotag
+from beets.autotag import Source
 from beets.autotag import tag_album as _tag_album
 
 from beets_flask.server.app import create_app
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
     from quart.typing import TestClientProtocol
     from sqlalchemy.orm import Session
 
-    from beets_flask.importer.types import BeetsLibrary
+    from beets_flask.importer.types import BeetsAlbum, BeetsItem, BeetsLibrary
 
 log = logging.getLogger(__name__)
 
@@ -193,6 +194,16 @@ def beets_lib_album(**kwargs):
     return a
 
 
+def beets_id(resource: BeetsItem | BeetsAlbum) -> int:
+    """Return the database id of a beets item or album.
+
+    The id is only set once the resource has been added to the library, but
+    beets types it as ``int | None``.
+    """
+    assert resource.id is not None
+    return resource.id
+
+
 # ---------------------------------- Mocking --------------------------------- #
 
 
@@ -247,14 +258,14 @@ def mock_tag_album():
     _original_tasks = getattr(tasks_mod, "tag_album")
 
     def _cached_tag_album(
-        items,
+        source: Source,
         search_artist: str | None = None,
         search_name: str | None = None,
         search_ids: list[str] = [],
     ):
         # Compute stable hash from items and search parameters
         m = hashlib.md5()
-        for item in items:
+        for item in source.items:
             m.update(item.path)
         if search_artist:
             m.update(search_artist.encode("utf-8"))
@@ -271,7 +282,7 @@ def mock_tag_album():
                 return pickle.load(f)
 
         # Real lookup on cache miss
-        res = _tag_album(items, search_artist, search_name, search_ids)
+        res = _tag_album(source, search_artist, search_name, search_ids)
         with open(cache_file, "wb") as f:
             pickle.dump(res, f)
         return res
