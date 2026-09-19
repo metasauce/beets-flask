@@ -70,8 +70,6 @@ class TaskStateMapper(DBMapper[TaskState, TaskStateInDb]):
             ],
         )
         beets_task.choice_flag = model.choice_flag
-        beets_task.cur_artist = model.cur_artist
-        beets_task.cur_album = model.cur_album
         old_paths: list[bytes] | None = (
             pickle.loads(model.old_paths) if model.old_paths else None
         )
@@ -147,8 +145,6 @@ class TaskStateMapper(DBMapper[TaskState, TaskStateInDb]):
             chosen_candidate_id=obj.chosen_candidate_state_id,
             progress=obj.progress.progress,
             choice_flag=obj.task.choice_flag,
-            cur_artist=obj.task.cur_artist,
-            cur_album=obj.task.cur_album,
             old_paths=old_paths,
         )
         ctx.to_cache[id(obj)] = model

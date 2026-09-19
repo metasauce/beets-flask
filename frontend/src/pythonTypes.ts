@@ -138,6 +138,16 @@ export interface BeetsFlaskSchema {
     num_preview_workers: number;
 }
 
+export interface AuthProviderStatus {
+    name: string;
+    authenticated: boolean;
+}
+
+export interface AuthFlow {
+    url: string;
+    flow_id: string;
+}
+
 export interface Archive extends FileSystemItem {
     is_album: boolean;
 }

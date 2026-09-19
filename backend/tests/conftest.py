@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 import yaml
 from beets import autotag
+from beets.autotag import Source
 from beets.autotag import tag_album as _tag_album
 
 from beets_flask.server.app import create_app
@@ -78,6 +79,23 @@ def fixture_testapp():
 def fixture_client(testapp: Quart) -> TestClientProtocol:
     # Needs beets_lib to be initialized for environment variables
     return testapp.test_client()
+
+
+@pytest.fixture
+def fake_redis(monkeypatch):
+    """Replace ``beets_flask.redis.redis_conn`` with an in-memory fake.
+
+    Note: unlike ``local_redis`` (which only mocks the rq queues), this also
+    replaces the shared connection, so code that talks to redis directly
+    (e.g. the auth flow store) works in tests.
+    """
+    from fakeredis import FakeStrictRedis
+
+    import beets_flask.redis
+
+    conn = FakeStrictRedis()
+    monkeypatch.setattr(beets_flask.redis, "redis_conn", conn)
+    return conn
 
 
 @pytest.fixture(name="runner")
@@ -247,14 +265,14 @@ def mock_tag_album():
     _original_tasks = getattr(tasks_mod, "tag_album")
 
     def _cached_tag_album(
-        items,
+        source: Source,
         search_artist: str | None = None,
         search_name: str | None = None,
         search_ids: list[str] = [],
     ):
         # Compute stable hash from items and search parameters
         m = hashlib.md5()
-        for item in items:
+        for item in source.items:
             m.update(item.path)
         if search_artist:
             m.update(search_artist.encode("utf-8"))
@@ -271,7 +289,7 @@ def mock_tag_album():
                 return pickle.load(f)
 
         # Real lookup on cache miss
-        res = _tag_album(items, search_artist, search_name, search_ids)
+        res = _tag_album(source, search_artist, search_name, search_ids)
         with open(cache_file, "wb") as f:
             pickle.dump(res, f)
         return res

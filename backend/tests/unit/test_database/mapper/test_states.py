@@ -159,8 +159,6 @@ class TestTaskStateMapper:
         assert len(model.candidates) == 0
         assert model.progress == original.progress.progress
         assert model.choice_flag == beets_task.choice_flag
-        assert model.cur_artist == beets_task.cur_artist
-        assert model.cur_album == beets_task.cur_album
         assert model.old_paths is None
 
         # Convert back to live object
@@ -218,28 +216,30 @@ class TestTaskStateMapper:
         assert result_item.genres == ["roundtrip-genre", "foo"]
 
     def test_roundtrip_with_choice_flag_and_metadata(self):
-        """Roundtrip a task that has choice_flag, cur_artist, cur_album set."""
+        """Roundtrip a task and check its derived source survives."""
         from beets.importer import Action
 
         mapper = TaskStateMapper()
         ctx = Context()
 
-        beets_task = _make_import_task()
+        item = beets_lib_item(
+            artist="Test Artist",
+            albumartist="Test Artist",
+            album="Test Album",
+        )
+        beets_task = _make_import_task(items=[item])
         beets_task.choice_flag = Action.ASIS
-        beets_task.cur_artist = "Test Artist"
-        beets_task.cur_album = "Test Album"
 
         original = TaskState(beets_task)
 
         model: TaskStateInDb = mapper.to_db(original, ctx)
         assert model.choice_flag == Action.ASIS
-        assert model.cur_artist == "Test Artist"
-        assert model.cur_album == "Test Album"
 
         result: TaskState = mapper.from_db(model, ctx)
         assert result.task.choice_flag == Action.ASIS
-        assert result.task.cur_artist == "Test Artist"
-        assert result.task.cur_album == "Test Album"
+
+        assert result.task.source.artist == item.albumartist
+        assert result.task.source.name == item.album
 
 
 class TestCandidateStateMapper:

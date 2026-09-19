@@ -414,19 +414,16 @@ def lookup_candidates(
     session: BaseSession,
     task: ImportTask,
 ):
-    """Performing the initial MusicBrainz lookup for an album.
+    """Performing the initial lookup for an album.
 
-    We tweaks this from upstream beets to not
-    call `task.lookup_candidates()` but instead `session.lookup_candidates(task)`,
-    with some extra logic
+    We tweaks this from upstream beets to not call `task.lookup_candidates()` but
+    instead `session.lookup_candidates(task)` with some extra logic.
 
-    This is more consistent, as it allows the logic
-    to be modified by each kind of session.
+    This is more convinient, as it allows us to modify logic the logic by each kind
+    of session.
 
-    Calls `task.lookup_candidates()`,
+    `session.lookup_candidates` calls `task.lookup_candidates`,
     which sets attributes of the task:
-        - cur_artist   # metadata in file
-        - cur_album
         - candidates
         - rec
     """
