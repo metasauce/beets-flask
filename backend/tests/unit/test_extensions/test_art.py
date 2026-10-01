@@ -14,6 +14,7 @@ from mediafile import Image, MediaFile
 
 from beets_flask.extensions.art import ArtResult, ArtSource
 from beets_flask.extensions.providers import ART_SOURCES
+from beets_flask.extensions.providers.bandcamp import BandcampArtSource
 from beets_flask.extensions.providers.file import FileArtSource
 from beets_flask.extensions.providers.musicbrainz import MusicbrainzArtSource
 from beets_flask.extensions.providers.spotify import SpotifyArtSource
@@ -87,6 +88,12 @@ class TestArtResult:
             "https://evil.com/?x=musicbrainz.org/release/1cf2ae06-bb5e-4256-af6c-e40d406abba5",
             None,
         ),
+        # Bandcamp
+        ("https://artist.bandcamp.com/album/x", BandcampArtSource),
+        ("https://bandcamp.com/album/x", BandcampArtSource),
+        ("https://notbandcamp.com/album/x", None),
+        ("https://bandcamp.com.evil.com/album/x", None),
+        ("https://evil.com/?x=bandcamp.com/album/x", None),
         # Other
         (
             "https://example.com/album/x",
@@ -270,3 +277,47 @@ class TestFileArtSourceGetArt:
             result = await FileArtSource().get_art(f"file://{tmp_path}", session)
 
         assert result is None
+
+
+class TestBandcampArtSourceGetArt:
+    async def get_art(self, body, status=200):
+        async def page(request: web.Request) -> web.Response:
+            return web.Response(text=body, status=status)
+
+        app = web.Application()
+        app.router.add_get("/album/x", page)
+        async with TestClient(TestServer(app)) as client:
+            return await BandcampArtSource().get_art(
+                f"http://127.0.0.1:{client.server.port}/album/x", client.session
+            )
+
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            (
+                (
+                    '{"@id": "https://x.bandcamp.com/album/y", '
+                    '"image": ["https://f4.bcbits.com/img/a1802951586_10.jpg"]}'
+                ),
+                "https://f4.bcbits.com/img/a1802951586_4.jpg",
+            ),
+            (
+                (
+                    '{"@id": "https://x.bandcamp.com/album/y", '
+                    '"inAlbum": {"image": "https://f4.bcbits.com/img/a1_16.jpg"}}'
+                ),
+                "https://f4.bcbits.com/img/a1_4.jpg",
+            ),
+            ('{"@id": "https://x.bandcamp.com/album/y"}', None),
+            ("<html>no metadata</html>", None),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_parses_page_metadata(self, body, expected):
+        result = await self.get_art(body)
+
+        assert result == (ArtResult.from_url(expected) if expected else None)
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_http_error(self):
+        assert await self.get_art("", status=404) is None
