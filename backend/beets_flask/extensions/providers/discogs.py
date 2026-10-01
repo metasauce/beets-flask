@@ -43,7 +43,6 @@ class DiscogsArtSource(ArtSource):
     async def get_art(
         self, url: str, session: aiohttp.ClientSession
     ) -> ArtResult | None:
-        log.info("DiscogsArtSource.get_art called for %s", url)
         release_id = _release_id(url)
         if release_id is None:
             return None

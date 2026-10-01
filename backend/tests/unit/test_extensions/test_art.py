@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -14,6 +15,7 @@ from mediafile import Image, MediaFile
 
 from beets_flask.extensions.art import ArtResult, ArtSource
 from beets_flask.extensions.providers import ART_SOURCES
+from beets_flask.extensions.providers.discogs import DiscogsArtSource
 from beets_flask.extensions.providers.file import FileArtSource
 from beets_flask.extensions.providers.musicbrainz import MusicbrainzArtSource
 from beets_flask.extensions.providers.spotify import SpotifyArtSource
@@ -87,6 +89,21 @@ class TestArtResult:
             "https://evil.com/?x=musicbrainz.org/release/1cf2ae06-bb5e-4256-af6c-e40d406abba5",
             None,
         ),
+        # Discogs
+        ("https://www.discogs.com/release/249504", DiscogsArtSource),
+        ("https://discogs.com/release/249504-Various-Space-Jam", DiscogsArtSource),
+        ("https://www.discogs.com/Artist-Name/release/249504", DiscogsArtSource),
+        ("https://www.discogs.com.evil.com/release/249504", None),
+        ("https://evil.com/?x=www.discogs.com/release/249504", None),
+        ("ftp://www.discogs.com/release/249504", None),
+        ("https://www.discogs.com/artist/249504", None),
+        ("https://www.discogs.com/release/not-a-number", None),
+        ("https://notdiscogs.com/release/249504", None),
+        ("https://www.discogs.com/artist/1?x=/release/249504", None),
+        ("https://www.discogs.com/artist/1#/release/249504", None),
+        ("HTTPS://WWW.DISCOGS.COM/release/249504", DiscogsArtSource),
+        ("https://www.discogs.com:443/release/249504", DiscogsArtSource),
+        ("https://[abc]/release/249504", None),
         # Other
         (
             "https://example.com/album/x",
@@ -270,3 +287,94 @@ class TestFileArtSourceGetArt:
             result = await FileArtSource().get_art(f"file://{tmp_path}", session)
 
         assert result is None
+
+
+class TestDiscogsArtSourceGetArt:
+    release_id = "249504"
+    url = f"https://www.discogs.com/release/{release_id}"
+
+    async def get_art(self, handler, url=None):
+        """Call ``get_art`` against a loopback server serving ``handler``."""
+        app = web.Application()
+        app.router.add_get(f"/releases/{self.release_id}", handler)
+        async with TestClient(TestServer(app)) as client:
+            source = DiscogsArtSource()
+            source.api_base = f"http://127.0.0.1:{client.server.port}"  # type: ignore[misc]
+            return await source.get_art(url or self.url, client.session)
+
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            (
+                {"images": [{"uri": "full", "uri150": "thumb"}]},
+                ArtResult.from_urls(["thumb", "full"]),
+            ),
+            ({"images": [{"uri": "full"}]}, ArtResult.from_urls(["full"])),
+            (
+                {
+                    "images": [
+                        {"uri": "first", "uri150": "first-150"},
+                        {"uri": "second", "uri150": "second-150"},
+                    ]
+                },
+                ArtResult.from_urls(["first-150", "first"]),
+            ),
+            ({"images": []}, None),
+            ({"images": [{"uri": None, "uri150": ""}]}, None),
+            ({"images": [{"uri": 42}]}, None),
+            ({"images": [{"uri1000": "x"}]}, None),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_image_payloads(self, payload, expected):
+        async def release(request: web.Request) -> web.Response:
+            return web.json_response(payload)
+
+        assert await self.get_art(release) == expected
+
+    def test_uses_discogs_api_base(self):
+        assert DiscogsArtSource.api_base == "https://api.discogs.com"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_http_error(self):
+        async def release(request: web.Request) -> web.Response:
+            return web.Response(status=404)
+
+        assert await self.get_art(release) is None
+
+    @pytest.mark.parametrize(
+        ("response", "error"),
+        [
+            ({"text": "oops"}, aiohttp.ClientError),
+            (
+                {"text": "not-json", "content_type": "application/json"},
+                json.JSONDecodeError,
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_errors_propagate_to_caller(self, response, error):
+        async def release(request: web.Request) -> web.Response:
+            return web.Response(**response)
+
+        with pytest.raises(error):
+            await self.get_art(release)
+
+    @pytest.mark.parametrize(
+        ("token", "expected"),
+        [("test-token", "Discogs token=test-token"), ("", "")],
+    )
+    @pytest.mark.asyncio
+    async def test_authorization_header(self, monkeypatch, token, expected):
+        monkeypatch.setattr(
+            "beets_flask.extensions.providers.discogs._user_token", lambda: token
+        )
+        received: dict[str, str] = {}
+
+        async def release(request: web.Request) -> web.Response:
+            received["authorization"] = request.headers.get("Authorization", "")
+            return web.json_response({"images": []})
+
+        await self.get_art(release)
+
+        assert received["authorization"] == expected
