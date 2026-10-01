@@ -1,49 +1,4 @@
-import io
-import sys
-
-from deprecated import deprecated
-
 from .logger import log
-
-# ------------------------------------------------------------------------------------ #
-#                                        Logging                                       #
-# ------------------------------------------------------------------------------------ #
-
-
-@deprecated
-def capture_stdout_stderr(func, *args, **kwargs):
-    """Capture the output of a function that uses beets' custom `print_`.
-
-    beets.ui uses a custom `print_` function to display most console output
-    in a nicely formatted way. This is the easiest way to capture that output.
-
-    Args:
-        func (callable): function to call
-        *args: positional arguments to pass to `func`
-        **kwargs: keyword arguments to pass to `func`
-
-    Returns:
-    -------
-        tuple: (str, str, any) -- stdout, stderr, return value of `func`
-
-    """
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-    buf_stdout = io.StringIO()
-    buf_stderr = io.StringIO()
-    sys.stdout = buf_stdout
-    sys.stderr = buf_stderr
-    try:
-        res = func(*args, **kwargs)
-    except Exception as ep:
-        log.error(ep, exc_info=True)
-        res = None
-    sys.stdout.flush()
-    sys.stderr.flush()
-    sys.stdout = original_stdout
-    sys.stderr = original_stderr
-    return buf_stdout.getvalue(), buf_stderr.getvalue(), res
-
 
 # ------------------------------------------------------------------------------------ #
 #                                         Misc                                         #

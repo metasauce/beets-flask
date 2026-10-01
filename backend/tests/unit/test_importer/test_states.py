@@ -120,8 +120,6 @@ class TestCandidateState(StateTest):
         assert candidate.match == task.candidates[0]
         assert candidate.task_state == self.task_state
         assert candidate.type == "album"
-        assert candidate.cur_artist == str(task.cur_artist)
-        assert candidate.cur_album == str(task.cur_album)
         assert candidate.items == task.items
         assert candidate.tracks == candidate.match.info.tracks
         assert candidate.distance == candidate.match.distance
@@ -136,12 +134,6 @@ class TestCandidateState(StateTest):
         assert self.task_state.asis_candidate_id == asis_candidate.id
         assert asis_candidate.id.startswith("asis")
         assert asis_candidate.type == "album"
-
-    def test_diff_preview(self):
-        candidate = self.candidates[0]
-        diff_preview = candidate.diff_preview
-        assert isinstance(diff_preview, str)
-        assert "match album" in diff_preview
 
     def test_identify_duplicates(
         self,

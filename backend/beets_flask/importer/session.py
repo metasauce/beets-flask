@@ -570,19 +570,19 @@ class AddCandidatesSession(PreviewSession):
 
         log.debug(f"Using {search=} for {task_state.id=}, {task_state.paths=}")
 
-        _, _, prop = autotag.tag_album(
-            task.items,
+        proposal = autotag.tag_album(
+            task.source,
             search_ids=search["search_ids"],
             search_name=search["search_name"],
             search_artist=search["search_artist"],
         )
 
-        task_state.add_candidates(prop.candidates)
+        task_state.add_candidates(proposal.candidates)
 
         # Update quality of best candidate, likely not needed for us, only beets cli.
-        task.rec = max(prop.recommendation, task.rec or autotag.Recommendation.none)
+        task.rec = max(proposal.recommendation, task.rec or autotag.Recommendation.none)
 
-        if len(prop.candidates) == 0:
+        if len(proposal.candidates) == 0:
             error_text = "Search found no candidates via "
             if search["search_ids"]:
                 error_text += f"ids: {', '.join(search['search_ids'])}; "
