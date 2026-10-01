@@ -34,6 +34,15 @@ The [musicbrainz plugin](https://docs.beets.io/en/latest/plugins/musicbrainz.htm
 
 Enabled by default.
 
+### Bandcamp
+
+The [beetcamp plugin](https://github.com/snejus/beetcamp) has:
+
+- Implements the {ref}`Art extension <art>`
+  - Art previews are resolved from the public Bandcamp release page
+
+Not enabled by default.
+
 ## Compatible
 
 Plugins confirmed to work. No dedicated UI integration, but function correctly.
