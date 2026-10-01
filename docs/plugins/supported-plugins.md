@@ -93,3 +93,11 @@ All extensions are built on beets-flask's
 
 The Art extension provides cover artwork for external release URLs. It allows
 beets-flask to show artwork previews for releases before they are imported.
+
+(auth)=
+
+### Auth
+
+Some beets plugins require you to authenticate with an external service to use them.
+The Auth extension lets them request that authentication through the beets-flask web UI,
+so you don't need to use the beets CLI directly.
