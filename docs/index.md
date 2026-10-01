@@ -33,6 +33,7 @@ getting-started.md
 configuration.md
 plugins/index.md
 limitations.md
+roadmap.md
 faq.md
 ```
 
