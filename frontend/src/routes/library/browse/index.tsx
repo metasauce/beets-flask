@@ -24,11 +24,10 @@ import {
     artistsQueryOptions,
     recentAlbumsQueryOptions,
 } from '@/api/library';
+import { AlbumGridCard } from '@/components/common/browser/albums';
 import { PageWrapper } from '@/components/common/page';
 import { relativeTime } from '@/components/common/units/time';
 import { CardHeader } from '@/components/frontpage/statsCard';
-import { CoverArt } from '@/components/library/coverArt';
-import { AlbumResponseMinimal } from '@/pythonTypes';
 
 export const Route = createFileRoute('/library/browse/')({
     component: RouteComponent,
@@ -154,7 +153,7 @@ function Albums() {
                         }}
                     >
                         {albums.slice(0, 6).map((album) => (
-                            <AlbumRecentCard key={album.id} {...album} />
+                            <AlbumGridCard key={album.id} album={album} />
                         ))}
                     </Box>
                 </Box>
@@ -188,90 +187,6 @@ function Albums() {
                 </Box>
             </CardContent>
         </Card>
-    );
-}
-
-function AlbumRecentCard(album: AlbumResponseMinimal) {
-    const theme = useTheme();
-    return (
-        <Link to="/library/album/$albumId" params={{ albumId: album.id }}>
-            <Box
-                sx={{
-                    padding: 0.5,
-                    border: '2px solid',
-                    borderColor: 'primary.muted',
-                    width: '100%',
-                    color: 'primary.muted',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    borderRadius: 1,
-                    alignItems: 'space-between',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                }}
-            >
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    <CoverArt
-                        size="small"
-                        type="album"
-                        beetsId={album.id}
-                        sx={{
-                            height: '70px',
-                            width: '70px',
-                            flexShrink: 0,
-                        }}
-                    />
-                    <Typography
-                        variant="h6"
-                        sx={{
-                            fontWeight: 600,
-                            overflowWrap: 'anywhere',
-                            width: '100%',
-                            lineHeight: 1.2,
-                        }}
-                    >
-                        {album.name || '[Unknown Album]'}
-                    </Typography>
-                </Box>
-                <Box
-                    sx={{
-                        width: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'space-between',
-                        justifyContent: 'space-between',
-                    }}
-                >
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 1,
-                            color: 'grey.600',
-                            letterSpacing: '1px',
-                            width: '100%',
-                        }}
-                    >
-                        <Box
-                            sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                            }}
-                        >
-                            <ClockIcon size={theme.iconSize.md} />
-                            <Typography variant="body2">
-                                Added{' '}
-                                {album.added
-                                    ? relativeTime(album.added)
-                                    : 'Unknown'}
-                            </Typography>
-                        </Box>
-                    </Box>
-                </Box>
-            </Box>
-        </Link>
     );
 }
 

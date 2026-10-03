@@ -151,6 +151,7 @@ class Search(TypedDict):
     search_ids: list[str]
     search_artist: str | None
     search_album: str | None
+    search_year: str | None
 
 
 def _is_search(d: Any) -> TypeGuard[Search]:
@@ -160,6 +161,7 @@ def _is_search(d: Any) -> TypeGuard[Search]:
         and isinstance(d, dict)
         and "search_ids" in d
         and isinstance(d["search_ids"], list)
+        and "search_year" in d
     )
 
 
@@ -555,6 +557,11 @@ class AddCandidatesSession(PreviewSession):
             search["search_artist"] = None
         if search["search_album"] is not None and search["search_album"].strip() == "":
             search["search_album"] = None
+        if (
+            search.get("search_year") is not None
+            and search["search_year"].strip() == ""
+        ):
+            search["search_year"] = None
         search["search_ids"] = list(
             filter(lambda x: x.strip() != "", search["search_ids"])
         )
@@ -592,6 +599,17 @@ class AddCandidatesSession(PreviewSession):
                     persist_in_db=False,
                 )
 
+        # beets tag_album does not support a year filter (as of beets 2.5),
+        # so we filter the fetched candidates here.
+        # prop is a NamedTuple: mutate the list in place instead of reassigning.
+        if search.get("search_year"):
+            year = search["search_year"].strip()
+            prop.candidates[:] = [
+                c
+                for c in prop.candidates
+                if c.info.year is not None and str(c.info.year) == year
+            ]
+
         task_state.add_candidates(prop.candidates)
 
         # Update quality of best candidate, likely not needed for us, only beets cli.
@@ -605,6 +623,8 @@ class AddCandidatesSession(PreviewSession):
                 error_text += f"artist: {search['search_artist']}; "
             if search["search_album"]:
                 error_text += f"album: {search['search_album']}; "
+            if search.get("search_year"):
+                error_text += f"year: {search['search_year']}; "
             error_text += NoCandidatesFoundException.metadata_plugin_info()
             raise NoCandidatesFoundException(
                 error_text,

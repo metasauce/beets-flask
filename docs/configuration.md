@@ -121,6 +121,56 @@ ignore:
 
 ```
 
+## MusicBrainz
+
+The `gui.musicbrainz` section contains options for the MusicBrainz tab in the web interface.
+The tab prepares the data of albums in your library for the [MusicBrainz release editor](https://musicbrainz.org/release/add),
+so you can create releases that are missing from the MusicBrainz database.
+The "Open release editor (prefilled)" button submits the prepared data to the editor URL as a form POST,
+which pre-fills the release fields and the track list. You need to be logged in at the editor URL in the browser.
+
+```yaml
+gui:
+    musicbrainz:
+        # Url of the MusicBrainz release editor that is opened from the UI.
+        # Point this to your own MusicBrainz instance or a test server if you use one.
+        editor_url: "https://musicbrainz.org/release/add"
+        # Base url of the MusicBrainz web service, used to check whether
+        # artists already exist before opening the release editor.
+        ws_url: "https://musicbrainz.org"
+        # Look up artists in MusicBrainz before opening the release editor.
+        # Disable if you have no internet access to ws_url.
+        check_artists: yes
+        # User-Agent sent to the MusicBrainz web service. MusicBrainz asks
+        # clients to identify themselves.
+        user_agent: "beets-flask (music assistant)"
+```
+
+### `gui.musicbrainz.editor_url`
+
+Url of the MusicBrainz release editor that receives the prefilled form POST.
+Defaults to the official `https://musicbrainz.org/release/add`, but can be changed
+to point at a self-hosted MusicBrainz instance or a test server.
+
+### `gui.musicbrainz.ws_url`
+
+Base url of the MusicBrainz web service. It is used to check whether the artists
+of a release already exist in MusicBrainz before the release editor is opened.
+Defaults to `https://musicbrainz.org`; change it when you run your own MusicBrainz
+instance or use a mirror.
+
+### `gui.musicbrainz.check_artists`
+
+Whether to look up artists in the MusicBrainz database when preparing a release
+(default `yes`). Artists with a stored MusicBrainz id are always marked as
+existing; the lookup only matters for artists without one. When disabled, those
+artists are shown as "unknown" and the release editor can still be opened.
+
+### `gui.musicbrainz.user_agent`
+
+User-Agent sent to the MusicBrainz web service. The MusicBrainz API asks clients
+to identify themselves, so make sure this is a value that describes your client.
+
 ## Library
 
 The `gui.library` section contains options for the library view in the web interface.

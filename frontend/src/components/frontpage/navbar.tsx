@@ -1,4 +1,11 @@
-import { Home, Inbox, Library, Search, Terminal } from 'lucide-react';
+import {
+    BrainCircuit,
+    Home,
+    Inbox,
+    Library,
+    Search,
+    Terminal,
+} from 'lucide-react';
 import { MouseEvent, ReactElement, useRef } from 'react';
 import { Box, BoxProps, darken, Typography, useTheme } from '@mui/material';
 import { styled } from '@mui/material/styles';
@@ -47,7 +54,7 @@ const StyledTabs = styled(Tabs)(({ theme }) => ({
         '& .MuiTabs-list': {
             width: 'auto',
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
+            gridTemplateColumns: 'repeat(6, 1fr)',
             gridTemplateRows: '1fr',
             alignItems: 'center',
             justifyItems: 'center',
@@ -155,6 +162,11 @@ function NavTabs() {
         //{ label: "Session", icon: <Inbox />, to: "/sessiondraft" as const },
         { label: 'Library', icon: <Library />, to: '/library/browse' as const },
         { label: 'Search', icon: <Search />, to: '/library/search' as const },
+        {
+            label: 'MusicBrainz',
+            icon: <BrainCircuit />,
+            to: '/musicbrainz' as const,
+        },
         {
             label: '',
             icon: <Terminal stroke={theme.palette.primary.main} />,

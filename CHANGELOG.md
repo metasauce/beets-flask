@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- New "MusicBrainz" tab that prepares albums from your library for the [MusicBrainz release editor](https://musicbrainz.org/release/add). It collects release fields, tracks (with lengths and ISRCs), flags missing data and provides a checklist, so you can create releases that are missing from the MusicBrainz database. The "Open release editor (prefilled)" button POSTs the prepared data to the editor, so the fields are populated automatically. The seeded editor data always includes a medium format (defaulting to `CD` when the album has no media), and artists are resolved automatically when a MusicBrainz artist id is stored, so the editor only asks you to pick an artist when the album is new to MusicBrainz.
+
 ## [1.2.1] - 25-12-28
 
 ### Fixed

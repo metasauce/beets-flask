@@ -10,6 +10,20 @@
 gui:
     num_preview_workers: 4 # how many previews to generate in parallel
 
+    musicbrainz:
+        # Url of the MusicBrainz release editor that the "MusicBrainz" tab opens.
+        # Point this to your own MusicBrainz instance or a test server if you use one.
+        editor_url: "https://musicbrainz.org/release/add"
+        # Base url of the MusicBrainz web service, used to check whether
+        # artists already exist before opening the release editor.
+        ws_url: "https://musicbrainz.org"
+        # Look up artists in MusicBrainz before opening the release editor.
+        # Disable if you have no internet access to ws_url.
+        check_artists: yes
+        # User-Agent sent to the MusicBrainz web service. MusicBrainz asks
+        # clients to identify themselves.
+        user_agent: "beets-flask (music assistant)"
+
     library:
         # Use to split artists in the library view if using multiple artists in a field.
         # Set to an empty list to disable this feature.

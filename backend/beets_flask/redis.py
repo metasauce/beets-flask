@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -7,7 +8,12 @@ from rq import Queue
 from rq.job import Job
 
 # Setup redis connection
-redis_conn = Redis()
+# Em producao REDIS_URL aponta para o redis compartilhado (com o db do
+# beets-flask no path, ex.: redis://:senha@redis:6379/1). Sem REDIS_URL
+# usamos o redis local que o entrypoint sobe (dev).
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+redis_conn = Redis.from_url(REDIS_URL)
 
 # Init our different queues
 preview_queue = Queue("preview", connection=redis_conn, default_timeout=600)
