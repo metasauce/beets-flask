@@ -460,3 +460,81 @@ def test_from_path_ignores_nested_items(tmpdir):
         assert any(
             os.path.basename(c.full_path) == "normal_file.txt" for c in folder.walk()
         )
+
+
+class TestDirSize:
+    """dir_size must never make a request wait for a full `du` walk."""
+
+    @pytest.fixture(autouse=True)
+    def _clean_cache(self):
+        from beets_flask import disk
+
+        disk.clear_cache()
+        yield
+        disk.clear_cache()
+
+    def test_small_dir_exact_on_first_call(self, tmp_path: Path):
+        from beets_flask.disk import dir_size
+
+        (tmp_path / "a.bin").write_bytes(b"x" * 5000)
+        assert dir_size(tmp_path) >= 5000
+
+    def test_slow_walk_does_not_block(self, tmp_path: Path, monkeypatch):
+        import threading
+        import time
+
+        from beets_flask import disk
+
+        release = threading.Event()
+
+        def slow_du(path: str) -> int:
+            release.wait(5)
+            return 42
+
+        monkeypatch.setattr(disk, "_du_bytes", slow_du)
+        monkeypatch.setattr(disk, "_DIR_SIZE_COLD_WAIT", 0.05)
+
+        t0 = time.monotonic()
+        assert disk.dir_size(tmp_path) == -1  # unknown yet, but answered fast
+        assert disk.dir_size(tmp_path) == -1  # no second walk is started
+        assert time.monotonic() - t0 < 1
+
+        release.set()
+        deadline = time.monotonic() + 5
+        while disk.dir_size(tmp_path) != 42 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert disk.dir_size(tmp_path) == 42
+
+    def test_failure_is_retried_soon(self, tmp_path: Path, monkeypatch):
+        import time
+
+        from beets_flask import disk
+
+        monkeypatch.setattr(disk, "_du_bytes", lambda path: -1)
+        assert disk.dir_size(tmp_path) == -1
+        stamp, size = disk._dir_size_cache[str(tmp_path.resolve())]
+        assert size == -1
+        remaining = disk._DIR_SIZE_TTL - (time.monotonic() - stamp)
+        assert remaining <= disk._DIR_SIZE_RETRY + 1
+
+    def test_du_total_used_despite_nonzero_exit(self, monkeypatch):
+        from beets_flask import disk
+
+        completed = mock.Mock(
+            stdout="123\t/x\n", stderr="du: cannot access", returncode=1
+        )
+        monkeypatch.setattr(disk.subprocess, "run", lambda *a, **k: completed)
+        assert disk._du_bytes("/x") == 123
+
+    def test_missing_dir(self, tmp_path: Path):
+        from beets_flask.disk import dir_size
+
+        assert dir_size(tmp_path / "does-not-exist") == -1
+
+    def test_clear_cache(self, tmp_path: Path):
+        from beets_flask import disk
+
+        disk.dir_size(tmp_path)
+        assert disk._dir_size_cache
+        disk.clear_cache()
+        assert not disk._dir_size_cache

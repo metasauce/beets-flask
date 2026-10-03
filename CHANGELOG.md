@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Finally tracked down our resource issues. Started with low hanging fruits to reduce mem footprint [#342](https://github.com/metasauce/beets-flask/pull/342)
 - Missing library stats dont cause a crash on first launch anymore [#264](https://github.com/metasauce/beets-flask/issues/264)
 - Fixed a potential memory leak when checking if files are archives. We now only check the file extension instead of trying to open the file, which should avoid the issue with `tarfile.is_tarfile` [#258](https://github.com/metasauce/beets-flask/issues/258)
+- Library stats no longer block for minutes on large or network-mounted libraries: the library size (`du`) is now refreshed in the background and served from cache, instead of walking every file on each request [#360](https://github.com/metasauce/beets-flask/issues/360)
 - Fixed tmux terminal could not start in some environments if `SHELL` was not set currently. We now always start a bash shell [#282](https://github.com/metasauce/beets-flask/issues/282)
 - Container user `beetle` now uses bash terminal by default and activates the uv environment automatically.
 - Yaml syntax and parser errors are passed to the frontend for user examination instead of crashing before UI startup [#305](https://github.com/metasauce/beets-flask/pull/305)
