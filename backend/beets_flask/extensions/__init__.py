@@ -14,3 +14,13 @@ artwork resolution). The module defines an abstract base class describing the
 extension interface, while concrete implementations live in
 `extensions/providers/` (one module per provider).
 """
+
+from .art import ArtResult, ArtSource
+from .auth import AuthExtension, PkceData
+
+__all__ = [
+    "ArtResult",
+    "ArtSource",
+    "AuthExtension",
+    "PkceData",
+]

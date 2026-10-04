@@ -67,3 +67,37 @@ async def test_wait_for_job_results():
     assert result is None
     assert job.result is None
     assert job.is_finished is True
+
+
+class TestStore:
+    """Tests for the generic TTL object store."""
+
+    def test_store_and_consume_roundtrip(self, fake_redis):
+        object_id = beets_flask.redis.store({"foo": "bar"})
+
+        assert object_id
+        assert beets_flask.redis.consume(object_id) == {"foo": "bar"}
+
+    def test_consume_is_single_use(self, fake_redis):
+        object_id = beets_flask.redis.store("value")
+
+        assert beets_flask.redis.consume(object_id) == "value"
+        assert beets_flask.redis.consume(object_id) is None
+
+    def test_consume_unknown_returns_none(self, fake_redis):
+        assert beets_flask.redis.consume("does-not-exist") is None
+
+    def test_default_ttl(self, fake_redis):
+        object_id = beets_flask.redis.store("value")
+        key = f"{beets_flask.redis._KEY_PREFIX}{object_id}"
+
+        # Matches the default of ``store(..., ttl=600)``.
+        ttl = fake_redis.ttl(key)
+        assert 0 < ttl <= 600
+
+    def test_custom_ttl(self, fake_redis):
+        object_id = beets_flask.redis.store("value", ttl=60)
+        key = f"{beets_flask.redis._KEY_PREFIX}{object_id}"
+
+        ttl = fake_redis.ttl(key)
+        assert 0 < ttl <= 60

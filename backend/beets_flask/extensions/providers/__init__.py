@@ -1,7 +1,7 @@
-"""Concrete art providers.
+"""Concrete providers.
 
-Each module implements one `ArtSource`. This package holds the
-hard-coded list of sources; a registry may replace this later.
+Each module implements one `ArtSource` and/or `AuthExtension`. This package
+holds the hard-coded list of sources; a registry may replace this later.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 from .file import FileArtSource
 from .musicbrainz import MusicbrainzArtSource
 from .spotify import SpotifyArtSource
+from .tidal import TidalAuth
 
 # TODO: We should add a proper registry here to simplify this
 # Not needed for now but once we add more parts to the extension system
@@ -20,6 +21,12 @@ ART_SOURCES = [
     MusicbrainzArtSource(),
 ]
 
+
+AUTH_EXTENSIONS = [
+    TidalAuth(),
+]
+
 __all__ = [
     "ART_SOURCES",
+    "AUTH_EXTENSIONS",
 ]
