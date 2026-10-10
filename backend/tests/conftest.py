@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from quart.typing import TestClientProtocol
     from sqlalchemy.orm import Session
 
-    from beets_flask.importer.types import BeetsLibrary
+    from beets_flask.importer.types import BeetsAlbum, BeetsItem, BeetsLibrary
 
 log = logging.getLogger(__name__)
 
@@ -192,6 +192,16 @@ def beets_lib_album(**kwargs):
         **{**default_kwargs, **kwargs},
     )
     return a
+
+
+def beets_id(resource: BeetsItem | BeetsAlbum) -> int:
+    """Return the database id of a beets item or album.
+
+    The id is only set once the resource has been added to the library, but
+    beets types it as ``int | None``.
+    """
+    assert resource.id is not None
+    return resource.id
 
 
 # ---------------------------------- Mocking --------------------------------- #

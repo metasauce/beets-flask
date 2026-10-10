@@ -128,6 +128,7 @@ It allows you to configure how the library is displayed and how we interact with
 ### `gui.library.artist_separators`
 
 A list of characters that are used to split artist names in the library view.
+This is applied on top of beets' built-in multi-value artist fields.
 This is mainly used to handle artist searches and filtering.
 If you don't want this feature, you can set it to an empty list `[]`.
 The default is `[";", ",", "&"]`.

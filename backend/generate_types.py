@@ -13,15 +13,19 @@ from beets_flask.invoker.enqueue import (
 )
 from beets_flask.server.routes.db_models.session import MinimalSession
 from beets_flask.server.routes.inbox import InboxStats
-from beets_flask.server.routes.library.resources import (
-    AlbumResponse,
-    AlbumResponseExpanded,
-    AlbumResponseMinimal,
-    AlbumResponseMinimalExpanded,
-    ItemResponse,
-    ItemResponseMinimal,
-)
 from beets_flask.server.routes.library.stats import LibraryStats
+from beets_flask.server.routes_next.beets._types import (
+    AlbumSortField,
+    ArtistSortField,
+    BulkResult,
+    ItemSortField,
+    MultiAlbumDocument,
+    MultiArtistDocument,
+    MultiItemDocument,
+    SingleAlbumDocument,
+    SingleArtistDocument,
+    SingleItemDocument,
+)
 from beets_flask.server.websocket.status import (
     FileSystemUpdate,
     FolderStatusUpdate,
@@ -68,15 +72,20 @@ builder.add(CandidateChoiceFallback)
 # Stats
 builder.add(LibraryStats)
 
-# Item responses
-builder.add(ItemResponse)
-builder.add(ItemResponseMinimal)
+# Beets api resources (json:api subset, see routes_next/beets).
+# py2ts resolves referenced types, so adding the documents also generates
+# their resources/attributes (e.g. SingleItemDocument -> ItemResource).
+builder.add(ItemSortField)
+builder.add(AlbumSortField)
+builder.add(ArtistSortField)
+builder.add(BulkResult)
+builder.add(SingleItemDocument)
+builder.add(MultiItemDocument)
+builder.add(SingleAlbumDocument)
+builder.add(MultiAlbumDocument)
+builder.add(SingleArtistDocument)
+builder.add(MultiArtistDocument)
 
-# Album responses
-builder.add(AlbumResponse)
-builder.add(AlbumResponseMinimal)
-builder.add(AlbumResponseExpanded)
-builder.add(AlbumResponseMinimalExpanded)
 
 # ------------------------------ Status updates ------------------------------ #
 

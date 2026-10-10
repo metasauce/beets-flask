@@ -37,12 +37,19 @@ def create_app(config: str | ServerConfig | None = None) -> Quart:
 
     setup_database(app)
 
+    # Initialize the openapi schema generator
+    from .schema import quart_schema
+
+    quart_schema.init_app(app)
+
     # Register different blueprints & websocket routes
     # In production, we use the frontend.py route to deliver vite's dist folder
     from .routes import register_routes
+    from .routes_next import register_routes as register_routes_next
     from .websocket import register_socketio
 
     register_routes(app)
+    register_routes_next(app)
     register_socketio(app)
 
     log.debug("Quart app created!")
@@ -59,6 +66,10 @@ def create_app(config: str | ServerConfig | None = None) -> Quart:
 
 
 class CustomProvider(DefaultJSONProvider):
+    # Quart's default JSON provider sorts object keys alphabetically, which
+    # would reorder the paths and HTTP methods in the generated openapi docs
+    sort_keys = False
+
     def dumps(self, obj: Any, **kwargs: Any) -> str:
         return json.dumps(obj, cls=Encoder, **kwargs)
 
