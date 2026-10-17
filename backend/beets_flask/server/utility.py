@@ -85,9 +85,7 @@ def pop_extra_meta(params: dict, n_jobs=1) -> list[ExtraJobMeta]:
     if not isinstance(job_refs, list):
         raise InvalidUsageError("job_frontend_refs must be a list")
     if len(job_refs) != n_jobs:
-        raise InvalidUsageError(
-            f"job_frontend_refs must be a list of length {n_jobs}"
-        )
+        raise InvalidUsageError(f"job_frontend_refs must be a list of length {n_jobs}")
 
     return [ExtraJobMeta(job_frontend_ref=job_ref) for job_ref in job_refs]
 

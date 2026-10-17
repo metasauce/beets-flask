@@ -44,9 +44,7 @@ async def item_audio(item_id: int):
     """
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundError(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     item_path = beets_util.syspath(item.path)
     if not os.path.exists(item_path):
@@ -69,9 +67,7 @@ async def item_audio_peaks(item_id: int):
     """
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundError(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     item_path = beets_util.syspath(item.path)
     if not os.path.exists(item_path):
