@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use an external redis server by setting the `REDIS_URL` environment variable. [#277](https://github.com/metasauce/beets-flask/pull/277)
 - Faster loading of the inbox: chip info (best match, duplicates, data source) is now fetched via a new lightweight `/session/minimal` endpoint, batched in a single request instead of loading full session states.
 - Cover art preview for external URLs is now resolved through a pluggable art-extension system. New providers can be added by implementing the `ArtSource` interface.
+- Added a Discogs art source: releases matched via the discogs plugin now get cover art previews. Works without a token; uses `discogs.user_token` when configured for a higher API rate limit.
 
 ### Fixed
 

@@ -9,7 +9,7 @@ compatible or incompatible list.
 ## Integrated
 
 These plugins have explicit integration in beets-flask — dedicated icons,
-art preview endpoints, or source links. Enabled in the default configuration.
+art preview endpoints, or source links.
 
 ### Spotify
 
@@ -34,9 +34,17 @@ The [musicbrainz plugin](https://docs.beets.io/en/latest/plugins/musicbrainz.htm
 
 Enabled by default.
 
+### Discogs
+
+The [discogs plugin](https://docs.beets.io/en/latest/plugins/discogs.html) has:
+
+- Implements the {ref}`Art extension <art>`
+
+Not enabled by default.
+
 ## Compatible
 
-Plugins confirmed to work. No dedicated UI integration, but function correctly.
+Plugins confirmed to work. No dedicated integration(s), but function correctly.
 
 | Plugin                                                                    | Description                               |
 | ------------------------------------------------------------------------- | ----------------------------------------- |
@@ -52,7 +60,6 @@ Plugins confirmed to work. No dedicated UI integration, but function correctly.
 | [fromfilename](https://docs.beets.io/en/latest/plugins/fromfilename.html) | Guess metadata from filename              |
 | [inline](https://docs.beets.io/en/latest/plugins/inline.html)             | Use Python snippets in templates          |
 | [edit](https://docs.beets.io/en/latest/plugins/edit.html)                 | Edit metadata via external editor         |
-| [discogs](https://docs.beets.io/en/latest/plugins/discogs.html)           | Match against Discogs                     |
 | [keyfinder](https://docs.beets.io/en/latest/plugins/keyfinder.html)       | Detect musical key (requires compilation) |
 
 ## Incompatible

@@ -6,6 +6,7 @@ hard-coded list of sources; a registry may replace this later.
 
 from __future__ import annotations
 
+from .discogs import DiscogsArtSource
 from .file import FileArtSource
 from .musicbrainz import MusicbrainzArtSource
 from .spotify import SpotifyArtSource
@@ -18,6 +19,7 @@ ART_SOURCES = [
     FileArtSource(),
     SpotifyArtSource(),
     MusicbrainzArtSource(),
+    DiscogsArtSource(),
 ]
 
 __all__ = [
