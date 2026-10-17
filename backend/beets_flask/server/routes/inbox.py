@@ -78,9 +78,7 @@ async def get_folder():
 
     # Only absolute paths are allowed
     if folder_path is not None and not Path(folder_path).is_absolute():
-        raise InvalidUsageError(
-            f"Only absolute paths are allowed. Got: {folder_path=}"
-        )
+        raise InvalidUsageError(f"Only absolute paths are allowed. Got: {folder_path=}")
 
     folder: Folder | Archive | None = None
 

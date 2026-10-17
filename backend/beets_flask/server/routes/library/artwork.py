@@ -72,9 +72,7 @@ def get_image_data_from_file(filepath: str, index: int = 0) -> BytesIO:
     mediafile = MediaFile(filepath)
     images = mediafile.images
     if not images or len(images) <= index:
-        raise NotFoundError(
-            f"File has no cover art at index {index}: '{filepath}'."
-        )
+        raise NotFoundError(f"File has no cover art at index {index}: '{filepath}'.")
 
     im: Image = cast(Image, images[index])
     return BytesIO(im.data)
@@ -106,9 +104,7 @@ async def item_art_idx(item_id: int):
 
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundError(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     item_path = beets_util.syspath(item.path)
     count = get_image_count_from_file(item_path)
@@ -123,9 +119,7 @@ async def item_art(item_id: int):
 
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundError(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     item_path = beets_util.syspath(item.path)
     img_data = get_image_data_from_file(item_path, idx)
@@ -143,9 +137,7 @@ async def album_art(album_id: int):
 
     album = g.lib.get_album(album_id)
     if not album:
-        raise NotFoundError(
-            f"Album with beets_id:'{album_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Album with beets_id:'{album_id}' not found in beets db.")
 
     # Has art set on album level
     if album.artpath and idx == 0:

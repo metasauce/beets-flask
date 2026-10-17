@@ -77,9 +77,7 @@ class ModelAPIBlueprint[T: Base]:
         with db_session_factory() as session:
             item = self.model.get_by(self.model.id == id, session=session)
             if not item:
-                raise InvalidUsageError(
-                    f"Item with id {id} not found", status_code=404
-                )
+                raise InvalidUsageError(f"Item with id {id} not found", status_code=404)
 
             return item.to_dict()
 

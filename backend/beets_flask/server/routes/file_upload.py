@@ -72,9 +72,7 @@ def _get_filename_and_dir() -> tuple[str, Path]:
     # Assert filename does not contain path separators
     filename = unquote_plus(filename)
     if "/" in filename or "\\" in filename:
-        raise InvalidUsageError(
-            "Invalid filename, must not contain path separators."
-        )
+        raise InvalidUsageError("Invalid filename, must not contain path separators.")
 
     filedir = unquote_plus(filedir)
     filedir = Path(filedir).expanduser().resolve()
