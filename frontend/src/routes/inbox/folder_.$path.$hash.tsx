@@ -11,6 +11,7 @@ import { FolderCard } from '@/components/inbox/cards/folderCard';
 import { ImportedCard } from '@/components/inbox/cards/importedCard';
 import { TagCard } from '@/components/inbox/cards/tagCard';
 import { GenericErrorCard } from '@/errors';
+import { toSerializedException } from '@/errorUtils';
 
 export const Route = createFileRoute('/inbox/folder_/$path/$hash')({
     component: RouteComponent,
@@ -64,12 +65,7 @@ export const Route = createFileRoute('/inbox/folder_/$path/$hash')({
                 <GenericErrorCard
                     title="Unexpected Error"
                     subtitle="Oh no! Seems like we dropped a beat!"
-                    exc={{
-                        type: error.name,
-                        message: error.message,
-                        description: error.message,
-                        trace: error.stack,
-                    }}
+                    exc={toSerializedException(error)}
                     showSocials={true}
                     color="secondary"
                 />
