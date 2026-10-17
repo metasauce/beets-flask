@@ -157,9 +157,7 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
         folder_paths = request.args.getlist("folder_path")
 
         if len(folder_hashes) == 0:
-            raise InvalidUsageError(
-                "Provide at least one folder hash", status_code=400
-            )
+            raise InvalidUsageError("Provide at least one folder hash", status_code=400)
 
         if len(folder_hashes) != len(folder_paths):
             raise InvalidUsageError(

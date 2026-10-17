@@ -34,9 +34,7 @@ async def item_metadata(item_id: int):
     # it is also used in artwork.py
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundError(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     # File path
     item_path = beets_util.syspath(item.path)

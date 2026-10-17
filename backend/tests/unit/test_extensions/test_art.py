@@ -15,8 +15,8 @@ from mediafile import Image, MediaFile
 
 from beets_flask.extensions.art import ArtResult, ArtSource
 from beets_flask.extensions.providers import ART_SOURCES
-from beets_flask.extensions.providers.discogs import DiscogsArtSource
 from beets_flask.extensions.providers.bandcamp import BandcampArtSource
+from beets_flask.extensions.providers.discogs import DiscogsArtSource
 from beets_flask.extensions.providers.file import FileArtSource
 from beets_flask.extensions.providers.musicbrainz import MusicbrainzArtSource
 from beets_flask.extensions.providers.spotify import SpotifyArtSource
@@ -385,7 +385,8 @@ class TestDiscogsArtSourceGetArt:
         await self.get_art(release)
 
         assert received["authorization"] == expected
-        
+
+
 class TestBandcampArtSourceGetArt:
     async def get_art(self, body, status=200):
         async def page(request: web.Request) -> web.Response:
