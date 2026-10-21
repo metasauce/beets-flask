@@ -4,6 +4,8 @@ import importlib.util
 import os
 import re
 import subprocess
+import threading
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from fnmatch import fnmatch
@@ -460,22 +462,70 @@ def _is_within_multi_dir(path: Path | str) -> bool:
     return False
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=60), info=True)
-def dir_size(path: Path) -> int:
-    """Size of a dir in bytes, including content."""
+# `du` walks every file below `path`. For a large library on a network mount that
+# takes minutes (e.g. ~38k files over NFS: ~115s), which is far longer than a short
+# TTL cache can hide, and the call happens inside request handlers. So never make a
+# request wait for a full walk: serve the last known size and refresh it in the
+# background (stale-while-revalidate). A cold call waits briefly, so small folders
+# (e.g. inbox entries) still get an exact size on first request.
+_DIR_SIZE_TTL = 3600.0  # seconds a successful walk is considered fresh
+_DIR_SIZE_RETRY = 60.0  # seconds before a failed walk is retried
+_DIR_SIZE_COLD_WAIT = 2.0  # max seconds a first request waits for the walk
+_dir_size_cache: dict[str, tuple[float, int]] = {}
+_dir_size_running: set[str] = set()
+_dir_size_lock = threading.Lock()
+
+
+def _du_bytes(path: str) -> int:
+    """Run `du -sb` on path. Returns -1 if no total could be obtained."""
+    result = None
     try:
-        result = subprocess.run(
-            ["du", "-sb", str(path.resolve())],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        size = int(result.stdout.split()[0])
-        return size
+        # No check=True: du exits 1 if a file vanishes during the walk (e.g. while
+        # an import moves files) but still prints a valid total.
+        result = subprocess.run(["du", "-sb", path], capture_output=True, text=True)
+        return int(result.stdout.split()[0])
     except Exception as e:
         # this happens e.g. if the directory does not exist.
-        log.error(e)
+        stderr = result.stderr.strip() if result is not None else ""
+        log.error(f"Could not determine size of {path}: {e} {stderr}")
         return -1
+
+
+def _refresh_dir_size(key: str) -> None:
+    try:
+        size = _du_bytes(key)
+        # Failures are only kept for _DIR_SIZE_RETRY seconds, not the full TTL.
+        age_offset = _DIR_SIZE_TTL - _DIR_SIZE_RETRY if size < 0 else 0.0
+        with _dir_size_lock:
+            _dir_size_cache[key] = (time.monotonic() - age_offset, size)
+    finally:
+        with _dir_size_lock:
+            _dir_size_running.discard(key)
+
+
+def dir_size(path: Path) -> int:
+    """Size of a dir in bytes, including content.
+
+    Returns the last known size immediately and refreshes it in a background
+    thread once it is older than an hour. Returns -1 if the size is not known
+    yet (first walk still running) or could not be determined.
+    """
+    key = str(path.resolve())
+    worker: threading.Thread | None = None
+    with _dir_size_lock:
+        hit = _dir_size_cache.get(key)
+        stale = hit is None or time.monotonic() - hit[0] > _DIR_SIZE_TTL
+        if stale and key not in _dir_size_running:
+            _dir_size_running.add(key)
+            worker = threading.Thread(
+                target=_refresh_dir_size, args=(key,), daemon=True
+            )
+            worker.start()
+    if hit is None and worker is not None:
+        worker.join(_DIR_SIZE_COLD_WAIT)
+        with _dir_size_lock:
+            hit = _dir_size_cache.get(key)
+    return hit[1] if hit is not None else -1
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=60), info=True)
@@ -500,7 +550,8 @@ def dir_files(path: Path) -> int:
 def clear_cache():
     """Clear the cache for all cached functions."""
     path_to_folder.cache.clear()  # type: ignore
-    dir_size.cache.clear()  # type: ignore
+    with _dir_size_lock:
+        _dir_size_cache.clear()
     dir_files.cache.clear()  # type: ignore
 
 
