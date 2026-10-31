@@ -46,7 +46,7 @@ export const Route = createFileRoute('/inbox/')({
         // Filter: all top level folders/archives in inboxes
         const prefetch_folders: Array<Folder | Archive> = [];
         for (const inbox of inboxes) {
-            for (const child of walkFolder(inbox, 1)) {
+            for (const child of walkFolder(inbox, Infinity)) {
                 if (child.type === 'directory' || child.type === 'archive') {
                     prefetch_folders.push(child);
                 }
