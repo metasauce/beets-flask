@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Folders without any import session no longer show a misleading "Unknown"/"Not started" badge.
 - Folders containing only non-music files (e.g. stray uploads like `foo.txt`) are no longer detected as albums and auto-tagged by the watchdog.
 - Session and inbox data is now cached in the frontend and only refetched when it actually changes, instead of on every view.
+- Paging through the library items no longer slows down with the size of the library. Each page used to read every item of the library from the database (6 s per page for 125k items), now only the items of the page are read.
 
 ### Other (dev)
 
