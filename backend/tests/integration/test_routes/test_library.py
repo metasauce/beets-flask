@@ -341,6 +341,21 @@ class TestItemEndpoint(IsolatedBeetsLibraryMixin):
             assert response.status_code == 200, "Response status code is not 200"
             assert data["id"] == item.id, "Data id does not match item id"
 
+    async def test_get_item_does_not_read_file(self, client: Client):
+        """The full item response must not open the audio file.
+
+        Computed fields like `has_cover_art` parse the whole file, which is slow
+        on network shares and fails if the file is missing.
+        """
+        item = beets_lib_item(path="/does/not/exist.mp3")
+        self.beets_lib.add(item)
+
+        response = await client.get(f"/api_v1/library/item/{item.id}")
+        data = await response.get_json()
+        assert response.status_code == 200, data
+        assert "has_cover_art" not in data
+        assert "filesize" not in data
+
 
 class TestItemsPagination(IsolatedBeetsLibraryMixin):
     """Test if pagination of items works as expected"""
@@ -353,10 +368,40 @@ class TestItemsPagination(IsolatedBeetsLibraryMixin):
             for i in range(n_items):
                 artist = "Even" if i % 2 == 0 else "Odd"
                 self.beets_lib.add(
-                    beets_lib_item(artist=f"{artist}", album=f"Album {i}")
+                    beets_lib_item(
+                        artist=f"{artist}",
+                        album=f"Album {i}",
+                        # a few items share the same added timestamp to test
+                        # the id tie-breaker of the cursor
+                        added=float(i // 3),
+                    )
                 )
 
         assert len(self.beets_lib.items()) == n_items
+
+    async def _iter_pages(self, client: Client, url: str) -> list[dict]:
+        items: list[dict] = []
+        next_url: str | None = url
+        while next_url:
+            response = await client.get(next_url)
+            data = await response.get_json()
+            assert response.status_code == 200, data
+            items.extend(data["items"])
+            next_url = data["next"]
+        return items
+
+    @pytest.mark.parametrize("query", ["", "Even"])
+    async def test_iter_cursor(self, client: Client, query: str):
+        """Paging through all items returns each matching item once, in order."""
+        expected = sorted(
+            self.beets_lib.items(query),
+            key=lambda i: (i.added, i.id),
+            reverse=True,
+        )
+        items = await self._iter_pages(
+            client, f"/api_v1/library/items/{query}?n_items=7"
+        )
+        assert [i["id"] for i in items] == [i.id for i in expected]
 
     async def test_get_items(self, client: Client):
         """Test the GET request to retrieve all items with pagination.
