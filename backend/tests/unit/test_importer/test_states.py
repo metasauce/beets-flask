@@ -144,6 +144,52 @@ class TestCandidateState(StateTest):
         assert len(duplicates) == 0
         assert candidate.has_duplicates_in_library is False
 
+    @pytest.mark.parametrize(
+        "keys",
+        [["albumartist", "album"], "albumartist album"],
+        ids=["list", "space-delimited str"],
+    )
+    def test_identify_duplicates_keys(self, keys):
+        """Only albums matching all duplicate keys are duplicates.
+
+        beets also accepts the keys as a space-delimited string.
+        """
+        from beets_flask.config import get_config
+        from tests.conftest import beets_lib_album
+
+        dup = beets_lib_album(albumartist="match artist", album="match album")
+        other = beets_lib_album(albumartist="other artist", album="other album")
+        self.beets_lib.add(dup)
+        self.beets_lib.add(other)
+        # Albums without items count as re-imports, not duplicates
+        for album in (dup, other):
+            self.beets_lib.add(beets_lib_item(album_id=album.id, path=f"{album.id}"))
+
+        item = beets_lib_item(title="title", path="path")
+        task = importer.ImportTask(paths=[b"a path"], toppath=b"top path", items=[item])
+        task.candidates = [
+            get_album_match(
+                [autotag.TrackInfo(title="match title")],
+                [item],
+                album="match album",
+                artist="match artist",
+            )
+        ]
+        candidate = TaskState(task).candidate_states[0]
+
+        config = get_config()
+        old_keys = config.data.import_.duplicate_keys.album
+        config.data.import_.duplicate_keys.album = keys
+        try:
+            duplicates = candidate.identify_duplicates(self.beets_lib)
+        finally:
+            config.data.import_.duplicate_keys.album = old_keys
+            dup.remove(with_items=True)
+            other.remove(with_items=True)
+
+        assert [d.id for d in duplicates] == [dup.id]
+        assert candidate.duplicate_ids == [str(dup.id)]
+
     def test_serialize(self):
         candidate = self.candidates[0]
         serialized = candidate.serialize()
