@@ -397,13 +397,19 @@ class SessionAPIBlueprint(ModelAPIBlueprint[SessionStateInDb]):
 
         log.debug(f"Checking status for {len(folder_hashes)} folders")
 
+        # Load the jobs once per request, not once per folder: each load reads
+        # every job of every registry from redis.
+        jobs_by_kind = _get_jobs_by_kind()
+
         for hash, path in zip(folder_hashes, folder_paths):
             log.debug(f"Checking folder status via session from db: {path} ({hash})")
             db_status, db_date, db_exc = _get_folder_status_from_db(hash)
             log.debug(f"Found {db_status=} {db_date=} {db_exc=}")
 
             log.debug(f"Checking folder status via job queues: {path} ({hash})")
-            job_status, job_date, job_exc = _get_folder_status_from_queues(hash)
+            job_status, job_date, job_exc = _get_folder_status_from_queues(
+                hash, jobs_by_kind
+            )
             log.debug(f"Found {job_status=} {job_date=} {job_exc=}")
 
             # just for None casting, timezones prevent comparing
@@ -476,9 +482,8 @@ def _get_folder_status_from_db(
             return status, s_state_indb.updated_at, exc
 
 
-def _get_folder_status_from_queues(
-    hash: str,
-) -> tuple[FolderStatus, datetime | None, SerializedException | None]:
+def _get_jobs_by_kind() -> dict[str, list[Job]]:
+    """Load all jobs from the redis queues, sorted by the queue/job status."""
     from beets_flask.redis import queues, redis_conn
 
     # could not simply import queues from beets_flask.redis ?
@@ -507,6 +512,16 @@ def _get_folder_status_from_queues(
         q_kinds["finished"].extend(
             _get_jobs(q.finished_job_registry, connection=redis_conn)
         )
+
+    return q_kinds
+
+
+def _get_folder_status_from_queues(
+    hash: str,
+    q_kinds: dict[str, list[Job]] | None = None,
+) -> tuple[FolderStatus, datetime | None, SerializedException | None]:
+    if q_kinds is None:
+        q_kinds = _get_jobs_by_kind()
 
     # We always want the latest info, no matter from which queue.
     job_date = None

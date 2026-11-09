@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Folders containing only non-music files (e.g. stray uploads like `foo.txt`) are no longer detected as albums and auto-tagged by the watchdog.
 - Session and inbox data is now cached in the frontend and only refetched when it actually changes, instead of on every view.
 - Albums are no longer all reported as duplicates if `import.duplicate_keys.album` is set as a space-separated string (e.g. `albumartist album`), which beets supports. Previews made with such a config keep the wrong duplicates until they are re-run.
+- The inbox status request reads the job queues once per request instead of once per folder.
 
 ### Other (dev)
 
