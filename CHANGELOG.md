@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session and inbox data is now cached in the frontend and only refetched when it actually changes, instead of on every view.
 - Paging through the library items no longer slows down with the size of the library. Each page used to read every item of the library from the database (6 s per page for 125k items), now only the items of the page are read.
 - Album and track details no longer open every audio file. beets 2.14 added the computed field `has_cover_art`, which parses the whole file including embedded images; it is no longer part of the item response (the frontend did not use it). This was slow on network shares and failed with an error if a file was missing.
+- beets-flask creates two indexes on the beets library at startup (on `items (added, id, mtime, length)` and `items (artist, added)`), so that paging through items, the artist list and the library stats stay fast for large libraries. Creating them takes a few seconds once; they are skipped if `gui.library.readonly` is set.
 
 ### Other (dev)
 
