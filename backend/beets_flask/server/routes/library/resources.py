@@ -627,6 +627,9 @@ class ItemSource(TypedDict):
 source_prefixes = ["mb", "spotify", "tidal", "discogs"]
 
 
+_DISK_IO_FIELDS = {"filesize", "has_cover_art"}
+
+
 def _repr_item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseMinimal:
     if not item:
         raise NotFoundError("Item not found")
@@ -645,8 +648,11 @@ def _repr_item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseM
             "isrc",
         ]
     else:
-        # Use all keys, except filesize which would trigger disk io.
-        keys = [k for k in item.keys(computed=True) if k != "filesize"] + ["name"]
+        # Use all keys, except computed fields that trigger disk io:
+        # filesize stats the file, has_cover_art (beets >= 2.14) parses the
+        # whole audio file including embedded images.
+        keys = [k for k in item.keys(computed=True) if k not in _DISK_IO_FIELDS]
+        keys.append("name")
 
         # Check data source prefixes:
         # plugins such as spotify, tidal, discogs add a prefix to the id,
