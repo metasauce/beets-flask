@@ -34,9 +34,9 @@ class Item(Base):
 class TaskItem(Base):
     __tablename__ = "tasks_items"
 
-    task_id: Mapped[str] = mapped_column(ForeignKey("task.id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey("task.id"), index=True)
     task: Mapped[TaskStateInDb] = relationship(back_populates="pending_items")
-    item_id: Mapped[str] = mapped_column(ForeignKey("items.id"))
+    item_id: Mapped[str] = mapped_column(ForeignKey("items.id"), index=True)
     item: Mapped[Item] = relationship()
 
     def __init__(self, item: Item, id: str | None = None):

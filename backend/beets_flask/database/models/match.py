@@ -15,8 +15,12 @@ from .pending import Item
 class Distance(Base):
     __tablename__ = "distances"
 
-    track_info_id: Mapped[str | None] = mapped_column(ForeignKey("track_info.id"))
-    parent_distance_id: Mapped[str | None] = mapped_column(ForeignKey("distances.id"))
+    track_info_id: Mapped[str | None] = mapped_column(
+        ForeignKey("track_info.id"), index=True
+    )
+    parent_distance_id: Mapped[str | None] = mapped_column(
+        ForeignKey("distances.id"), index=True
+    )
 
     # FK columns auto-created from relationships
     track_info: Mapped[TrackInfo | None] = relationship()
@@ -59,7 +63,7 @@ class Penalty(Base):
 
     key: Mapped[str] = mapped_column(index=True)
     value: Mapped[list[float]]
-    distance_id: Mapped[int] = mapped_column(ForeignKey("distances.id"))
+    distance_id: Mapped[int] = mapped_column(ForeignKey("distances.id"), index=True)
 
     # Derived
     distance: Mapped[Distance] = relationship(back_populates="penalties")
@@ -81,7 +85,9 @@ class Penalty(Base):
 class TrackInfo(Base):
     __tablename__ = "track_info"
 
-    album_id: Mapped[str | None] = mapped_column(ForeignKey("album_info.id"))
+    album_id: Mapped[str | None] = mapped_column(
+        ForeignKey("album_info.id"), index=True
+    )
     album: Mapped[AlbumInfo] = relationship(back_populates="tracks")
     data: Mapped[dict[str, Any]] = mapped_column(JSON(), default=dict)
 
@@ -130,7 +136,7 @@ class Match(Base):
     id: Mapped[str] = mapped_column(primary_key=True)
     type: Mapped[str] = mapped_column()
 
-    distance_id: Mapped[str] = mapped_column(ForeignKey("distances.id"))
+    distance_id: Mapped[str] = mapped_column(ForeignKey("distances.id"), index=True)
     distance: Mapped[Distance] = relationship()
 
     __mapper_args__: ClassVar[dict[str, str]] = {  # type: ignore[misc]
@@ -144,7 +150,7 @@ class AlbumMatch(Match):
 
     id: Mapped[str] = mapped_column(ForeignKey("matches.id"), primary_key=True)
 
-    info_id: Mapped[str] = mapped_column(ForeignKey("album_info.id"))
+    info_id: Mapped[str] = mapped_column(ForeignKey("album_info.id"), index=True)
     info: Mapped[AlbumInfo] = relationship()
 
     track_mappings: Mapped[list[AlbumMatchTrackMapping]] = relationship(
@@ -172,8 +178,8 @@ class TrackMatch(Match):
 
     id: Mapped[str] = mapped_column(ForeignKey("matches.id"), primary_key=True)
 
-    info_id: Mapped[str] = mapped_column(ForeignKey("track_info.id"))
-    item_id: Mapped[str] = mapped_column(ForeignKey("items.id"))
+    info_id: Mapped[str] = mapped_column(ForeignKey("track_info.id"), index=True)
+    item_id: Mapped[str] = mapped_column(ForeignKey("items.id"), index=True)
 
     info: Mapped[TrackInfo] = relationship()
     item: Mapped[Item] = relationship()
@@ -206,9 +212,13 @@ class AlbumMatchTrackMapping(Base):
 
     __tablename__ = "album_match_track_mappings"
 
-    album_match_id: Mapped[str] = mapped_column(ForeignKey("matches_album.id"))
-    track_info_id: Mapped[str | None] = mapped_column(ForeignKey("track_info.id"))
-    item_id: Mapped[str | None] = mapped_column(ForeignKey("items.id"))
+    album_match_id: Mapped[str] = mapped_column(
+        ForeignKey("matches_album.id"), index=True
+    )
+    track_info_id: Mapped[str | None] = mapped_column(
+        ForeignKey("track_info.id"), index=True
+    )
+    item_id: Mapped[str | None] = mapped_column(ForeignKey("items.id"), index=True)
 
     # ID of the beets library Item (not our model, just the raw ID)
     album_match: Mapped[AlbumMatch] = relationship(back_populates="track_mappings")

@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Folders without any import session no longer show a misleading "Unknown"/"Not started" badge.
 - Folders containing only non-music files (e.g. stray uploads like `foo.txt`) are no longer detected as albums and auto-tagged by the watchdog.
 - Session and inbox data is now cached in the frontend and only refetched when it actually changes, instead of on every view.
+- Albums are no longer all reported as duplicates if `import.duplicate_keys.album` is set as a space-separated string (e.g. `albumartist album`), which beets supports. Previews made with such a config keep the wrong duplicates until they are re-run.
+- The inbox status request reads the job queues once per request instead of once per folder.
+- Opening an inbox folder no longer takes minutes with many previews. The beets-flask database had no index on its foreign keys, so loading a session scanned whole tables for every candidate; a database migration adds them.
 
 ### Other (dev)
 
