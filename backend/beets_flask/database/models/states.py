@@ -376,7 +376,7 @@ class TaskStateInDb(Base):
     __tablename__ = "task"
 
     # Relationships
-    session_id: Mapped[str] = mapped_column(ForeignKey("session.id"))
+    session_id: Mapped[str] = mapped_column(ForeignKey("session.id"), index=True)
     session: Mapped[SessionStateInDb] = relationship(
         back_populates="tasks",
         foreign_keys=[session_id],
@@ -390,7 +390,7 @@ class TaskStateInDb(Base):
     # Set at the end of the import session
     # use_alter=True to break circular FK with candidate.task_id
     chosen_candidate_id: Mapped[str | None] = mapped_column(
-        ForeignKey("candidate.id", use_alter=True)
+        ForeignKey("candidate.id", use_alter=True), index=True
     )
     chosen_candidate: Mapped[CandidateStateInDb | None] = relationship(
         back_populates="task",
@@ -444,14 +444,14 @@ class CandidateStateInDb(Base):
 
     __tablename__ = "candidate"
 
-    task_id: Mapped[str] = mapped_column(ForeignKey("task.id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey("task.id"), index=True)
     task: Mapped[TaskStateInDb] = relationship(
         back_populates="candidates",
         foreign_keys=[task_id],
     )
 
     # Should deserialize to AlbumMatch|TrackMatch
-    match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"))
+    match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"), index=True)
     match: Mapped[Match] = relationship()
 
     # Duplicate ids (if any) (beets_id)
