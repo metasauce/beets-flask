@@ -341,6 +341,21 @@ class TestItemEndpoint(IsolatedBeetsLibraryMixin):
             assert response.status_code == 200, "Response status code is not 200"
             assert data["id"] == item.id, "Data id does not match item id"
 
+    async def test_get_item_does_not_read_file(self, client: Client):
+        """The full item response must not open the audio file.
+
+        Computed fields like `has_cover_art` parse the whole file, which is slow
+        on network shares and fails if the file is missing.
+        """
+        item = beets_lib_item(path="/does/not/exist.mp3")
+        self.beets_lib.add(item)
+
+        response = await client.get(f"/api_v1/library/item/{item.id}")
+        data = await response.get_json()
+        assert response.status_code == 200, data
+        assert "has_cover_art" not in data
+        assert "filesize" not in data
+
 
 class TestItemsPagination(IsolatedBeetsLibraryMixin):
     """Test if pagination of items works as expected"""
