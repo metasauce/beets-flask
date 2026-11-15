@@ -39,6 +39,10 @@ export const libraryStatsQueryOptions = () => {
                     : undefined,
             };
         },
+        // The server walks the library for its size in the background. Poll
+        // until it has a number.
+        refetchInterval: (query) =>
+            query.state.data?.size === null ? 4000 : false,
     });
 };
 
