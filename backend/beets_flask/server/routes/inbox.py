@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 from pathlib import Path
@@ -11,11 +12,10 @@ from sqlalchemy import func, select
 
 from beets_flask.database import db_session_factory
 from beets_flask.database.models.states import FolderInDb, SessionStateInDb
+from beets_flask.dir_size import dir_files, dir_size
 from beets_flask.disk import (
     Archive,
     Folder,
-    dir_files,
-    dir_size,
     fs_item_from_path,
     path_to_folder,
 )
@@ -224,8 +224,8 @@ class InboxStats(TypedDict):
     # Number of albums imported via GUI
     imported_via_gui: int
 
-    # Bytes of the inbox folder
-    size: int
+    # Bytes of the inbox folder, None while the size walk runs or if it failed
+    size: int | None
     nFiles: int
 
     last_created: datetime | None
@@ -242,11 +242,11 @@ async def stats_for_all():
 
     """
     folders = get_inbox_folders()
-    stats = [compute_stats(f) for f in folders]
+    stats = await asyncio.gather(*(compute_stats(f) for f in folders))
     return jsonify(stats)
 
 
-def compute_stats(folder: str):
+async def compute_stats(folder: str):
     """Compute the stats for the inbox folder.
 
     # Path parameters
@@ -289,11 +289,19 @@ def compute_stats(folder: str):
         )
         last_created = session.execute(stmt).scalars().first()
 
+    # A response waits at most two seconds for the du walk. The walk keeps
+    # running, so the next request can return the size.
+    try:
+        async with asyncio.timeout(2):
+            size = await dir_size(p)
+    except TimeoutError:
+        size = None
+
     ret_map: InboxStats = {
         "name": inbox.name,
         "path": inbox.path,
         "nFiles": dir_files(p),
-        "size": dir_size(p),
+        "size": size,
         "tagged_via_gui": n_tagged,
         "imported_via_gui": n_imported,
         "last_created": last_created,
