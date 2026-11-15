@@ -1,7 +1,15 @@
+"""Tests for the shared `du` walk cache.
+
+The stats endpoints depend on three things: one walk per path, a walk that
+outlives a request timeout, and a cache that can be invalidated. Each test below
+covers one of them.
+"""
+
 from __future__ import annotations
 
 import asyncio
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from unittest import mock
 
@@ -11,66 +19,58 @@ import beets_flask.dir_size as dir_size_module
 from beets_flask.dir_size import clear_size_cache, dir_files, dir_size
 
 
+@dataclass
+class DuStub:
+    """Stand-in for the `du` subprocess."""
+
+    calls: list[Path]
+    release: asyncio.Event
+    result: int = 42  # what `du -sb` prints; -1 is the failure sentinel
+
+    async def __call__(self, path: Path) -> int:
+        self.calls.append(path)
+        await self.release.wait()
+        return self.result
+
+
 @pytest.fixture(autouse=True)
 def reset_walks():
-    """Walks do not outlive the loop of a test."""
+    """Walks are module state bound to an event loop, so do not leak them."""
     dir_size_module._walks.clear()
     yield
     dir_size_module._walks.clear()
 
 
-async def test_dir_size_on_first_call(tmp_path: Path):
-    (tmp_path / "a.bin").write_bytes(b"x" * 5000)
-    assert await dir_size(tmp_path) >= 5000
+@pytest.fixture
+def du(monkeypatch) -> DuStub:
+    """Replace `du` with a stub that returns 42 unless `du.release` is cleared."""
+    stub = DuStub(calls=[], release=asyncio.Event())
+    stub.release.set()
+    monkeypatch.setattr(dir_size_module, "_du_bytes", stub)
+    return stub
 
 
-async def test_concurrent_callers_share_one_walk(tmp_path: Path, monkeypatch):
-    release = asyncio.Event()
-    walks = 0
+@pytest.mark.parametrize("existing", [True, False])
+async def test_dir_size_with_the_real_du(tmp_path: Path, existing: bool):
+    """The real binary must work as called: a total for an existing folder, None
+    when `du` prints nothing (missing folder, empty stdout)."""
+    path = tmp_path / "walk"
+    if existing:
+        path.mkdir()
+        (path / "a.bin").write_bytes(b"x" * 5000)
 
-    async def slow_du(path: Path) -> int:
-        nonlocal walks
-        walks += 1
-        await release.wait()
-        return 42
+    size = await dir_size(path)
 
-    monkeypatch.setattr(dir_size_module, "_du_bytes", slow_du)
-
-    first = asyncio.create_task(dir_size(tmp_path))
-    second = asyncio.create_task(dir_size(tmp_path))
-    await asyncio.sleep(0)
-    release.set()
-
-    assert await first == 42
-    assert await second == 42
-    assert walks == 1
+    if existing:
+        assert size is not None
+        assert size >= 5000
+    else:
+        assert size is None
 
 
-async def test_cancelled_caller_does_not_cancel_walk(tmp_path: Path, monkeypatch):
-    release = asyncio.Event()
-    walks = 0
-
-    async def slow_du(path: Path) -> int:
-        nonlocal walks
-        walks += 1
-        await release.wait()
-        return 42
-
-    monkeypatch.setattr(dir_size_module, "_du_bytes", slow_du)
-
-    with pytest.raises(TimeoutError):
-        async with asyncio.timeout(0.01):
-            await dir_size(tmp_path)
-    with pytest.raises(TimeoutError):
-        async with asyncio.timeout(0.01):
-            await dir_size(tmp_path)
-    assert walks == 1  # the second caller joined the running walk
-
-    release.set()
-    assert await dir_size(tmp_path) == 42
-
-
-async def test_du_total_used_on_nonzero_exit(monkeypatch):
+async def test_du_total_is_used_when_du_reports_errors(monkeypatch):
+    """`du` exits nonzero on unreadable files inside a folder but still prints a
+    usable total; that total is what gets shown."""
     proc = mock.AsyncMock()
     proc.communicate.return_value = (b"123\t/x\n", b"du: cannot access '/x/y'")
     monkeypatch.setattr(
@@ -78,89 +78,78 @@ async def test_du_total_used_on_nonzero_exit(monkeypatch):
         "create_subprocess_exec",
         mock.AsyncMock(return_value=proc),
     )
+
     assert await dir_size_module._du_bytes(Path("/x")) == 123
 
 
-async def test_unknown_for_missing_dir(tmp_path: Path):
-    assert await dir_size(tmp_path / "does-not-exist") is None
+async def test_slow_walk_is_shared_and_survives_a_caller_timeout(tmp_path: Path, du):
+    """A second request joins the running walk instead of starting another, and
+    the stats deadline (2 s in the endpoints) cancels the request, not the walk."""
+    du.release.clear()
+
+    with pytest.raises(TimeoutError):
+        async with asyncio.timeout(0.01):
+            await dir_size(tmp_path)
+
+    other = asyncio.create_task(dir_size(tmp_path))
+    du.release.set()
+
+    assert await other == 42
+    assert len(du.calls) == 1
 
 
-async def test_failed_walk_returns_none_and_is_cached(tmp_path: Path, monkeypatch):
-    walks = 0
+@pytest.mark.parametrize(("result", "expected"), [(42, 42), (-1, None)])
+async def test_walk_result_is_cached_until_cleared(
+    tmp_path: Path, du, result: int, expected: int | None
+):
+    """Later requests reuse the finished walk, and a failed walk (`du` returning
+    -1) is exposed as None but cached the same way. Only `clear_size_cache`
+    forces a new walk, because walking a network mount on every poll is worse
+    than a stale value."""
+    du.result = result
 
-    async def failing_du(path: Path) -> int:
-        nonlocal walks
-        walks += 1
-        return -1
-
-    monkeypatch.setattr(dir_size_module, "_du_bytes", failing_du)
-
-    assert await dir_size(tmp_path) is None
-    assert await dir_size(tmp_path) is None
-    assert walks == 1  # -1 stays cached for _WALK_TTL
+    assert await dir_size(tmp_path) == expected
+    assert await dir_size(tmp_path) == expected
+    assert len(du.calls) == 1
 
     clear_size_cache()
-    assert await dir_size(tmp_path) is None
-    assert walks == 2
+    assert await dir_size(tmp_path) == expected
+    assert len(du.calls) == 2
 
 
-async def test_finished_walk_is_reused_until_ttl(tmp_path: Path, monkeypatch):
-    walks = 0
-
-    async def du(path: Path) -> int:
-        nonlocal walks
-        walks += 1
-        return 7
-
-    monkeypatch.setattr(dir_size_module, "_du_bytes", du)
-
-    assert await dir_size(tmp_path) == 7
-    assert await dir_size(tmp_path) == 7
-    assert walks == 1
-
+async def test_finished_walk_expires(tmp_path: Path, du, monkeypatch):
+    """The TTL keeps a size from being reused forever on a server that never gets
+    a filesystem event for the folder."""
     monkeypatch.setattr(dir_size_module, "_WALK_TTL", 0.0)
+
+    assert await dir_size(tmp_path) == 42
     time.sleep(0.001)
-    assert await dir_size(tmp_path) == 7
-    assert walks == 2
+    assert await dir_size(tmp_path) == 42
+    assert len(du.calls) == 2
 
 
-async def test_clear_size_cache_invalidates_running_walk(tmp_path: Path, monkeypatch):
-    release = asyncio.Event()
-    walks = 0
-
-    async def slow_du(path: Path) -> int:
-        nonlocal walks
-        walks += 1
-        await release.wait()
-        return 42
-
-    monkeypatch.setattr(dir_size_module, "_du_bytes", slow_du)
+async def test_clear_size_cache_does_not_reuse_a_running_walk(tmp_path: Path, du):
+    """Deleting or uploading a folder clears the cache while a walk may still be
+    running. That walk still answers its caller, but nobody gets its stale
+    result afterwards."""
+    du.release.clear()
 
     first = asyncio.create_task(dir_size(tmp_path))
     await asyncio.sleep(0)
-    clear_size_cache()  # the folder changed while the walk was running
-    release.set()
-
-    assert await first == 42  # the old awaiter still gets its result
-    assert await dir_size(tmp_path) == 42
-    assert walks == 2  # new requests do not reuse the invalidated walk
-
-
-async def test_clear_size_cache_drops_known_sizes(tmp_path: Path):
-    await dir_size(tmp_path)
-    assert dir_size_module._walks
     clear_size_cache()
-    assert not dir_size_module._walks
+    du.release.set()
+
+    assert await first == 42
+    assert await dir_size(tmp_path) == 42
+    assert len(du.calls) == 2
 
 
-def test_dir_files_counts_the_directory_itself(tmp_path: Path):
-    (tmp_path / "a.bin").write_bytes(b"x")
-    (tmp_path / "sub").mkdir()
-    assert dir_files(tmp_path) == 3
-
-
-def test_dir_files_handles_paths_with_spaces(tmp_path: Path):
-    folder = tmp_path / "with space"
+@pytest.mark.parametrize("name", ["plain", "with space"])
+def test_dir_files_counts_entries(tmp_path: Path, name: str):
+    """`dir_files` runs `find` without a shell, so paths with spaces work. The
+    count includes the folder itself, same as the old `find | wc -l`."""
+    folder = tmp_path / name
     folder.mkdir()
     (folder / "a.bin").write_bytes(b"x")
+
     assert dir_files(folder) == 2
