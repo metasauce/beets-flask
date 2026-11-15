@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
-import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from fnmatch import fnmatch
@@ -20,8 +19,8 @@ from cachetools import Cache, TTLCache, cached
 from natsort import os_sorted
 
 from beets_flask.config import get_config
+from beets_flask.dir_size import clear_size_cache
 from beets_flask.dirhash_custom import archive_hash, dirhash_c
-from beets_flask.logger import log
 from beets_flask.utility import AUDIO_EXTENSIONS
 
 if TYPE_CHECKING:
@@ -460,48 +459,10 @@ def _is_within_multi_dir(path: Path | str) -> bool:
     return False
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=60), info=True)
-def dir_size(path: Path) -> int:
-    """Size of a dir in bytes, including content."""
-    try:
-        result = subprocess.run(
-            ["du", "-sb", str(path.resolve())],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        size = int(result.stdout.split()[0])
-        return size
-    except Exception as e:
-        # this happens e.g. if the directory does not exist.
-        log.error(e)
-        return -1
-
-
-@cached(cache=TTLCache(maxsize=1024, ttl=60), info=True)
-def dir_files(path: Path) -> int:
-    """Count the number of files in a directory."""
-    try:
-        result = subprocess.run(
-            [f"find {path.resolve()!s} | wc -l"],
-            capture_output=True,
-            text=True,
-            check=True,
-            shell=True,
-        )
-        count = int(result.stdout)
-        return count
-    except Exception as e:
-        # this happens e.g. if the directory does not exist.
-        log.error(e)
-        return -1
-
-
 def clear_cache():
     """Clear the cache for all cached functions."""
     path_to_folder.cache.clear()  # type: ignore
-    dir_size.cache.clear()  # type: ignore
-    dir_files.cache.clear()  # type: ignore
+    clear_size_cache()
 
 
-__all__ = ["dir_size", "fs_item_from_path"]
+__all__ = ["fs_item_from_path"]

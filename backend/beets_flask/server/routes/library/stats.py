@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+import asyncio
 from pathlib import Path
 from typing import TypedDict
 
 from quart import Blueprint, jsonify
 
 from beets_flask.config import get_config
-from beets_flask.disk import dir_size
+from beets_flask.dir_size import dir_size
 from beets_flask.importer.types import BEETS_DB_MULTI_VALUE_DELIMITER
 
 from . import g
@@ -22,7 +25,7 @@ class LibraryStats(TypedDict):
     genres: int  # Num Genres
     labels: int  # Num Labels
 
-    size: int  # bytes of the library folder
+    size: int | None  # bytes of the library folder, None while unknown
     lastItemAdded: int | None  # UTC timestamp
     lastItemModified: int | None  # UTC timestamp
     runtime: int  # seconds
@@ -57,6 +60,14 @@ async def stats():
             }
         )
 
+    # A response waits at most two seconds for the du walk. The walk keeps
+    # running, so the next request can return the size.
+    try:
+        async with asyncio.timeout(2):
+            size = await dir_size(Path(config_dir))
+    except TimeoutError:
+        size = None
+
     ret: LibraryStats = {
         "libraryPath": str(config_dir),
         "items": items_stats[0][0],
@@ -64,7 +75,7 @@ async def stats():
         "artists": album_stats[0][2],
         "genres": len(genres),
         "labels": album_stats[0][1],
-        "size": dir_size(Path(config_dir)),
+        "size": size,
         "lastItemAdded": (
             round(items_stats[0][1] * 1000) if items_stats[0][1] is not None else None
         ),
