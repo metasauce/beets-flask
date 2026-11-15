@@ -27,6 +27,7 @@ python -c "from beets_flask.database.migration import run_migrations; run_migrat
 
 # Database creation & migration (beets)
 python -c "from beets.ui import _open_library; from beets_flask.config.beets_config import get_config; _open_library(get_config().beets_config)"
+python -c "from beets_flask.library_indexes import ensure_library_indexes; ensure_library_indexes()"
 
 # Redis server (if not set outside container)
 if [ -z "$REDIS_URL" ]; then
