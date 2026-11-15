@@ -15,7 +15,6 @@ We extend the [default beets configuration](https://beets.readthedocs.io/en/stab
 You may use the following example configuration as a starting point.
 It contains all options that can be set in the `/config/beets-flask/config.yaml`.
 
-
 ```{literalinclude} ../backend/beets_flask/config/config_bf_example.yaml
 :language: yaml
 ```
@@ -30,14 +29,13 @@ You may add multiple inboxes, each may have a different purpose.
 The `gui.inbox.folders` section allows you to define multiple inboxes, each with a name, path, and an `autotag` setting.
 The `autotag` setting determines how the files in the inbox are processed by beets-flask.
 
-- <i data-lucide="inbox"></i> `"no"` you have to do everything manually.
-- <i data-lucide="tag"></i> `"preview"` fetch meta data from online sources, but don't import yet.
-- <i data-lucide="rocket"></i> `"auto"` fetch meta data, and import if the match is good enough (based on threshold).
-- <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sneaker-icon lucide-sneaker"><path d="M14.1 7.9 12.5 10"/><path d="M17.4 10.1 16 12"/><path d="M2 16a2 2 0 0 0 2 2h13c2.8 0 5-2.2 5-5a2 2 0 0 0-2-2c-.8 0-1.6-.2-2.2-.7l-6.2-4.2c-.4-.3-.9-.2-1.3.1 0 0-.6.8-1.2 1.1a3.5 3.5 0 0 1-4.2.1C4.4 7 3.7 6.3 3.7 6.3A.92.92 0 0 0 2 7Z"/><path d="M2 11c0 1.7 1.3 3 3 3h7"/></svg> `"bootleg"` you are sure the meta data is fine, or it does not exist online.
+-   <i data-lucide="inbox"></i> `"off"` you have to do everything manually.
+-   <i data-lucide="tag"></i> `"preview"` fetch meta data from online sources, but don't import yet.
+-   <i data-lucide="rocket"></i> `"auto"` fetch meta data, and import if the match is good enough (based on threshold).
+-   <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sneaker-icon lucide-sneaker"><path d="M14.1 7.9 12.5 10"/><path d="M17.4 10.1 16 12"/><path d="M2 16a2 2 0 0 0 2 2h13c2.8 0 5-2.2 5-5a2 2 0 0 0-2-2c-.8 0-1.6-.2-2.2-.7l-6.2-4.2c-.4-.3-.9-.2-1.3.1 0 0-.6.8-1.2 1.1a3.5 3.5 0 0 1-4.2.1C4.4 7 3.7 6.3 3.7 6.3A.92.92 0 0 0 2 7Z"/><path d="M2 11c0 1.7 1.3 3 3 3h7"/></svg> `"bootleg"` you are sure the meta data is fine, or it does not exist online.
     Drop files to import as-is in here, _but still create one subfolder for each
     import session you want to create_. (Beets acts on _folders_.
     Files directly inside the inbox wont trigger an imported)
-
 
 Note that the top label (i.e. Inbox1, Inbox2...) does not matter.
 
@@ -48,7 +46,7 @@ gui:
             Inbox1:
                 name: "Dummy inbox"
                 path: "/music/dummy"
-                autotag: no
+                autotag: "off"
                 # do not automatically trigger tagging and do not automatically import
 
             Inbox2:
@@ -80,6 +78,7 @@ gui:
 ---
 
 ### `gui.inbox.debounce_before_autotag`
+
 Specify the number of seconds to wait after the last filesystem event before starting the autotagging process.
 Applies to _all_ inboxes.
 For example, when adding files one by one, the timer gets reset after each file.
@@ -90,6 +89,7 @@ The default value is `30` seconds.
 ---
 
 ### `gui.inbox.ignore`
+
 Specifies a list of file patterns to ignore when scanning the inbox folders.
 This is useful to exclude temporary files or other unwanted files from being shown in the inbox.
 
@@ -100,25 +100,24 @@ To show all files in the inbox (independent of which files beets will copy) set 
 ```yaml
 # beets-flask/config.yaml
 gui:
-  inbox:
-    ignore:
-        # Usually you want to keep these in place.
-        # When customizing, we _do not_ copy beets defaults over.
-        - ".*"
-        - "*~"
-        - "System Volume Information"
-        - "lost+found"
-        # also exclude some common resource files on Synology NAS
-        - "@eaDir"
-        - "@SynoEAStream"
+    inbox:
+        ignore:
+            # Usually you want to keep these in place.
+            # When customizing, we _do not_ copy beets defaults over.
+            - ".*"
+            - "*~"
+            - "System Volume Information"
+            - "lost+found"
+            # also exclude some common resource files on Synology NAS
+            - "@eaDir"
+            - "@SynoEAStream"
 
 # default in beets config
 ignore:
-  - ".*"
-  - "*~"
-  - "System Volume Information"
-  - "lost+found"
-
+    - ".*"
+    - "*~"
+    - "System Volume Information"
+    - "lost+found"
 ```
 
 ## Library
@@ -135,16 +134,22 @@ The default is `[";", ",", "&"]`.
 
 ## Terminal
 
+### `gui.terminal.enabled`
+
+A boolean to enable or disable the terminal in the web interface.
+By default, the terminal is enabled.
+
 ### `gui.terminal.start_path`
+
 Specifies the path that is used when starting the terminal in the web interface.
 This is useful if you want to start the terminal in a specific directory, such as your music library.
 The default value is `/music/inbox`.
 You should change this if you have a different inbox path!
 
-
 ## Other options
 
 ### `gui.num_preview_workers`
+
 Specifies the number of worker threads that are used to generate previews for the inboxes.
 This is useful to speed up the preview generation process, especially when you have a large number of items in your inboxes.
 The default value is `4`.
@@ -155,6 +160,11 @@ However, the import itself is always done sequentially.
 This is to ensure that the import process is not interrupted by other operations.
 ```
 
+### `gui.inbox.temp_dir`
+Specifies the temporary directory that is used to store files during the upload process.
+This is useful to ensure that files are uploaded to a filesystem that is fast and has enough
+space. The default value is `/tmp/beets-flask/upload`.
+
 ## Docker Environment Variables
 
 These environment variables are set in the `docker-compose.yaml` file and control the container's behavior.
@@ -163,11 +173,15 @@ These environment variables are set in the `docker-compose.yaml` file and contro
 
 The `USER_ID` and `GROUP_ID` environment variables are used to set the UID and GID of the `beetle` user inside the container. This is useful to match the user and group IDs of the host system. The default value is `1000` for both.
 
+Need to be set together!
+
 ```yaml
 environment:
     USER_ID: 1000
     GROUP_ID: 1000
 ```
+
+For convenience and your yaml anchors, you can also use `PUID` and `PGID` as in [linuxserver.io images](https://docs.linuxserver.io/general/understanding-puid-and-pgid/).
 
 ### `EXTRA_GROUPS`
 
@@ -181,10 +195,11 @@ environment:
 ```
 
 This is particularly useful in scenarios where:
-- Files in the inbox are created by external services running as different users/groups
-- You're using ACL-based permissions with specific group access
-- You're running in environments like LXC/Proxmox with mapped group IDs
-- You need the container to manage files from network shares with specific group ownership
+
+-   Files in the inbox are created by external services running as different users/groups
+-   You're using ACL-based permissions with specific group access
+-   You're running in environments like LXC/Proxmox with mapped group IDs
+-   You need the container to manage files from network shares with specific group ownership
 
 Example: If your download client (e.g., slskd, transmission) creates files with group ownership `nas_shares` (gid 1001), you can add that group to the beetle user:
 
@@ -194,3 +209,64 @@ environment:
 ```
 
 This will allow the beets-flask container to delete and manage those files via the web UI.
+
+### `BEETSFLASKLOG`
+
+Location and Filename for our log file
+
+Default: `/logs/beets-flask.log`
+
+### `LOG_LEVEL_BEETSFLASK`
+
+Log level for our own logs. Uses Python log level notation (DEBUG, INFO, WARNING etc)
+
+Default: `INFO`
+
+### `LOG_LEVEL_OTHERS`
+
+Log level for our all other modules. Uses Python log level notation (DEBUG, INFO, WARNING etc)
+
+Default: `WARNING`
+
+### `BEETSDIR`
+
+Default: `/config/beets`
+
+Should not be changed.
+
+### `BEETSFLASKDIR`
+
+Default: `/config/beets-flask`
+
+Should not be changed.
+
+### `REDIS_URL`
+
+Usually, a daemonised Redis server is started within the container. This can cause issues due to the expectation that only one process runs per container, or if you wish to run the beets-flask container with a read-only root filesystem, or want greater control over the persistence of the Redis database. The `REDIS_URL` environment variable makes beets-flask connect to an external Redis instead, ideally one running in another container.
+
+Example: Add a Redis container to your `docker-compose.yaml`, and make beets-flask connect to it:
+
+```yaml
+services:
+    redis:
+        image: docker.io/library/redis:alpine
+        volumes:
+            - redis:/data
+    beets-flask:
+        ...
+        environment:
+            ...
+            REDIS_URL: "redis://redis:6379/"
+volumes:
+    redis:
+```
+
+## Validation
+
+Beets Flask validates it's own configuration[^1] and a few select fields of the native beets configs. The frontend and docker log messages will inform you of any typos or incompatible values.
+
+[^1]: Powered by [eyconf](https://github.com/semohr/eyconf)
+
+```{figure} _static/config_error.webp
+Note however, for these changes to take full effect in beets-flask's background workers, you still need to manually restart the container (despite that cheeky _retry_ button)!
+```

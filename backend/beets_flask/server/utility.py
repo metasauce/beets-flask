@@ -1,12 +1,16 @@
-from collections.abc import Callable
+from __future__ import annotations
+
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from typing_extensions import TypeVar
 
 from beets_flask.invoker.job import ExtraJobMeta
 
-from .exceptions import InvalidUsageException
+from .exceptions import InvalidUsageError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 R = TypeVar("R")
 D = TypeVar(
@@ -33,9 +37,11 @@ def pop_query_param(
     default : any, optional
         The default value if the parameter is not found, defaults to None.
     convert_func : callable, optional
-        A function to convert the parameter value, defaults to None. Common example, just use the type: `str`, `int` etc.
+        A function to convert the parameter value, defaults to None. Common
+        example, just use the type: `str`, `int` etc.
     error_message : str, optional
         The error message to raise if the conversion fails, defaults to None.
+
     """
     if params is None:
         return default
@@ -50,7 +56,7 @@ def pop_query_param(
     except (ValueError, TypeError):
         if error_message is None:
             error_message = f"Invalid parameter'{key}'"
-        raise InvalidUsageException(error_message)
+        raise InvalidUsageError(error_message)
 
     return value
 
@@ -58,13 +64,16 @@ def pop_query_param(
 def pop_extra_meta(params: dict, n_jobs=1) -> list[ExtraJobMeta]:
     """Extract fields that qualify as extra metadata from your request.
 
-    Used for adding metadata to jobs that are not strictly required for the job to run. But
-    are useful for tracking the job in the frontend.
+    Used for adding metadata to jobs that are not strictly required for the
+    job to run. But are useful for tracking the job in the frontend.
 
     Parameters
     ----------
     params : dict
         The request args.
+    n_jobs : int
+        The number of jobs to return metadata for.
+
     """
 
     job_refs: list[str] | None = pop_query_param(
@@ -74,11 +83,9 @@ def pop_extra_meta(params: dict, n_jobs=1) -> list[ExtraJobMeta]:
     if job_refs is None:
         return [{} for _ in range(n_jobs)]
     if not isinstance(job_refs, list):
-        raise InvalidUsageException("job_frontend_refs must be a list")
+        raise InvalidUsageError("job_frontend_refs must be a list")
     if len(job_refs) != n_jobs:
-        raise InvalidUsageException(
-            f"job_frontend_refs must be a list of length {n_jobs}"
-        )
+        raise InvalidUsageError(f"job_frontend_refs must be a list of length {n_jobs}")
 
     return [ExtraJobMeta(job_frontend_ref=job_ref) for job_ref in job_refs]
 
@@ -114,12 +121,12 @@ def pop_folder_params(
     )
 
     if not allow_mismatch and len(folder_hashes) != len(folder_paths):
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "folder_hashes and folder_paths must be of the same length"
         )
 
     if not allow_empty and ((len(folder_hashes) + len(folder_paths)) == 0):
-        raise InvalidUsageException("folder_hashes and folder_paths cannot be empty")
+        raise InvalidUsageError("folder_hashes and folder_paths cannot be empty")
 
     return folder_hashes, folder_paths
 

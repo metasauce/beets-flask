@@ -3,11 +3,7 @@
     "compilerOptions": {
         "target": "ES2020",
         "useDefineForClassFields": true,
-        "lib": [
-            "es2024",
-            "dom",
-            "dom.Iterable"
-        ],
+        "lib": ["es2024", "dom", "dom.Iterable"],
         "module": "ES2022",
         "skipLibCheck": true,
         /* Bundler mode */
@@ -20,15 +16,10 @@
         "strictNullChecks": true, // Recommended for better type inference
         /* Linting */
         "strict": true,
-        "baseUrl": ".",
         "paths": {
-            "@/*": [
-                "src/*"
-            ]
+            "@/*": ["./src/*"],
         },
         //"diagnostics": true
     },
-    "include": [
-        "src"
-    ]
+    "include": ["src"],
 }

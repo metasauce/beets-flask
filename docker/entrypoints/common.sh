@@ -1,15 +1,15 @@
+#!/bin/bash
 # A number of common functions used by entrypoints
-
 log() {
-    echo -e "[Entrypoint] $1"
+    printf "[Entrypoint] $1\n"
 }
 
 log_error() {
-    echo -e "\033[0;31m[Entrypoint] $1\033[0m"
+    printf "\033[0;31m[Entrypoint] $1\033[0m\n" >&2
 }
 
 log_warning() {
-    echo -e "\033[0;33m[Entrypoint] $1\033[0m"
+    printf "\033[0;33m[Entrypoint] $1\033[0m\n"
 }
 
 log_current_user() {

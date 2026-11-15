@@ -1,165 +1,203 @@
-FROM python:3.11-alpine3.20 AS base
+# ------------------------------ Builder ffmpeg ------------------------------ #
 
-FROM base AS deps
+# FFMPEG comes with a ton of dependencies (e.g. llvm)
+# the full install is over 400mb...
+# we use a static version which is only 50mb
+FROM python:3.12-slim-trixie AS builder_ffmpeg
 
+# Install required tools
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+        xz-utils \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup -g 1000 beetle && \
-    adduser -D -u 1000 -G beetle beetle
-
-ENV HOSTNAME="beets-container"
-ENV EDITOR="vi"
-# need to set some cli editor so `beet edit` works, vi comes with alpine
-
-# map beets directory and our configs to /config
-RUN mkdir -p /config/beets
-RUN mkdir -p /config/beets-flask
-RUN mkdir -p /logs
-RUN chown -R beetle:beetle /config
-RUN chown -R beetle:beetle /logs
-ENV BEETSDIR="/config/beets"
-ENV BEETSFLASKDIR="/config/beets-flask"
-ENV BEETSFLASKLOG="/logs/beets-flask.log"
-
-# our default folders they should not be used in production
-RUN mkdir -p /music/inbox
-RUN mkdir -p /music/imported
-RUN chown -R beetle:beetle /music
-
-# dependencies
-# RUN --mount=type=cache,target=/var/cache/apk \
-RUN apk update
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add \
-    imagemagick \
-    redis  \
-    bash \
-    tmux \
-    shadow \
-    git \
-    ffmpeg
+WORKDIR /tmp
+RUN mkdir -p /tmp/ffmpeg
+ARG TARGETARCH
+RUN curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-${TARGETARCH}-static.tar.xz \
+    | tar -xJ -C /tmp/ffmpeg --strip-components=1
 
 
-# Install backend dependencies
+# ------------------------------ Builder python ------------------------------ #
 
-# Prevent __pycache__ directories
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-# avoid creating a venv with uv, use system python
-ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
-
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir uv
-
+FROM python:3.12-slim-trixie AS builder_py
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /repo/backend
-COPY ./backend/pyproject.toml /repo/backend/
-COPY ./README.md /repo/
+ENV PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+ENV UV_NO_DEV=1
+ENV UV_NO_EDITABLE=1
+ENV UV_PYTHON_DOWNLOADS=0
+ENV UV_PROJECT_ENVIRONMENT=/venv
 
-RUN uv sync --no-install-project
+# Install backend dependencies
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=backend/uv.lock,target=uv.lock \
+    --mount=type=bind,source=backend/pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project
 
-# Install our package (backend)
-COPY ./backend/beets_flask/ /repo/backend/beets_flask/
-COPY ./backend/generate_types.py /repo/backend/
-COPY ./backend/launch_redis_workers.py /repo/backend/
-COPY ./backend/launch_watchdog_worker.py /repo/backend/
-COPY ./backend/launch_db_init.py /repo/backend/
+# Install backend package
+COPY ./backend/ /repo/backend/
 
-RUN uv sync
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked
 
 # Extract version from pyproject.toml
 RUN mkdir -p /version
 RUN python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyproject.toml', 'rb'))['project']['version'])" > /version/backend.txt
 
-# ------------------------------------------------------------------------------------ #
-#                                      Development                                     #
-# ------------------------------------------------------------------------------------ #
+# ------------------------------- Builder node ------------------------------- #
 
-FROM deps AS dev
+# Note: there is no tag for node that fixes to debian trixi.
+# we might get inconsistencies after a new debian release
+FROM node:22-slim AS builder_node
 
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add \
-    npm
+# Install pnpm
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
-RUN npm install -g pnpm
-RUN pnpm config set store-dir /repo/frontend/.pnpm-store
-
-# Copy the lock files and install dependencies
-WORKDIR /repo
-COPY ./frontend/package.json /repo/frontend/
-COPY ./frontend/pnpm-lock.yaml /repo/frontend/
+COPY ./frontend /repo/frontend/
 
 WORKDIR /repo/frontend
-# RUN pnpm i
+RUN --mount=type=cache,sharing=locked,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Extract version from package.json
 RUN mkdir -p /version
-RUN python -c "import json; print(json.load(open('/repo/frontend/package.json'))['version'])" \
-    > /version/frontend.txt
+RUN node -p "require('/repo/frontend/package.json').version" > /version/frontend.txt
 
-ENV IB_SERVER_CONFIG="dev_docker"
-
-# relies on mounting this volume
-WORKDIR /repo
-USER root
-ENTRYPOINT [ \
-    "/bin/sh", "-c", \
-    "./docker/entrypoints/entrypoint_fix_permissions.sh && \
-    su beetle -c ./docker/entrypoints/entrypoint_dev.sh" \
-    ]
-
-# ------------------------------------------------------------------------------------ #
-#                                         Build                                        #
-# ------------------------------------------------------------------------------------ #
-
-FROM deps AS build
-# Build frontend files
-
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add \
-    npm
-
-RUN npm install -g pnpm
-RUN pnpm config set store-dir /repo/frontend/.pnpm-store
-
-WORKDIR /repo
-COPY ./frontend ./frontend/
-RUN chown -R beetle:beetle /repo
-
-# Extract version from package.json
-RUN mkdir -p /version
-RUN python -c "import json; print(json.load(open('/repo/frontend/package.json'))['version'])" \
-    > /version/frontend.txt
-
-USER beetle
-WORKDIR /repo/frontend
-# RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-RUN pnpm install
 RUN pnpm run build
 
+# ---------------------------------------------------------------------------- #
+#                                     Base                                     #
+# ---------------------------------------------------------------------------- #
 
+FROM python:3.12-slim-trixie AS base
+COPY --from=builder_py /bin/uv/ /bin/uvx/ /bin/
+
+ENV HOSTNAME="beets-container"
+ENV EDITOR="vi"
+# need to set some cli editor so `beet edit` works, vi comes with slim
+ENV BEETSDIR="/config/beets"
+ENV BEETSFLASKDIR="/config/beets-flask"
+ENV BEETSFLASKLOG="/logs/beets-flask.log"
+ENV UV_PROJECT_ENVIRONMENT=/venv
+
+# Create user and group
+RUN groupadd -g 1000 beetle && \
+    useradd -m -u 1000 -g beetle beetle && \
+    usermod -s /bin/bash beetle
+
+ENV VIRTUAL_ENV_DISABLE_PROMPT=1
+RUN echo 'if [ -f /repo/backend/.venv/bin/activate ]; then source /repo/backend/.venv/bin/activate; fi' >> /home/beetle/.bashrc
+RUN echo 'alias pip="echo '\''Beets-Flask relies on uv. Use: uv pip install'\''"' >> /home/beetle/.bashrc
+
+# map beets directory and our configs to /config
+RUN mkdir -p /config/beets /config/beets-flask /logs && \
+    chown -R beetle:beetle /config /logs
+
+# our default folders they should not be used in production
+RUN mkdir -p \
+    /music/beets_flask_config_example/imported \
+    /music/beets_flask_config_example/inbox_off \
+    /music/beets_flask_config_example/inbox_auto \
+    /music/beets_flask_config_example/inbox_preview
+RUN chown -R beetle:beetle /music
+
+# Install dependencies:
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    redis \
+    tmux \
+    imagemagick && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy only the binaries from builder
+COPY --from=builder_ffmpeg /tmp/ffmpeg/ffmpeg /usr/local/bin/ffmpeg
+COPY --from=builder_ffmpeg /tmp/ffmpeg/ffprobe /usr/local/bin/ffprobe
+RUN ffmpeg -version
+
+
+# Copy bf dependencies
+COPY --from=builder_py --chown=beetle:beetle /venv /venv
 
 
 # ------------------------------------------------------------------------------------ #
 #                                      Production                                      #
 # ------------------------------------------------------------------------------------ #
 
-FROM deps AS prod
+FROM base AS prod
 
 ENV IB_SERVER_CONFIG="prod"
 
 WORKDIR /repo
-COPY --from=build /repo/frontend/dist /repo/frontend/dist
-COPY --from=build /version /version
-COPY docker/entrypoints .
-RUN chown -R beetle:beetle /repo
+COPY --from=builder_node --chown=beetle:beetle /repo/frontend/dist /repo/frontend/dist
+COPY --from=builder_node --chown=beetle:beetle /version/frontend.txt /version/frontend.txt
+COPY --from=builder_py --chown=beetle:beetle /repo/backend/ /repo/backend/
+COPY --from=builder_py --chown=beetle:beetle /version/backend.txt /version/backend.txt
 
-USER root
+COPY --chown=beetle:beetle ./docker/entrypoints/*.sh /repo/
+RUN chmod +x /repo/*.sh
 
 ENTRYPOINT [ \
-    "/bin/sh", "-c", \
-    "/repo/entrypoint_fix_permissions.sh && \
+    "/bin/bash", "-c", \
+    "source /venv/bin/activate && \
+    /repo/entrypoint_fix_permissions.sh && \
     /repo/entrypoint_user_scripts.sh && \
     su beetle -c /repo/entrypoint.sh" \
     ]
 
 
+# ------------------------------------------------------------------------------------ #
+#                                      Development                                     #
+# ------------------------------------------------------------------------------------ #
+
+FROM base AS dev
+
+ENV IB_SERVER_CONFIG="dev_docker"
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Install nodejs
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+RUN apt-get install -y nodejs
+
+# Install pnpm globally (not via corepack) so it's available to all users
+# without per-user cache downloads at runtime.
+RUN npm install --global pnpm@latest-11
+
+# Copy the lock files and install dependencies
+WORKDIR /repo
+COPY ./frontend/package.json ./frontend/pnpm-lock.yaml /repo/frontend/
+COPY ./backend/pyproject.toml ./backend/uv.lock /repo/backend/
+
+# Extract version from package.json
+WORKDIR /repo/frontend
+RUN mkdir -p /version
+RUN node -p "require('/repo/frontend/package.json').version" > /version/frontend.txt
+RUN uv run python -c "import tomllib; print(tomllib.load(open('/repo/backend/pyproject.toml', 'rb'))['project']['version'])" > /version/backend.txt
+
+# relies on mounting this volume
+WORKDIR /repo
+ENTRYPOINT [ \
+    "/bin/bash", "-c", \
+    "source /venv/bin/activate && \
+    ./docker/entrypoints/entrypoint_fix_permissions.sh && \
+    ./docker/entrypoints/entrypoint_user_scripts.sh && \
+    su beetle -c ./docker/entrypoints/entrypoint_dev.sh" \
+    ]

@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import asyncio
 import os
-import signal
-from collections import OrderedDict
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
 from watchdog.events import FileMovedEvent, FileSystemEvent
 from watchdog.observers.polling import PollingObserver
@@ -20,19 +21,22 @@ from beets_flask.logger import log
 from beets_flask.server.websocket.status import FileSystemUpdate, send_status_update
 from beets_flask.watchdog.eventhandler import AIOEventHandler, AIOWatchdog
 
+if TYPE_CHECKING:
+    from beets_flask.config.schema import InboxFolderSchema
+
 # ------------------------------------------------------------------------------------ #
 #                                   init and watchdog                                  #
 # ------------------------------------------------------------------------------------ #
 
 
 def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog | None:
-    """
-    Register file system watcher to monitor configured inboxes.
+    """Register file system watcher to monitor configured inboxes.
 
     Parameters
     ----------
     timeout: float
-        Timeout for the polling observer in seconds (heartbeat, to recheck file system changes)
+        Timeout for the polling observer in seconds (heartbeat, to recheck
+        file system changes)
     debounce: float
         Debounce window in seconds, to wait before starting tagging operations.
         This is to avoid multiple triggers for changes in the same folder.
@@ -44,6 +48,7 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
     -----
     - This should not be called from uvicorn workers to avoid concurrency issues.
       You only want one watchdog (use separate init script).
+
     """
     _inboxes = get_inboxes()
 
@@ -58,7 +63,7 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
         return None
     log.info(
         f"Registering watchdog with debounce of {debounce} seconds for "
-        + f"inboxes: {[i['path'] for i in _inboxes]}"
+        f"inboxes: {[i.path for i in _inboxes]}"
     )
 
     # One observer for all inboxes.
@@ -67,31 +72,32 @@ def register_inboxes(timeout: float = 2.5, debounce: float = 30) -> AIOWatchdog 
     # timeout/debounce in seconds
 
     watchdog = AIOWatchdog(
-        paths=[Path(i["path"]) for i in _inboxes],
+        paths=[Path(i.path) for i in _inboxes],
         handler=handler,
         observer=observer,
     )
 
     watchdog.start()
 
-    # Stop watchdog on exit signals.
-    signal.signal(signal.SIGINT, lambda s, f: watchdog.stop())
-    signal.signal(signal.SIGHUP, lambda s, f: watchdog.stop())
-    signal.signal(signal.SIGTERM, lambda s, f: watchdog.stop())
-    signal.signal(signal.SIGQUIT, lambda s, f: watchdog.stop())
-
-    # user would expect autotagging inboxes to automatically scan on first launch
+    # user would expect autotagging inboxes to automatically scan on first
+    # launch
     async def auto_tag_wait_for_workers(f: Path):
-        # HACK: checking if redis is ready was not trivial enough, so we just wait a bit.
+        # HACK: checking if redis is ready was not trivial enough, so we just
+        # wait a bit.
         await asyncio.sleep(10)
         await auto_tag(f)
 
-    auto_inboxes = [i for i in _inboxes if i.get("autotag", None)]
+    auto_inboxes = [i for i in _inboxes if i.autotag not in (False, "off")]
+
+    # Keep references to the tasks so they are not garbage collected.
+    background_tasks: set[asyncio.Task] = set()
 
     for inbox in auto_inboxes:
-        album_folders = all_album_folders(inbox["path"])
+        album_folders = all_album_folders(inbox.path)
         for f in album_folders:
-            asyncio.create_task(auto_tag_wait_for_workers(f))
+            task = asyncio.create_task(auto_tag_wait_for_workers(f))
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
 
     return watchdog
 
@@ -144,15 +150,20 @@ class InboxHandler(AIOEventHandler):
             log.exception(f"Error in inbox handler task for {album_folder}", e)
 
 
-async def auto_tag(folder_path: Path, inbox_kind: str | None = None):
+async def auto_tag(
+    folder_path: Path,
+    inbox_kind: Literal["auto", "preview", "bootleg", "off"] | None = None,
+):
     """Retag a (taggable) folder.
 
     Parameters
     ----------
-    path: str
+    folder_path : Path
         Full path to the folder or archive file to retag.
-    kind: str, optional
-        If None, the configured autotag kind from the inbox this folder is in will be used.
+    inbox_kind : str, optional
+        If None, the configured autotag kind from the inbox this folder is in
+        will be used.
+
     """
     inbox = get_inbox_for_path(folder_path)
     if inbox is None:
@@ -160,20 +171,20 @@ async def auto_tag(folder_path: Path, inbox_kind: str | None = None):
         return
 
     if inbox_kind is None:
-        inbox_kind = inbox.get("autotag", None)
+        inbox_kind = inbox.autotag
 
     # Infer enqueue kind from inbox kind
     enq_kind: invoker.EnqueueKind
-    enq_kwargs = {}
+    enq_kwargs: dict[str, Any] = {}
     match inbox_kind:
         case "preview":
             enq_kind = invoker.EnqueueKind.PREVIEW
         case "auto":
             enq_kind = invoker.EnqueueKind.IMPORT_AUTO
-            enq_kwargs["import_threshold"] = inbox.get("auto_threshold", None)
+            enq_kwargs["import_threshold"] = inbox.auto_threshold
         case "bootleg":
             enq_kind = invoker.EnqueueKind.IMPORT_BOOTLEG
-        case False | None:
+        case "off" | False | None:
             log.debug(f"Autotagging disabled for {folder_path}, skipping.")
             return
         case _:
@@ -209,12 +220,12 @@ async def auto_tag(folder_path: Path, inbox_kind: str | None = None):
 # ------------------------------------------------------------------------------------ #
 
 
-def get_inbox_for_path(path: str | Path):
+def get_inbox_for_path(path: str | Path) -> InboxFolderSchema | None:
     if isinstance(path, str):
         path = Path(path)
     inbox = None
     for i in get_inboxes():
-        ipath = Path(i["path"])
+        ipath = Path(i.path)
         if path.is_relative_to(ipath) or path == ipath:
             inbox = i
             break
@@ -222,12 +233,12 @@ def get_inbox_for_path(path: str | Path):
 
 
 def get_inbox_folders() -> list[str]:
-    return [i["path"] for i in get_inboxes()]
+    return [i.path for i in get_inboxes()]
 
 
 def is_inbox_folder(path: str) -> bool:
     return path in get_inbox_folders()
 
 
-def get_inboxes() -> list[OrderedDict]:
-    return get_config()["gui"]["inbox"]["folders"].flatten().values()  # type: ignore
+def get_inboxes() -> list[InboxFolderSchema]:
+    return list(get_config().data.gui.inbox.folders.values())

@@ -86,7 +86,7 @@ export function FolderCard({ folder }: { folder: Folder | Archive }) {
     const showHashWarning = hashes.size > 1;
     const showNoSessionWarning =
         prevError instanceof BeetsFlaskError &&
-        prevError.name == 'NotFoundException';
+        prevError.name == 'NotFoundError';
 
     const isArchive = folder.type === 'archive';
     const isAlbum = !isArchive && folder.is_album;

@@ -3,11 +3,12 @@
 Allows to stream an item's file as mp3.
 """
 
+from __future__ import annotations
+
 import asyncio
 import os
 import time
 from asyncio.subprocess import PIPE, Process
-from collections.abc import AsyncIterator, Hashable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import aiofiles
@@ -15,22 +16,24 @@ import numpy as np
 from beets import util as beets_util
 from cachetools import Cache, TTLCache
 from cachetools.keys import hashkey
-from quart import Blueprint, Response, g
+from quart import Blueprint, Response
 
 from beets_flask.logger import log
-from beets_flask.server.exceptions import IntegrityException, NotFoundException
+from beets_flask.server.exceptions import IntegrityError, NotFoundError
+
+from . import g
 
 audio_bp = Blueprint("audio", __name__)
 
 if TYPE_CHECKING:
     # For type hinting the global g object
-    from . import g
+    from collections.abc import AsyncIterator, Hashable
 
 
-transcodeCache: Cache[Hashable, Any] = TTLCache(
+transcode_cache: Cache[Hashable, Any] = TTLCache(
     maxsize=128, ttl=60 * 60
 )  # 1 hour cache
-peaksCache: Cache[Hashable, Any] = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
+peaks_cache: Cache[Hashable, Any] = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
 
 
 @audio_bp.route("/item/<int:item_id>/audio", methods=["GET"])
@@ -41,19 +44,17 @@ async def item_audio(item_id: int):
     """
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundException(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     item_path = beets_util.syspath(item.path)
     if not os.path.exists(item_path):
-        raise IntegrityException(
+        raise IntegrityError(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."
         )
 
     it = await transcode_to_webm(item_path)
     return Response(
-        cached_async_iterator(item_path, it, transcodeCache),
+        cached_async_iterator(item_path, it, transcode_cache),
         mimetype="audio/webm",
     )
 
@@ -66,13 +67,11 @@ async def item_audio_peaks(item_id: int):
     """
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundException(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     item_path = beets_util.syspath(item.path)
     if not os.path.exists(item_path):
-        raise IntegrityException(
+        raise IntegrityError(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."
         )
 
@@ -103,11 +102,14 @@ class FFmpegStreamer:
     """
 
     process: Process | None
-    _stderr_lines: list[str] = []
+    _stderr_lines: list[str]
+    _stderr_task: asyncio.Task | None
     chunk_size: int = 4096
 
     def __init__(self):
         self.process = None
+        self._stderr_lines = []
+        self._stderr_task = None
 
     async def start(self, *ffmpeg_args):
         """Initialize a persistent FFmpeg process with stdin open for input."""
@@ -119,7 +121,7 @@ class FFmpegStreamer:
             stdout=PIPE,
             stderr=PIPE,
         )
-        asyncio.create_task(self._drain_stderr())
+        self._stderr_task = asyncio.create_task(self._drain_stderr())
 
     async def stream_file(self, file_path: str | None) -> AsyncIterator[bytes]:
         """Stream an audio file through the pre-warmed FFmpeg process.
@@ -232,7 +234,7 @@ class FFmpegStreamer:
 T = TypeVar("T")
 
 
-async def cached_async_iterator(
+async def cached_async_iterator[T](
     key: Hashable, iterator: AsyncIterator[T], cache: Cache[Hashable, list[T]]
 ) -> AsyncIterator[T]:
     """Cache the results of an async iterator."""
@@ -308,18 +310,18 @@ async def transcode_to_webm(file_path: str) -> AsyncIterator[bytes]:
     return ffmpeg_streamer.stream_file(file_path)
 
 
-peaksCache = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
+peaks_cache = TTLCache(maxsize=128, ttl=60 * 60)  # 1 hour cache
 
 
 async def audio_peaks_cached(item_path: str) -> np.ndarray:
     """Helper function with LRU caching."""
     cache_key = hashkey(item_path)
-    if cache_key in peaksCache:
+    if cache_key in peaks_cache:
         log.debug(f"Using cached peaks for {item_path}")
-        return peaksCache[cache_key]
+        return peaks_cache[cache_key]
 
     result = await audio_peaks(item_path)
-    peaksCache[cache_key] = result
+    peaks_cache[cache_key] = result
     return result
 
 
@@ -355,12 +357,12 @@ async def audio_peaks(path: str):
 async def chunked_bytes_iterator(
     data: bytes, chunk_size: int = 8192
 ) -> AsyncIterator[bytes]:
-    """
-    Async iterator that yields chunks of bytes data.
+    """Async iterator that yields chunks of bytes data.
 
     Args:
         data: The bytes object to be chunked
         chunk_size: Size of each chunk in bytes (default: 8KB)
+
     """
     for i in range(0, len(data), chunk_size):
         yield data[i : i + chunk_size]

@@ -1,8 +1,10 @@
+from __future__ import annotations
+
+import asyncio
 import os
 import shutil
-from datetime import datetime
 from pathlib import Path
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from cachetools import Cache
 from quart import Blueprint, jsonify, request
@@ -10,17 +12,16 @@ from sqlalchemy import func, select
 
 from beets_flask.database import db_session_factory
 from beets_flask.database.models.states import FolderInDb, SessionStateInDb
+from beets_flask.dir_size import dir_files, dir_size
 from beets_flask.disk import (
     Archive,
     Folder,
-    dir_files,
-    dir_size,
     fs_item_from_path,
     path_to_folder,
 )
 from beets_flask.importer.progress import Progress
 from beets_flask.logger import log
-from beets_flask.server.exceptions import InvalidUsageException, NotFoundException
+from beets_flask.server.exceptions import InvalidUsageError, NotFoundError
 from beets_flask.server.utility import (
     pop_folder_params,
 )
@@ -31,6 +32,9 @@ from beets_flask.watchdog.inbox import (
     get_inbox_folders,
     get_inbox_for_path,
 )
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 inbox_bp = Blueprint("inbox", __name__, url_prefix="/inbox")
 
@@ -57,14 +61,16 @@ async def get_folder():
     ----------
     folder_path : str
         The path to the folder to get the structure for.
+
     """
     params = await request.get_json()
 
     folder_hashes, folder_paths = pop_folder_params(params, allow_mismatch=True)
 
     if len(folder_paths) != 1 and len(folder_hashes) != 1:
-        raise InvalidUsageException(
-            f"Only one folder path or hash must be provided. Got: {folder_hashes=}, {folder_paths=}"
+        raise InvalidUsageError(
+            "Only one folder path or hash must be provided. "
+            f"Got: {folder_hashes=}, {folder_paths=}"
         )
 
     folder_path = folder_paths[0] if len(folder_paths) == 1 else None
@@ -72,9 +78,7 @@ async def get_folder():
 
     # Only absolute paths are allowed
     if folder_path is not None and not Path(folder_path).is_absolute():
-        raise InvalidUsageException(
-            f"Only absolute paths are allowed. Got: {folder_path=}"
-        )
+        raise InvalidUsageError(f"Only absolute paths are allowed. Got: {folder_path=}")
 
     folder: Folder | Archive | None = None
 
@@ -124,7 +128,7 @@ async def get_folder():
 
     # If we still don't have a folder, raise an error
     if folder is None:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             f"Could not find folder with {folder_hash=} or path {folder_path=}.",
             status_code=404,
         )
@@ -149,6 +153,7 @@ async def delete():
         The paths to the folders to remove.
     folder_hashes : list[str]
         The hashes of the folders to remove.
+
     """
     params = await request.get_json()
     folder_hashes, folder_paths = pop_folder_params(params, allow_empty=False)
@@ -162,7 +167,8 @@ async def delete():
             seen.add((path, hash))
             folder_paths_and_hashes.append((path, hash))
 
-    # Sort by length of the path (longest first, to delete the most nested folders first)
+    # Sort by length of the path (longest first, to delete the most nested
+    # folders first)
     folder_paths_and_hashes = sorted(
         folder_paths_and_hashes, key=lambda x: len(x[0].parts), reverse=True
     )
@@ -177,8 +183,9 @@ async def delete():
             continue
         folders.append(f)
         if f.hash != folder_hash:
-            raise InvalidUsageException(
-                "Folder hash does not match the current folder hash! Please refresh your hashes before deleting!",
+            raise InvalidUsageError(
+                "Folder hash does not match the current folder hash! "
+                "Please refresh your hashes before deleting!",
             )
 
     # Delete the folders
@@ -188,7 +195,7 @@ async def delete():
         elif isinstance(f, Folder):
             shutil.rmtree(f.full_path)
         else:
-            raise InvalidUsageException(
+            raise InvalidUsageError(
                 f"Cannot delete object of type {type(f)} at {f.full_path}"
             )
 
@@ -217,8 +224,8 @@ class InboxStats(TypedDict):
     # Number of albums imported via GUI
     imported_via_gui: int
 
-    # Bytes of the inbox folder
-    size: int
+    # Bytes of the inbox folder, None while the size walk runs or if it failed
+    size: int | None
     nFiles: int
 
     last_created: datetime | None
@@ -232,13 +239,14 @@ async def stats_for_all():
     ----------
     folder : str (optional)
         The folder to compute stats for. If not provided, all inbox folders are used.
+
     """
     folders = get_inbox_folders()
-    stats = [compute_stats(f) for f in folders]
+    stats = await asyncio.gather(*(compute_stats(f) for f in folders))
     return jsonify(stats)
 
 
-def compute_stats(folder: str):
+async def compute_stats(folder: str):
     """Compute the stats for the inbox folder.
 
     # Path parameters
@@ -247,7 +255,7 @@ def compute_stats(folder: str):
     """
     inbox = get_inbox_for_path(folder)
     if inbox is None:
-        raise NotFoundException(f"Inbox folder `{folder} not found.")
+        raise NotFoundError(f"Inbox folder `{folder} not found.")
 
     p = Path(folder)
 
@@ -281,11 +289,19 @@ def compute_stats(folder: str):
         )
         last_created = session.execute(stmt).scalars().first()
 
+    # A response waits at most two seconds for the du walk. The walk keeps
+    # running, so the next request can return the size.
+    try:
+        async with asyncio.timeout(2):
+            size = await dir_size(p)
+    except TimeoutError:
+        size = None
+
     ret_map: InboxStats = {
-        "name": inbox["name"],
-        "path": inbox["path"],
+        "name": inbox.name,
+        "path": inbox.path,
         "nFiles": dir_files(p),
-        "size": dir_size(p),
+        "size": size,
         "tagged_via_gui": n_tagged,
         "imported_via_gui": n_imported,
         "last_created": last_created,

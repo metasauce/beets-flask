@@ -9,9 +9,14 @@
 
 !backend/beets_flask
 !backend/pyproject.toml
+!backend/uv.lock
 !backend/main.py
 !backend/launch_*.py
 !backend/generate_types.py
+
+# DB migrations
+!backend/alembic
+!backend/alembic.ini
 
 !configs/
 
@@ -23,6 +28,7 @@
 !frontend/index.html
 !frontend/package.json
 !frontend/pnpm-lock.yaml
+!frontend/pnpm-workspace.yaml
 !frontend/postcss.config.js
 !frontend/tailwind.config.js
 !frontend/tsconfig.json

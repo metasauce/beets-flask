@@ -1,33 +1,30 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
-import subprocess
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from functools import cache
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Literal,
 )
 
-from beets.importer import (
-    ArchiveImportTask,
-)
-from beets.importer.tasks import (
-    MULTIDISC_MARKERS,
-    MULTIDISC_PAT_FMT,
-    albums_in_dir,
-)
+from beets.importer.tasks import MULTIDISC_PATTERNS, albums_in_dir
 from beets.util import bytestring_path
 from cachetools import Cache, TTLCache, cached
 from natsort import os_sorted
 
 from beets_flask.config import get_config
+from beets_flask.dir_size import clear_size_cache
 from beets_flask.dirhash_custom import archive_hash, dirhash_c
-from beets_flask.logger import log
 from beets_flask.utility import AUDIO_EXTENSIONS
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
 
 # Regex pattern to exclude hidden files (files starting with ".")
 audio_regex = re.compile(
@@ -222,9 +219,29 @@ class Archive(FileSystemItem):
         )
 
 
+@cache
+def allowed_archive_extensions() -> list[str]:
+    # Tar files
+    ext = [".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"]
+    # Zip files
+    ext += [".zip"]
+    if importlib.util.find_spec("rarfile") is not None:
+        ext += [".rar"]
+    if importlib.util.find_spec("py7zr") is not None:
+        ext += [".7z"]
+    return ext
+
+
 def is_archive_file(path: Path | str) -> bool:
-    """Check if a file is an archive file based on its extension."""
-    return ArchiveImportTask.is_archive(str(path))
+    """Check if a file is an archive file based on its extension.
+
+    It seems like there is a memory issue with `tarfile.is_tarfile`
+    (see https://github.com/metasauce/beets-flask/issues/258). We try
+    to avoid this by only checking the file extension here, and not trying
+    to open the file.
+    """
+    allowed_extensions = allowed_archive_extensions()
+    return Path(path).suffix.lower() in allowed_extensions
 
 
 @dataclass
@@ -264,11 +281,14 @@ def path_to_folder(root_dir: Path | str, subdirs=True) -> Folder:
     root_dir : str
         The root directory to start from.
     subdirs : bool, optional
-        Whether to mark qualifying subfolders of an album as album folders themselves. If true, e.g. for `/album/CD1/track.mp3` both `/album/` and `/album/CD1/` are flagged. Defaults to True.
+        Whether to mark qualifying subfolders of an album as album folders
+        themselves. If true, e.g. for `/album/CD1/track.mp3` both `/album/`
+        and `/album/CD1/` are flagged. Defaults to True.
 
     Returns
     -------
         dict: The nested dict structure.
+
     """
 
     return Folder.from_path(root_dir, subdirs=subdirs)
@@ -284,12 +304,14 @@ def album_folders_from_track_paths(
     track_paths : list[Path]
         list of track paths, e.g. mp3 files.
     use_parent_for_multidisc : bool, optional
-        When files are in an album folder that might be a multi-disc folder (e.g. `/album/cd1`),
-        return the parent (`/album`) instead of the lowest-level-folder (`/cd1`). Defaults to True.
+        When files are in an album folder that might be a multi-disc folder
+        (e.g. `/album/cd1`), return the parent (`/album`) instead of the
+        lowest-level-folder (`/cd1`). Defaults to True.
 
     Returns
     -------
         list[str]: album folders
+
     """
 
     folders_to_check: set[Path] = set()
@@ -316,7 +338,7 @@ def album_folders_from_track_paths(
         parents: set[Path] = set()
         children: set[Path] = set()
         for folder in album_folders:
-            if is_within_multi_dir(folder):
+            if _is_within_multi_dir(folder):
                 parents.add(folder.parent)
                 children.add(folder)
 
@@ -329,22 +351,28 @@ def album_folders_from_track_paths(
 def is_album_folder(path: Path | str):
     """Check if a path is an album folder.
 
-    Returns true if the path is detected as an album by beets, or if it is an archive file.
+    Returns true if the path is detected as an album by beets, or if it is an
+    archive file.
     -------
     path : Path | str
         The path to check, can be a folder, file or archive.
 
-    Note
+    Note:
     ----
     Except in tests, we dont use this function yet.
     Its logic is duplicated in `all_album_folders`. (We should consolidate.)
+
     """
     if isinstance(path, str):
         path = Path(path).absolute()
     if is_archive_file(path):
         return True
     for paths, items in albums_in_dir(bytestring_path(path)):
-        if all(is_archive_file(i.decode("utf-8")) for i in items):
+        items_str = [i.decode("utf-8") for i in items]
+        if all(is_archive_file(i) for i in items_str):
+            continue
+        # Same music-file requirement as in `all_album_folders`.
+        if not any(audio_regex.match(os.path.basename(i)) for i in items_str):
             continue
         if str(path).encode("utf-8") in paths:
             return True
@@ -352,8 +380,7 @@ def is_album_folder(path: Path | str):
 
 
 def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]:
-    """
-    Get all album folders from a given root dir.
+    """Get all album folders from a given root dir.
 
     Parameters
     ----------
@@ -366,37 +393,48 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
     Returns
     -------
         list[Path]
+
     """
 
-    # FIXME: For backwards compatibility, we allow a string as input
     if isinstance(root_dir, str):
         root_dir = Path(root_dir)
 
     folders: list[bytes] = []
     for paths, items in albums_in_dir(bytestring_path(root_dir.absolute())):
+        items_str = [i.decode("utf-8") for i in items]
+
         # Our choice on handling archives:
         # - archives are always simple albums. no multi-disc logic supported,
         #   all discs need to be _inside_ the archive.
         # - if a folder contains only archives, it will never be considered an
         #   album folder
         # - if a folder contains a mix of archives and music files, it will be
-        #   considered an album folder (as we think archives might be metadata or additional files e.g. cover art)
-
-        if all(is_archive_file(i.decode("utf-8")) for i in items):
+        #   considered an album folder (as we think archives might be metadata
+        #   or additional files e.g. cover art)
+        if all(is_archive_file(i) for i in items_str):
             folders.extend(items)
+            continue
+
+        # beets `albums_in_dir` treats any directory with *any* files as an
+        # album. Require at least one music file; stray uploads or cover art
+        # without music do not make a folder an album.
+        if not any(audio_regex.match(os.path.basename(i)) for i in items_str):
             continue
 
         if subdirs:
             folders.extend(p for p in paths)
         else:
             # the top-level path is always the first in the list
-            # however, there is an edgecase, if we have a rogue element in a multi-disc folder:
+            # however, there is an edgecase, if we have a rogue element in a
+            # multi-disc folder:
             # - artist/album/should_not_be_here.mp3
             # - artist/album/CD1/track.mp3
             # - artist/album/CD2/track.mp3
-            # -> then albums_in_dir returns [album], [CD1, CD2] so that picking the first element is wrong.
-            # we would want all 3: album, CD1 and CD2. but in this case, the parent `album` should already
-            # be in our set when we check [CD1, CD2]
+            # -> then albums_in_dir returns [album], [CD1, CD2] so that
+            #    picking the first element is wrong.
+            # we would want all 3: album, CD1 and CD2. but in this case, the
+            # parent `album` should already be in our set when we check
+            # [CD1, CD2]
             if os.path.dirname(paths[0]) in folders:
                 folders.extend(p for p in paths)
             else:
@@ -405,70 +443,26 @@ def all_album_folders(root_dir: Path | str, subdirs: bool = False) -> list[Path]
     return [Path(f.decode("utf-8")) for f in folders]
 
 
-def is_within_multi_dir(path: Path | str) -> bool:
-    """
-    Minimal version of beets heuristic to check if a string matches a multi-disc pattern.
+def _is_within_multi_dir(path: Path | str) -> bool:
+    """Minimal version of beets' multi-disc pattern heuristic.
 
     E.g. "My Album CD1" or "Disc 2" will return True
     """
 
-    # FIXME: For backwards compatibility, we allow a string as input
     if isinstance(path, str):
         path = Path(path)
 
-    path_str = path.name  # Use pathlib to get the basename
-
-    for marker in MULTIDISC_MARKERS:
-        p = MULTIDISC_PAT_FMT.replace(b"%s", marker)
-        marker_pat = re.compile(p, re.I)
-        match = marker_pat.match(path_str.encode("utf-8"))
+    for marker_pat in MULTIDISC_PATTERNS:
+        match = marker_pat.match(path.name)
         if match:
             return True
     return False
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=60), info=True)
-def dir_size(path: Path) -> int:
-    """Size of a dir in bytes, including content."""
-    try:
-        result = subprocess.run(
-            ["du", "-sb", str(path.resolve())],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        size = int(result.stdout.split()[0])
-        return size
-    except Exception as e:
-        # this happens e.g. if the directory does not exist.
-        log.error(e)
-        return -1
-
-
-@cached(cache=TTLCache(maxsize=1024, ttl=60), info=True)
-def dir_files(path: Path) -> int:
-    """Count the number of files in a directory."""
-    try:
-        result = subprocess.run(
-            [f"find {str(path.resolve())} | wc -l"],
-            capture_output=True,
-            text=True,
-            check=True,
-            shell=True,
-        )
-        count = int(result.stdout)
-        return count
-    except Exception as e:
-        # this happens e.g. if the directory does not exist.
-        log.error(e)
-        return -1
-
-
 def clear_cache():
     """Clear the cache for all cached functions."""
     path_to_folder.cache.clear()  # type: ignore
-    dir_size.cache.clear()  # type: ignore
-    dir_files.cache.clear()  # type: ignore
+    clear_size_cache()
 
 
-__all__ = ["dir_size", "fs_item_from_path"]
+__all__ = ["fs_item_from_path"]

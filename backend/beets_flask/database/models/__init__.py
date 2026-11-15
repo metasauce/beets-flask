@@ -3,8 +3,8 @@ from .states import CandidateStateInDb, FolderInDb, SessionStateInDb, TaskStateI
 
 __all__ = [
     "Base",
+    "CandidateStateInDb",
     "FolderInDb",
     "SessionStateInDb",
     "TaskStateInDb",
-    "CandidateStateInDb",
 ]

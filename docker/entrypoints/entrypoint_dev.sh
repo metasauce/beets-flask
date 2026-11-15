@@ -1,19 +1,26 @@
-#!/bin/sh
-source ./docker/entrypoints/common.sh
+#!/bin/bash
+. ./docker/entrypoints/common.sh
 
 log_current_user
 log_version_info
 log "Starting development environment..."
 
-cd /repo/frontend
+# We rely on live mounting the /repo folder
+# and expect the developer to have the dependencies installed
+# locally
 
+
+cd /repo/frontend
+# pnpm want to overwrite locally isntalled packages and has a user prompt here
+# ci=true skips this prompt
+export CI="true"
 # pnpm run build:dev &  # use this for debugging with ios, port 5001 (no cors allowed)
 pnpm run dev & # normal dev, port 5173
 vite_pid=$!
 sleep 3  # Give Vite a moment to start
 if ! kill -0 $vite_pid 2>/dev/null; then
-    echo "starting vite failed, will try to fix this by installing dependencies ..."
-    pnpm install
+    log_warning "starting vite failed, will try to fix this by installing dependencies ..."
+    pnpm install --frozen-lockfile
     pnpm run dev &
 fi
 
@@ -37,11 +44,18 @@ export FLASK_DEBUG=1
 # running the server from inside the backend dir makes imports and redis easier
 cd /repo/backend
 
+uv sync --locked --active
+
+# Databse creation & migrations (beets-flask)
+python -c "from beets_flask.database.migration import run_migrations; run_migrations()"
+
+# Database creation & migration (beets)
+python -c "from beets.ui import _open_library; from beets_flask.config.beets_config import get_config; _open_library(get_config().beets_config)"
+
+
 redis-server --daemonize yes
 
-
 # blocking
-python ./launch_db_init.py
 python ./launch_redis_workers.py
 
 # keeps running in the background
@@ -54,7 +68,7 @@ redis-cli FLUSHALL
 python ./generate_types.py
 
 # we need to run with one worker for socketio to work (but need at least threads for SSEs)
-# sufficient timout for the interactive import sessions, which may take a couple of minutes
+# sufficient timeout for the interactive import sessions, which may take a couple of minutes
 # gunicorn --worker-class eventlet -w 1 --threads 32  --timeout 300 --bind 0.0.0.0:5001 --reload 'main:create_app()'
 
 
@@ -69,5 +83,5 @@ uvicorn beets_flask.server.app:create_app --port 5001 \
 
 
 
-# if we need to debug the continaer without running the webserver:
+# if we need to debug the container without running the webserver:
 # tail -f /dev/null

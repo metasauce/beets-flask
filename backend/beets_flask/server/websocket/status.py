@@ -6,10 +6,9 @@ a preview is finished.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import Concatenate, Literal, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Concatenate, Literal, ParamSpec, TypeVar
 
 import socketio
 from quart import json
@@ -18,16 +17,20 @@ from beets_flask.database import db_session_factory
 from beets_flask.database.models.states import FolderInDb
 from beets_flask.disk import clear_cache
 from beets_flask.importer.progress import FolderStatus
-from beets_flask.invoker.job import JobMeta
 from beets_flask.logger import log
 from beets_flask.server.exceptions import (
-    InvalidUsageException,
+    InvalidUsageError,
     SerializedException,
     to_serialized_exception,
 )
 
 from . import sio
 from .errors import sio_catch_exception
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from beets_flask.invoker.job import JobMeta
 
 
 @dataclass
@@ -153,9 +156,12 @@ def emit_folder_status(
     Parameters
     ----------
     before: FolderStatus, optional
-        The status before the function is called. If none is given, no status update is sent.
+        The status before the function is called. If none is given, no
+        status update is sent.
     after: FolderStatus, optional
-        The status after the function is called. If none is given, no status update is sent.
+        The status after the function is called. If none is given, no
+        status update is sent.
+
     """
 
     def decorator(
@@ -170,8 +176,8 @@ def emit_folder_status(
                         FolderInDb.id == hash, session=db_session
                     )
                     if f_on_disk is None:
-                        raise InvalidUsageException(
-                            f"If only hash is given, it must be in the db."
+                        raise InvalidUsageError(
+                            "If only hash is given, it must be in the db."
                         )
                     path = f_on_disk.full_path
 

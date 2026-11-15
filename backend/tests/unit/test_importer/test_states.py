@@ -67,11 +67,12 @@ class TestTaskState(StateTest):
         assert task_state.items == [self.task.items[0]]
         assert task_state.progress == Progress.NOT_STARTED
 
-        assert len(task_state.candidate_states) == len(self.task.candidates)
+        assert len(task_state.candidate_states) == len(self.task.candidates or [])
 
     def test_best_candidate(self):
         task_state = self.task_state
         assert task_state.best_candidate_state is not None
+        assert self.task.candidates is not None
         assert task_state.best_candidate_state.match is self.task.candidates[0]
 
         self.task.candidates = []
@@ -115,11 +116,10 @@ class TestCandidateState(StateTest):
 
         assert isinstance(candidate, CandidateState)
         assert candidate.id is not None
+        assert task.candidates is not None
         assert candidate.match == task.candidates[0]
         assert candidate.task_state == self.task_state
         assert candidate.type == "album"
-        assert candidate.cur_artist == str(task.cur_artist)
-        assert candidate.cur_album == str(task.cur_album)
         assert candidate.items == task.items
         assert candidate.tracks == candidate.match.info.tracks
         assert candidate.distance == candidate.match.distance
@@ -128,23 +128,12 @@ class TestCandidateState(StateTest):
         assert candidate.url == task.candidates[0].info.data_url
         assert candidate.url == "url"
 
-        # _mapping is set statically in the user_query stage, not via fixture.
-        # but mapping has a fallback that uses candidate.match.mapping
-        assert candidate._mapping == candidate.current_mapping
-        assert candidate.mapping == {0: 0}
-
     def test_asis_candidate(self):
         # Test asis candidate (last in list)
         asis_candidate = self.task_state.asis_candidate
         assert self.task_state.asis_candidate_id == asis_candidate.id
         assert asis_candidate.id.startswith("asis")
         assert asis_candidate.type == "album"
-
-    def test_diff_preview(self):
-        candidate = self.candidates[0]
-        diff_preview = candidate.diff_preview
-        assert isinstance(diff_preview, str)
-        assert "match album" in diff_preview
 
     def test_identify_duplicates(
         self,
@@ -237,7 +226,7 @@ class TestSessionState(StateTest):
 
         assert serialized["status"]["message"] is None
         assert serialized["status"]["progress"] == Progress.NOT_STARTED
-        assert serialized["status"]["plugin_name"] == None
+        assert serialized["status"]["plugin_name"] is None
 
         # Can be serialized with json.dumps and Encoder
         import json

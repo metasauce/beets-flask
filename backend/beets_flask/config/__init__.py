@@ -9,11 +9,11 @@ from .flask_config import (
 )
 
 __all__ = [
-    "get_config",
-    "get_flask_config",
+    "DeploymentDocker",
+    "DevelopmentDocker",
+    "DevelopmentLocal",
     "ServerConfig",
     "Testing",
-    "DevelopmentLocal",
-    "DevelopmentDocker",
-    "DeploymentDocker",
+    "get_config",
+    "get_flask_config",
 ]

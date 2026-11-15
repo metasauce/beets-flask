@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from abc import ABC
+from typing import TYPE_CHECKING, ClassVar
 from unittest import mock
 
 import pytest
-from beets.plugins import EventType, send
+from beets.plugins import send
+
+if TYPE_CHECKING:
+    from beets.events import EventType
 
 
 class PluginEventsMixin(ABC):
@@ -20,7 +26,7 @@ class PluginEventsMixin(ABC):
 
     """
 
-    events: list[str] = []
+    events: ClassVar[list[str]] = []
 
     def send_event(self, event: EventType, **kwargs):
         self.events.append(event)
@@ -36,4 +42,5 @@ class PluginEventsMixin(ABC):
         ):
             yield
 
-        self.events = []
+        # Clear the shared capture list so events do not leak into the next test.
+        self.events.clear()

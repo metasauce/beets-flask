@@ -11,8 +11,9 @@ import {
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
-import { Action } from '@/api/config';
-import { inboxQueryOptions } from '@/api/inbox';
+import { Action, useConfig } from '@/api/config';
+import { inboxQueryOptions, walkFolder } from '@/api/inbox';
+import { ensureMinimalSessions, ensureStatuses } from '@/api/session';
 import { MatchChip, StyledChip } from '@/components/common/chips';
 import { Dialog } from '@/components/common/dialogs';
 import {
@@ -28,15 +29,45 @@ import {
 } from '@/components/inbox/actions/buttons';
 import { getActionDescription } from '@/components/inbox/actions/descriptions';
 import { InboxCard } from '@/components/inbox/cards/inboxCard';
+import { FileUploadProvider } from '@/components/inbox/fileUpload/context';
+import { DropZone } from '@/components/inbox/fileUpload/dropzone';
 import { FolderSelectionProvider } from '@/components/inbox/folderSelectionContext';
-import { Folder } from '@/pythonTypes';
+import { Archive, Folder } from '@/pythonTypes';
 
 /* ---------------------------------- Route --------------------------------- */
 
 export const Route = createFileRoute('/inbox/')({
     component: RouteComponent,
     loader: async ({ context }) => {
-        return await context.queryClient.ensureQueryData(inboxQueryOptions());
+        // Load inboxes
+        const inboxes =
+            await context.queryClient.ensureQueryData(inboxQueryOptions());
+
+        // Filter: all top level folders/archives in inboxes
+        const prefetch_folders: Array<Folder | Archive> = [];
+        for (const inbox of inboxes) {
+            for (const child of walkFolder(inbox, 1)) {
+                if (child.type === 'directory' || child.type === 'archive') {
+                    prefetch_folders.push(child);
+                }
+            }
+        }
+        // Prefetch minimal information for all sessions within the top level inbox
+        // folders. This prevents waterfall loading states
+        await Promise.all([
+            ensureStatuses(
+                prefetch_folders.map((f) => ({
+                    hash: f.hash,
+                    path: f.full_path,
+                }))
+            ),
+            ensureMinimalSessions(
+                prefetch_folders.map((f) => ({
+                    hash: f.hash,
+                    path: f.full_path,
+                }))
+            ),
+        ]);
     },
 });
 
@@ -44,39 +75,44 @@ function RouteComponent() {
     const { data: inboxes } = useSuspenseQuery(inboxQueryOptions());
 
     return (
-        <>
-            <PageWrapper
-                sx={(theme) => ({
+        <PageWrapper
+            sx={(theme) => ({
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '100%',
+                alignItems: 'center',
+                paddingTop: theme.spacing(1),
+                paddingInline: theme.spacing(0.5),
+                [theme.breakpoints.up('laptop')]: {
+                    height: 'auto',
+                    paddingTop: theme.spacing(2),
+                    paddingInline: theme.spacing(1),
+                },
+            })}
+        >
+            <PageHeader inboxes={inboxes} />
+            <Box
+                sx={{
+                    width: '100%',
                     display: 'flex',
+                    gap: 2,
                     flexDirection: 'column',
-                    minHeight: '100%',
-                    alignItems: 'center',
-                    paddingTop: theme.spacing(1),
-                    paddingInline: theme.spacing(0.5),
-                    [theme.breakpoints.up('laptop')]: {
-                        height: 'auto',
-                        paddingTop: theme.spacing(2),
-                        paddingInline: theme.spacing(1),
-                    },
-                })}
+                }}
             >
-                <PageHeader inboxes={inboxes} />
-                <Box
-                    sx={{
-                        width: '100%',
-                        display: 'flex',
-                        gap: 2,
-                        flexDirection: 'column',
-                    }}
-                >
+                <FileUploadProvider>
                     {inboxes.map((folder) => (
                         <FolderSelectionProvider key={folder.full_path}>
-                            <InboxCard folder={folder} />
+                            <DropZone inboxDir={folder.full_path}>
+                                <InboxCard
+                                    key={folder.full_path}
+                                    folder={folder}
+                                />
+                            </DropZone>
                         </FolderSelectionProvider>
                     ))}
-                </Box>
-            </PageWrapper>
-        </>
+                </FileUploadProvider>
+            </Box>
+        </PageWrapper>
     );
 }
 
@@ -121,7 +157,6 @@ function PageHeader({ inboxes, ...props }: { inboxes: Folder[] } & BoxProps) {
                     alignSelf: 'center',
                     display: 'flex',
                     gap: 1,
-                    zIndex: 1,
                     borderRadius: 1,
                     color: 'secondary.muted',
                     gridColumn: '1',
@@ -136,7 +171,6 @@ function PageHeader({ inboxes, ...props }: { inboxes: Folder[] } & BoxProps) {
                     alignSelf: 'center',
                     display: 'flex',
                     gap: 1,
-                    zIndex: 1,
                     borderRadius: 1,
                     color: 'secondary.muted',
                     gridColumn: '1',
@@ -153,6 +187,8 @@ function PageHeader({ inboxes, ...props }: { inboxes: Folder[] } & BoxProps) {
 /** Description of the inbox page, shown as modal on click */
 function InfoDescription() {
     const theme = useTheme();
+    const config = useConfig();
+
     const [open, setOpen] = useState(false);
     const { data } = useSuspenseQuery(inboxQueryOptions());
 
@@ -252,10 +288,13 @@ function InfoDescription() {
                         <ActionInfo action="retag" />
                         <ActionInfo action="import_best" />
                         <ActionInfo action="import_bootleg" />
-                        <ActionInfo action="import_terminal" />
+                        {config.gui.terminal.enabled ?? (
+                            <ActionInfo action="import_terminal" />
+                        )}
                         <ActionInfo action="copy_path" />
                         <ActionInfo action="delete" />
                         <ActionInfo action="undo" />
+                        <ActionInfo action="upload" />
                     </Box>
                     {/* Tree view */}
                     <Typography sx={{ fontWeight: 'bold', marginBottom: 0.5 }}>
@@ -306,6 +345,29 @@ function InfoDescription() {
                             />
                             <Typography>
                                 Music album (identified as such by beets)
+                            </Typography>
+                        </Box>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                gap: 1,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <FolderTypeIcon
+                                isAlbum={true}
+                                isOpen={false}
+                                isArchive={true}
+                                size={theme.iconSize.lg}
+                            />
+                            <FolderTypeIcon
+                                isAlbum={true}
+                                isOpen={true}
+                                isArchive={true}
+                                size={theme.iconSize.lg}
+                            />
+                            <Typography>
+                                Archive file (identified as such by beets)
                             </Typography>
                         </Box>
                         <Box

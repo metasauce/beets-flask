@@ -4,9 +4,12 @@ import json
 import os
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
+from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quart import Quart
+from quart.json.provider import DefaultJSONProvider
 
 from ..config.flask_config import ServerConfig, init_server_config
 from ..logger import log
@@ -54,10 +57,6 @@ def create_app(config: str | ServerConfig | None = None) -> Quart:
 # FIXME: We might be able to remove this once our serialized state does not
 # contain bytes or datetime objects
 
-from enum import Enum
-
-from quart.json.provider import DefaultJSONProvider
-
 
 class CustomProvider(DefaultJSONProvider):
     def dumps(self, obj: Any, **kwargs: Any) -> str:
@@ -82,5 +81,9 @@ class Encoder(json.JSONEncoder):
         # Enum values are not serializable by default
         if isinstance(o, Enum):
             return o.value
+
+        # Path to string
+        if isinstance(o, Path):
+            return str(o)
 
         return json.JSONEncoder.default(self, o)

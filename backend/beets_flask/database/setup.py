@@ -1,14 +1,19 @@
-from contextlib import contextmanager
-from functools import wraps
+from __future__ import annotations
 
-from quart import Quart
+from contextlib import contextmanager
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from sqlalchemy.pool import QueuePool
 
 from beets_flask.config import get_flask_config
 from beets_flask.logger import log
 
 from .models import Base
+
+if TYPE_CHECKING:
+    from quart import Quart
 
 engine: Engine | None = None
 session_factory: scoped_session[Session]
@@ -25,16 +30,15 @@ def setup_database(app: Quart | None = None) -> None:
     Args:
         app (Quart): The Quart application instance.
 
-    Returns
+    Returns:
     -------
         None
+
     """
-    __setup_factory()
+    _setup_factory()
     if get_flask_config()["RESET_DB_ON_START"]:
         log.warning("Resetting database due to RESET_DB=True in config")
         _reset_database()
-
-    _create_tables(engine)
 
     if app is not None:
         # Gracefully shutdown the database session, if launched
@@ -44,11 +48,19 @@ def setup_database(app: Quart | None = None) -> None:
             session_factory.remove()
 
 
-def __setup_factory():
+def _setup_factory():
     global engine
     global session_factory
 
-    engine = create_engine(get_flask_config()["DATABASE_URI"])
+    engine = create_engine(
+        get_flask_config()["DATABASE_URI"],
+        # The following arguments help save some RAM by reducing idle connections
+        poolclass=QueuePool,
+        pool_size=5,  # Max active connections (was unlimited)
+        max_overflow=10,  # Queue overflow
+        pool_recycle=3600,  # Recycle stale connections
+        pool_pre_ping=True,  # Validate before use
+    )
     session_factory = scoped_session(sessionmaker(bind=engine, expire_on_commit=False))
 
 
@@ -58,7 +70,8 @@ def db_session_factory(session: Session | None = None):
 
     Makes sure sessions are closed at the end.
     If an existing session is provided, it will not be closed at the end.
-    This allows to wrap multiple `with db_session()` blocks around each other without closing the outer session.
+    This allows to wrap multiple `with db_session()` blocks around each
+    other without closing the outer session.
 
     Example:
     ```
@@ -73,13 +86,14 @@ def db_session_factory(session: Session | None = None):
         s.merge(tag)
         return tag.to_dict()
     ```
+
     """
     is_outermost = session is None
     if is_outermost:
         try:
             session = session_factory()
         except NameError:
-            __setup_factory()
+            _setup_factory()
             session = session_factory()
 
     try:
@@ -94,35 +108,6 @@ def db_session_factory(session: Session | None = None):
             session.close()  # type: ignore
 
 
-def with_db_session(func):
-    """Decorate a function with a db session as a keyword argument to the function.
-
-    Example
-    ```
-    @with_db_session
-    def my_function(session=None):
-        tag.foo = "bar"
-        session.merge(tag)
-        return tag.to_dict()
-    ```
-    """
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with db_session_factory() as session:
-            kwargs.setdefault("session", session)
-            return func(*args, **kwargs)
-
-    return wrapper
-
-
-def _create_tables(engine) -> None:
-    Base.metadata.create_all(bind=engine)
-
-
 def _reset_database():
-    # Removes all data from the database but keeps schema
-    for t in reversed(Base.metadata.sorted_tables):
-        with db_session_factory() as session:
-            session.execute(t.delete())
-            session.commit()
+    Base.metadata.drop_all(bind=engine)  # type: ignore
+    Base.metadata.create_all(bind=engine)  # type: ignore

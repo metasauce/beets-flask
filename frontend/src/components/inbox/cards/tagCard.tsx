@@ -69,9 +69,9 @@ export function TagCard({
         // TODO: move this error handling into the session query?
         session.exc != null &&
         ![
-            'DuplicateException',
-            'NotImportedException',
-            'NoCandidatesFoundException',
+            'DuplicateError',
+            'NotImportedError',
+            'NoCandidatesFoundError',
         ].includes(session.exc.type)
     ) {
         throw new APIError(session.exc);
@@ -162,10 +162,10 @@ function UserSelection({ session }: { session: SerializedSessionState }) {
             />
             <Divider />
             {/* warnings */}
-            {session.exc?.type === 'DuplicateException' && (
+            {session.exc?.type === 'DuplicateError' && (
                 <DuplicateWarning exc={session.exc} />
             )}
-            {session.exc?.type === 'NotImportedException' && (
+            {session.exc?.type === 'NotImportedError' && (
                 <AutoImportFailedWarning
                     exc={session.exc}
                     source_type={
@@ -173,7 +173,7 @@ function UserSelection({ session }: { session: SerializedSessionState }) {
                     }
                 />
             )}
-            {session.exc?.type === 'NoCandidatesFoundException' && (
+            {session.exc?.type === 'NoCandidatesFoundError' && (
                 <NoCandidatesFoundWarning exc={session.exc} />
             )}
             {session.status.progress == Progress.DELETION_COMPLETED && (

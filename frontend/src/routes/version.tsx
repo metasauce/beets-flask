@@ -123,7 +123,7 @@ function DataSources() {
                 Data Sources
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {config.data_sources.map((source) => (
+                {config.beets_metadata_sources.map((source) => (
                     <Box
                         key={source}
                         sx={{ display: 'flex', gap: 1, alignItems: 'center' }}

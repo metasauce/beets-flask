@@ -13,41 +13,36 @@ Why not just have State and StateInDb in the same class?
 
 from __future__ import annotations
 
-import io
 import pickle
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
-from beets.autotag import AlbumMatch
-from beets.autotag.distance import Distance
-from beets.importer import Action, ImportTask
-from beets.library.models import Item as LibraryItem
+from beets.importer import Action
 from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
+    case,
     select,
 )
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
     Mapped,
     Session,
     mapped_column,
     relationship,
 )
+from sqlalchemy.sql.elements import ColumnElement
 
+from beets_flask.database.mapper.base import Context
 from beets_flask.database.models.base import Base
+from beets_flask.database.models.match import Distance, Match
 from beets_flask.disk import Archive, Folder
 from beets_flask.importer.progress import Progress
-from beets_flask.importer.states import (
-    CandidateState,
-    SerializedCandidateState,
-    SerializedSessionState,
-    SerializedTaskState,
-    SessionState,
-    TaskState,
-)
-from beets_flask.importer.types import BeetsAlbumMatch, BeetsTrackMatch
+from beets_flask.importer.states import SessionState
 from beets_flask.logger import log
 from beets_flask.server.exceptions import SerializedException
+
+from .pending import TaskItem
 
 
 class FolderInDb(Base):
@@ -66,8 +61,7 @@ class FolderInDb(Base):
     is_album: Mapped[bool | None]
 
     def __init__(self, path: Path | str, hash: str, is_album: bool | None = None):
-        """
-        Create a FolderInDb object from a path.
+        """Create a FolderInDb object from a path.
 
         Convention:
         /home/user/foo/
@@ -77,6 +71,11 @@ class FolderInDb(Base):
         ----------
         path : Path
             The path to create the object from.
+        hash : str
+            The hash of the folder.
+        is_album : bool | None, optional
+            Whether the folder is an album; None if not checked yet.
+
         """
         if isinstance(path, str):
             path = Path(path)
@@ -113,10 +112,11 @@ class FolderInDb(Base):
 
     @property
     def hash(self) -> str:
-        """
-        Convenience property to get the id.
+        """Convenience property to get the id.
 
-        Note: Although the id is just the hash, when querying the db, you **must** use `FolderInDb.id == hash`. Sqlalchemy does not resolve properties.
+        Note: Although the id is just the hash, when querying the db, you
+        **must** use `FolderInDb.id == hash`. Sqlalchemy does not resolve
+        properties.
         """
         return self.id
 
@@ -130,14 +130,16 @@ class FolderInDb(Base):
 
     @classmethod
     def get_current_on_disk(cls, hash: str, path: Path | str) -> Folder | Archive:
-        """
-        Check that a folders hash is still the same, as you have previously determined.
+        """Check that a folder's hash is still the same as previously determined.
 
-        If changed, a new instance of FolderInDb is created and stored in the DB.
+        If changed, a new instance of FolderInDb is created and stored in
+        the DB.
 
         Returns
         -------
-        Folder: The live folder object on disk, with the potentially new (current) hash.
+        Folder: The live folder object on disk, with the potentially new
+        (current) hash.
+
         """
         from beets_flask.database.setup import db_session_factory
 
@@ -160,7 +162,7 @@ class FolderInDb(Base):
             if f_in_db.hash != f_on_disk.hash:
                 log.debug(
                     f"Hash mismatch {path=} {f_in_db.hash=} {f_on_disk.hash=}"
-                    + "This indicatest that the folder has changed."
+                    "This indicatest that the folder has changed."
                 )
             return f_on_disk
 
@@ -188,6 +190,7 @@ class SessionStateInDb(Base):
     select(SessionStateInDb).where(TaskStateInDb.id == "some path").first()
     s_db_state = SessionStateInDb.get_by(
     ```
+
     """
 
     __tablename__ = "session"
@@ -209,11 +212,12 @@ class SessionStateInDb(Base):
             "folder_hash", "folder_revision", name="uq_folder_hash_revision"
         ),
     )
-    # We have folder revisions to allow multiple sessions for the same folder hash,
-    # the purpose being that we want to keep old sessions around. E.g. to not loose
-    # old data when regenerating previews.
-    # but at the same time, we want a soft 1:1 mapping between folder hash and session.
-    # Thus, revisions are needed: the session-hash link always uses the highest revision.
+    # We have folder revisions to allow multiple sessions for the same folder
+    # hash, the purpose being that we want to keep old sessions around. E.g.
+    # to not loose old data when regenerating previews. But at the same time,
+    # we want a soft 1:1 mapping between folder hash and session.
+    # Thus, revisions are needed: the session-hash link always uses the
+    # highest revision.
 
     # FIXME: This should be a getter for the which queries the tasks
     progress: Mapped[Progress]
@@ -235,50 +239,9 @@ class SessionStateInDb(Base):
         self.progress = progress
         self.exc = pickle.dumps(exc) if exc else None
 
-    @classmethod
-    def from_live_state(cls, state: SessionState) -> SessionStateInDb:
-        """Create the DB representation of a live SessionState.."""
-
-        session = cls(
-            folder=FolderInDb(state.folder_path, state.folder_hash),
-            id=state.id,
-            tasks=[TaskStateInDb.from_live_state(ts) for ts in state.task_states],
-            progress=state.progress.progress,
-            exc=state.exc,
-        )
-
-        return session
-
     @property
     def folder_path(self) -> Path:
         return self.folder.path
-
-    def to_live_state(self, new_folder=True) -> SessionState:
-        """Recreate the live SessionState with underlying task from its stored version in the db.
-
-        HACK: new_folder param is a bit hacky, as if we do not include the children if we
-        are not recomputing the folder hash. Might lead to some issues down the line.
-        """
-
-        if new_folder:
-            s_state = SessionState(self.folder.path)
-        else:
-            s_state = SessionState(self.folder.to_live_folder())
-
-        if s_state.folder_hash != self.folder.hash:
-            log.warning(
-                f"Folder hash mismatch for {self.folder.path}. "
-                f"Expected {self.folder.hash} but got {s_state.folder_hash}."
-            )
-        s_state.id = self.id
-        s_state.created_at = self.created_at
-        s_state.updated_at = self.updated_at
-        s_state._task_states = [task.to_live_state(s_state) for task in self.tasks]
-        s_state.exc = pickle.loads(self.exc) if self.exc else None
-        return s_state
-
-    def to_dict(self) -> SerializedSessionState:
-        return self.to_live_state(False).serialize()
 
     @classmethod
     def get_by_hash_and_path(
@@ -287,8 +250,7 @@ class SessionStateInDb(Base):
         path: Path | str | None,
         db_session: Session | None = None,
     ) -> SessionStateInDb | None:
-        """
-        Get a session by its hash and if this fails, try its path.
+        """Get a session by its hash and if this fails, try its path.
 
         If multiple matches, returns the most recent one.
         """
@@ -318,10 +280,89 @@ class SessionStateInDb(Base):
 
             return item
 
+    @classmethod
+    def get_ids_by_hash_and_path(
+        cls,
+        hash_path_pairs: Sequence[tuple[str | None, Path | str | None]],
+        db_session: Session | None = None,
+    ) -> list[str | None]:
+        """Resolve many (hash, path) pairs to session ids in two queries.
+
+        Same lookup semantics as `get_by_hash_and_path`: by hash first
+        (latest revision), then by path (most recently updated session).
+        Returns a sequence of session ids in the same order as the input
+        pairs; unresolved pairs map to None.
+        """
+        from beets_flask.database import db_session_factory
+
+        with db_session_factory(db_session) as db_session:
+            by_hash: dict[str, str] = {}
+            hashes = [h for h, _ in hash_path_pairs if h]
+            if hashes:
+                query = (
+                    select(cls.folder_hash, cls.id)
+                    .where(cls.folder_hash.in_(hashes))
+                    # highest revision first
+                    .order_by(cls.folder_revision.desc())
+                )
+                for folder_hash, session_id in db_session.execute(query).all():
+                    by_hash.setdefault(folder_hash, session_id)
+
+            pending = [
+                (i, str(p))
+                for i, (h, p) in enumerate(hash_path_pairs)
+                if (not h or h not in by_hash) and p
+            ]
+            by_path: dict[str, str] = {}
+            if pending:
+                query = (
+                    select(FolderInDb.full_path, cls.id)
+                    .join(cls.folder)
+                    .where(FolderInDb.full_path.in_([p for _, p in pending]))
+                    # most recently updated first
+                    .order_by(cls.updated_at.desc(), cls.folder_revision.desc())
+                )
+                for full_path, session_id in db_session.execute(query).all():
+                    by_path.setdefault(full_path, session_id)
+
+            result: list[str | None] = [None] * len(hash_path_pairs)
+            for i, (h, p) in enumerate(hash_path_pairs):
+                item = by_hash.get(h) if h else None
+                if item is None and p:
+                    item = by_path.get(str(p))
+                result[i] = item
+
+            return result
+
     @property
     def exception(self) -> SerializedException | None:
         """Returns the exception of the session if it failed."""
         return pickle.loads(self.exc) if self.exc else None
+
+    def to_live_state(self):
+        """To live state.
+
+        Outlook: We should remove this at some point once we refactor
+        the live_state logic!
+        """
+        from beets_flask.database.mapper.states import SessionStateMapper
+
+        mapper = SessionStateMapper()
+        ctx = Context()
+        return mapper.from_db(self, ctx)
+
+    @classmethod
+    def from_live_state(cls, live_state: SessionState):
+        """From live state.
+
+        Outlook: We should remove this at some point once we refactor
+        the live_state logic!
+        """
+        from beets_flask.database.mapper.states import SessionStateMapper
+
+        mapper = SessionStateMapper()
+        ctx = Context()
+        return mapper.to_db(live_state, ctx)
 
 
 class TaskStateInDb(Base):
@@ -347,7 +388,10 @@ class TaskStateInDb(Base):
         cascade="all, delete-orphan",
     )
     # Set at the end of the import session
-    chosen_candidate_id: Mapped[str | None] = mapped_column(ForeignKey("candidate.id"))
+    # use_alter=True to break circular FK with candidate.task_id
+    chosen_candidate_id: Mapped[str | None] = mapped_column(
+        ForeignKey("candidate.id", use_alter=True)
+    )
     chosen_candidate: Mapped[CandidateStateInDb | None] = relationship(
         back_populates="task",
         foreign_keys=[chosen_candidate_id],
@@ -360,14 +404,11 @@ class TaskStateInDb(Base):
     old_paths: Mapped[bytes | None]
     # old_paths contain original file paths, but are only set when files are moved.
     # (which breaks some deep links that before were identical to paths, but no more!)
-    items: Mapped[bytes]
+    pending_items: Mapped[list[TaskItem]] = relationship(
+        back_populates="task",
+        cascade="all, delete-orphan",
+    )
     choice_flag: Mapped[Action | None]
-
-    # To allow for continue we need to store the current artist and album
-    # TODO: REMOVE this is not needed!! We can look at the asis candidate for this!
-    # E.g. frontend component to compare two candidates
-    cur_artist: Mapped[str | None]
-    cur_album: Mapped[str | None]
 
     progress: Mapped[Progress]
 
@@ -377,92 +418,22 @@ class TaskStateInDb(Base):
         toppath: bytes | None = None,
         paths: list[bytes] = [],
         old_paths: list[bytes] | None = None,
-        items: list[LibraryItem] = [],
+        pending_items: list[TaskItem] = [],
         candidates: list[CandidateStateInDb] = [],
         chosen_candidate_id: str | None = None,
         progress: Progress = Progress.NOT_STARTED,
         choice_flag: Action | None = None,
-        cur_artist: str | None = None,
-        cur_album: str | None = None,
     ):
         super().__init__(id)
         self.toppath = toppath
         self.paths = pickle.dumps(paths)
         self.old_paths = pickle.dumps(old_paths) if old_paths else None
 
-        for item in items:
-            # Remove db from all items as it can't be pickled
-            item._db = None
-            item._Item__album = None
-
-        self.items = pickle.dumps(items)
+        self.pending_items = pending_items
         self.candidates = candidates
         self.chosen_candidate_id = chosen_candidate_id
         self.progress = progress
         self.choice_flag = choice_flag
-        self.cur_artist = cur_artist
-        self.cur_album = cur_album
-
-    @classmethod
-    def from_live_state(cls, state: TaskState) -> TaskStateInDb:
-        """Create the DB representation of a live TaskState."""
-        if hasattr(state.task, "old_paths"):
-            old_paths = state.task.old_paths
-        else:
-            old_paths = None
-
-        task = cls(
-            id=state.id,
-            toppath=str(state.toppath).encode("utf-8") if state.toppath else None,
-            paths=state.task.paths,
-            items=state.task.items,
-            candidates=[
-                CandidateStateInDb.from_live_state(c) for c in state.candidate_states
-            ],
-            chosen_candidate_id=state.chosen_candidate_state_id,
-            progress=state.progress.progress,
-            choice_flag=state.task.choice_flag,
-            cur_artist=state.task.cur_artist,
-            cur_album=state.task.cur_album,
-            old_paths=old_paths,
-        )
-        return task
-
-    def to_live_state(self, session_state: SessionState | None = None) -> TaskState:
-        """Recreate the live TaskState with underlying task from its stored version in the db."""
-
-        # We just assume it is a normal import task
-        beets_task = ImportTask(
-            toppath=self.toppath,
-            paths=pickle.loads(self.paths),
-            items=pickle.loads(self.items),
-        )
-        beets_task.choice_flag = self.choice_flag
-        beets_task.cur_artist = self.cur_artist
-        beets_task.cur_album = self.cur_album
-        old_paths: list[bytes] | None = (
-            pickle.loads(self.old_paths) if self.old_paths else None
-        )
-        # TODO: Update type hints once beets is updated
-        beets_task.old_paths = old_paths  # type: ignore
-
-        live_state = TaskState(beets_task)
-        live_state.id = self.id
-        live_state.created_at = self.created_at
-        live_state.updated_at = self.updated_at
-        live_state.candidate_states = [
-            c.to_live_state(live_state) for c in self.candidates
-        ]
-        live_state.chosen_candidate_state_id = self.chosen_candidate_id
-        live_state.progress.progress = self.progress
-
-        # Set candidate of beets_task
-        live_state.task.candidates = [c.match for c in live_state.candidate_states]
-
-        return live_state
-
-    def to_dict(self) -> SerializedTaskState:
-        return self.to_live_state().serialize()
 
 
 class CandidateStateInDb(Base):
@@ -480,108 +451,47 @@ class CandidateStateInDb(Base):
     )
 
     # Should deserialize to AlbumMatch|TrackMatch
-    # ~4kb per match
-    match: Mapped[bytes]
+    match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"))
+    match: Mapped[Match] = relationship()
 
     # Duplicate ids (if any) (beets_id)
+    # TODO: We should recompute the duplicates on fetching data from the database
     duplicate_ids: Mapped[str]
-
-    # association between tracks online and items on disk, from int to int
-    mapping: Mapped[dict[int, int]]
 
     def __init__(
         self,
-        match: BeetsAlbumMatch | BeetsTrackMatch,
-        mapping: dict[int, int],
+        match: Match,
+        task: TaskStateInDb,
         duplicate_ids: list[str] = [],
         id: str | None = None,
     ):
         super().__init__(id)
 
-        # Remove db from all items as it can't be pickled
-        # FIXME: this should go into beets __getstate__ method
-        # see https://github.com/beetbox/beets/pull/5641
-        if isinstance(match, BeetsAlbumMatch):
-            for item in match.mapping.keys():
-                item._db = None
-                item._Item__album = None
-            for item in match.extra_items:
-                item._db = None
-                item._Item__album = None
-
-        self.match = pickle.dumps(match)
+        self.match = match
+        self.task = task
         self.duplicate_ids = ";".join(map(str, duplicate_ids))
-        self.mapping = mapping
 
-    @classmethod
-    def from_live_state(cls, state: CandidateState) -> CandidateStateInDb:
-        """Create the DB representation of a live CandidateState."""
-        return cls(
-            id=state.id,
-            match=state.match,
-            duplicate_ids=state.duplicate_ids,
-            mapping=state._mapping,
+    @hybrid_property
+    def normalized_distance(self) -> float:
+        """Normalized beets distance of this candidate (0-1, lower is better).
+
+        A max distance of zero (no penalties) counts as a perfect match.
+        """
+        distance = self.match.distance
+        if distance.max_distance == 0:
+            return 0.0
+        return distance.raw_distance / distance.max_distance
+
+    @normalized_distance.inplace.expression
+    def _normalized_distance_expression(self) -> ColumnElement[float]:
+        """SQL counterpart of `normalized_distance`.
+
+        Requires joins to `Match` and `Distance` in the query.
+        """
+        return case(
+            (Distance.max_distance == 0, 0.0),
+            else_=Distance.raw_distance / Distance.max_distance,
         )
 
-    def to_live_state(self, task_state: TaskState | None) -> CandidateState:
-        """Recreate the live CandidateState with underlying task from its stored version in the db."""
-        if task_state is None:
-            task_state = self.task.to_live_state()
-        live_state = CandidateState(
-            CustomUnpickler(io.BytesIO(self.match)).load(),
-            task_state,
-            mapping=self.mapping,
-        )
-        live_state.id = self.id
-        live_state.created_at = self.created_at
-        live_state.updated_at = self.updated_at
-        live_state.duplicate_ids = (
-            # edge case: "".split() gives ['']
-            [] if len(self.duplicate_ids) == 0 else self.duplicate_ids.split(";")
-        )
-        return live_state
 
-    def to_dict(self) -> SerializedCandidateState:
-        return self.to_live_state(self.task.to_live_state()).serialize()
-
-
-# Hotfix for match unpickler to resolve beets distance moved
-# This is needed because various beets updates changed class implementations
-# and we want to rebuild the newer versions of some beets classes from old pickles.
-# TODO: We should fix this in general and not pickle beets objects
-class CustomUnpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        """Override the find_class method to redirect Distance class references."""
-        # Redirect Distance class from beets.autotag.hooks to beets.distance (2.4.0)
-        if module == "beets.autotag.hooks" and name == "Distance":
-            return Distance
-
-        # For all other classes, use the default lookup mechanism
-        return super().find_class(module, name)
-
-    def load(self) -> Any:
-        object = super().load()
-        if isinstance(object, Distance):
-            self.patch_distance(object)
-
-        if isinstance(object, AlbumMatch):
-            self.patch_distance(object.distance)
-
-        return object
-
-    def patch_distance(self, distance: Distance) -> Distance:
-        # Rewrite "source" penalty to "data_source" penalty (2.5.0)
-        if "source" in distance._penalties:
-            log.debug(
-                "Converting old distance.source to distance.data_source (changed in beets 2.5.0)"
-            )
-            distance._penalties["data_source"] = distance._penalties["source"]
-            del distance._penalties["source"]
-
-            # Potential infinite recursion, ah well
-            for track, d in distance.tracks.items():
-                self.patch_distance(d)
-        return distance
-
-
-__all__ = ["SessionStateInDb", "TaskStateInDb", "CandidateStateInDb"]
+__all__ = ["CandidateStateInDb", "SessionStateInDb", "TaskStateInDb"]

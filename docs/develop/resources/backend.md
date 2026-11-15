@@ -5,6 +5,8 @@ Beets-Flask provides a quart application with REST API for the beets music libra
 ```{toctree}
 :hidden:
 
+./classes
+./database
 ./state_serialize
 ```
 
@@ -23,5 +25,3 @@ BEETSDIR="/config/beets"
 BEETSFLASKDIR="/config/beets-flask"
 BEETSFLASKLOG="/logs/beets-flask.log"
 ```
-
-

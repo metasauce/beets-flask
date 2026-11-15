@@ -18,6 +18,7 @@ import Typography from '@mui/material/Typography';
 import { useRouter } from '@tanstack/react-router';
 
 import { BackButton } from './components/common/inputs/back';
+import { toSerializedException } from './errorUtils';
 import { SerializedException } from './pythonTypes';
 
 import brokenRecord from '@/assets/broken-record.png';
@@ -31,7 +32,7 @@ import brokenRecord from '@/assets/broken-record.png';
  *
  * Also includes a link to the github issues page.
  */
-export function ErrorCard({ error }: { error: Error }) {
+export function ErrorCard({ error }: { error: unknown }) {
     useEffect(() => {
         console.error(error);
     }, [error]);
@@ -41,12 +42,7 @@ export function ErrorCard({ error }: { error: Error }) {
             title="Unexpected Error"
             subtitle="Oh no! Seems like we dropped a beat!"
             color="primary"
-            exc={{
-                type: error.name,
-                message: error.message,
-                description: error.message,
-                trace: error.stack,
-            }}
+            exc={toSerializedException(error)}
             showSocials={true}
         />
     );
@@ -207,7 +203,7 @@ export function GenericErrorCard({
                         sx={{ color: 'text.secondary', marginTop: '0.2rem' }}
                     >
                         If this is a reoccurring issue, feel free to raise an{' '}
-                        <Link href="https://github.com/pSpitzner/beets-flask/issues">
+                        <Link href="https://github.com/metasauce/beets-flask/issues">
                             issue on GitHub
                         </Link>
                         .

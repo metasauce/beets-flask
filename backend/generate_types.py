@@ -1,6 +1,7 @@
 from py2ts.builder import TSBuilder
 from py2ts.config import CONFIG
 
+from beets_flask.config.schema import BeetsSchema
 from beets_flask.disk import Archive, File, FileSystemItem, Folder
 from beets_flask.importer.session import CandidateChoiceFallback
 from beets_flask.importer.states import (
@@ -10,6 +11,7 @@ from beets_flask.invoker import EnqueueKind
 from beets_flask.invoker.enqueue import (
     Search,
 )
+from beets_flask.server.routes.db_models.session import MinimalSession
 from beets_flask.server.routes.inbox import InboxStats
 from beets_flask.server.routes.library.resources import (
     AlbumResponse,
@@ -41,6 +43,9 @@ builder = TSBuilder()
 
 # Session state
 builder.add(SerializedSessionState)
+
+# Best-match chip info per folder
+builder.add(MinimalSession)
 
 # ------------------------------- inbox routes ------------------------------- #
 
@@ -79,6 +84,10 @@ builder.add(FolderStatusUpdate)
 builder.add(JobStatusUpdate)
 builder.add(FileSystemUpdate)
 
+
+# ---------------------------------- Config ---------------------------------- #
+
+builder.add(BeetsSchema)
 
 builder.save_file("../frontend/src/pythonTypes.ts")
 print("✅ Typescript types generated successfully!")

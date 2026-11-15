@@ -37,8 +37,12 @@ export const libraryStatsQueryOptions = () => {
                 lastItemModified: dat.lastItemModified
                     ? new Date(dat.lastItemModified)
                     : undefined,
-            } as LibraryStats;
+            };
         },
+        // The server walks the library for its size in the background. Poll
+        // until it has a number.
+        refetchInterval: (query) =>
+            query.state.data?.size === null ? 4000 : false,
     });
 };
 

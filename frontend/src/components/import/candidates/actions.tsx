@@ -44,7 +44,7 @@ function candidateMatchText({
 }: {
     candidate: SerializedCandidateState;
 }) {
-    let text = '';
+    let text: string;
     const match = 1 - candidate.distance;
     if (match > 0.95) {
         text = 'This is a perfect match!';
@@ -217,7 +217,7 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
     const [search, setSearch] = useState<Search>({
         search_ids: [],
         search_artist: null,
-        search_album: null,
+        search_name: null,
     });
 
     /** Mutation for the search
@@ -274,7 +274,7 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                             setSearch({
                                 search_ids: [],
                                 search_artist: '',
-                                search_album: '',
+                                search_name: '',
                             });
                         } catch (e) {
                             // dont close the dialog
@@ -332,11 +332,11 @@ export function CandidateSearch({ task }: { task: SerializedTaskState }) {
                                     id="input-search-artist"
                                     label="and album"
                                     placeholder="Album"
-                                    value={search.search_album || ''}
+                                    value={search.search_name || ''}
                                     onChange={(e) => {
                                         setSearch({
                                             ...search,
-                                            search_album: e.target.value,
+                                            search_name: e.target.value,
                                         });
                                     }}
                                 />

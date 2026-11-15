@@ -11,9 +11,12 @@ function in the `__init__.py` file.
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ..logger import log
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 cwd = os.getcwd()
 
@@ -37,6 +40,9 @@ class ServerConfig:
     # Folder where the frontend build resources are stored
     # FIXME: 2025-06-04 likely we only need this in production.
     FRONTEND_DIST_DIR = "../frontend/dist/"
+
+    # For file uploads
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2 GB
 
     # Not sure if this is even used!
     SECRET_KEY = "secret"

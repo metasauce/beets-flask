@@ -9,11 +9,16 @@ from cachetools import Cache
 from confuse import AttrDict
 
 from beets_flask.dirhash_custom import dirhash_c
-from beets_flask.disk import Folder, _matches_patterns, audio_regex
+from beets_flask.disk import (
+    Folder,
+    _matches_patterns,
+    audio_regex,
+    is_album_folder,
+)
 
 
 def touch(path):
-    with open(path, "w") as f:
+    with open(path, "w"):
         pass
 
 
@@ -87,6 +92,8 @@ def s_base(tmpdir_factory):
     # but with the default config, hidden files should be ignored:
     os.makedirs(os.path.join(base, "artist/album_junk"))
     touch(os.path.join(base, "artist/album_junk/.junk.jpg"))
+    # non-hidden junk must not make the folder an album either
+    touch(os.path.join(base, "artist/album_junk/foo.txt"))
 
     # the annoying rogue element (same as nested folders, but with a rogue file)
     os.makedirs(os.path.join(base, "artist/album_rogue/CD1"))
@@ -100,7 +107,8 @@ def s_base(tmpdir_factory):
     touch(os.path.join(base, "artist/album_good/track_1.mp3"))
     touch(os.path.join(base, "artist/album_good/track_2.mp3"))
 
-    # Archive, needs to be an actual zip file, just touching is not enough for the beets' internal archive detection
+    # Archive, needs to be an actual zip file, just touching is not enough
+    # for the beets' internal archive detection
     os.makedirs(os.path.join(base, "artist/archive"))
     with zipfile.ZipFile(os.path.join(base, "artist/archive/foo.zip"), "w") as _zipf:
         pass
@@ -116,9 +124,6 @@ def s_base(tmpdir_factory):
     yield base
 
     shutil.rmtree(base)
-
-
-from beets_flask.disk import is_album_folder
 
 
 class TestIsAlbumFolder:
@@ -153,7 +158,7 @@ class TestIsAlbumFolder:
         assert is_album_folder(s_base + "/artist/album_rogue/CD2")
 
     def test_archive(self, s_base):
-        assert is_album_folder(s_base + "/artist/archive") == False
+        assert not is_album_folder(s_base + "/artist/archive")
         assert is_album_folder(s_base + "/artist/archive/foo.zip")
 
     @pytest.mark.skip("is_album_folder tricky logic for archive and music")
@@ -161,7 +166,7 @@ class TestIsAlbumFolder:
     # `is_album_folder` and `all_album_folders`
     def test_archive_and_music(self, s_base):
         assert is_album_folder(s_base + "/artist/archive_and_music")
-        assert is_album_folder(s_base + "/artist/archive_and_music/foo.zip") == False
+        assert not is_album_folder(s_base + "/artist/archive_and_music/foo.zip")
 
 
 class TestAllAlbumFolders:
@@ -227,16 +232,16 @@ class TestIsWithinMultiDir:
         [Path, str],
     )
     def test_is_within_multi_dir(self, type, s_base):
-        from beets_flask.disk import is_within_multi_dir
+        from beets_flask.disk import _is_within_multi_dir
 
-        assert is_within_multi_dir(type(s_base + "/artist/album_multi/CD1"))
-        assert is_within_multi_dir(type(s_base + "/artist/album_multi/CD2"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_multi/CD1"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_multi/CD2"))
         # should work with and without trailing slashes
-        assert is_within_multi_dir(type(s_base + "/artist/album_rogue/CD1"))
-        assert is_within_multi_dir(type(s_base + "/artist/album_rogue/CD2"))
-        assert not is_within_multi_dir(type(s_base + "/artist/album_multi/"))
-        assert not is_within_multi_dir(type(s_base + "/artist/album_good/"))
-        assert not is_within_multi_dir(type(s_base + "/artist/archive/foo.zip"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_rogue/CD1"))
+        assert _is_within_multi_dir(type(s_base + "/artist/album_rogue/CD2"))
+        assert not _is_within_multi_dir(type(s_base + "/artist/album_multi/"))
+        assert not _is_within_multi_dir(type(s_base + "/artist/album_good/"))
+        assert not _is_within_multi_dir(type(s_base + "/artist/archive/foo.zip"))
 
 
 # input, use_parent_for_multidisc, expected

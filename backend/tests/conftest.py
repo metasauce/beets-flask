@@ -1,17 +1,30 @@
+from __future__ import annotations
+
+import hashlib
 import logging
 import os
+import pickle
 import shutil
-from collections.abc import Callable, Generator
-from contextlib import _GeneratorContextManager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-from quart import Quart
-from quart.typing import TestClientProtocol
-from sqlalchemy.orm import Session
+import yaml
+from beets import autotag
+from beets.autotag import Source
+from beets.autotag import tag_album as _tag_album
 
-from beets_flask.importer.types import BeetsLibrary
 from beets_flask.server.app import create_app
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+    from contextlib import _GeneratorContextManager
+
+    from quart import Quart
+    from quart.typing import TestClientProtocol
+    from sqlalchemy.orm import Session
+
+    from beets_flask.importer.types import BeetsLibrary
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +48,19 @@ def setup_and_teardown(tmpdir_factory):
     os.environ["BEETSFLASKDIR"] = str(tmp_dir / "beets-flask")
     os.makedirs(name=tmp_dir / "beets-flask", exist_ok=True)
     os.environ["IB_SERVER_CONFIG"] = "test"
+
+    # ---------------------- Overwrite default settings ---------------------- #
+
+    # Let's not create default configs that wouldnt pass our tests
+    with open(tmp_dir / "beets-flask/config.yaml", "w") as f:
+        yaml.dump(
+            {"gui": {"num_preview_workers": 4, "terminal": {"enabled": False}}}, f
+        )
+
+    # we have one test that does replacements on this file
+    # and assumes the default 4 workers
+    with open(tmp_dir / "beets/config.yaml", "w") as f:
+        yaml.dump({"plugins": ["musicbrainz", "spotify"]}, f)
 
     yield
 
@@ -64,12 +90,15 @@ def fixture_runner(app):
 # Both for our and the beets database
 
 
-@pytest.fixture(name="db_session_factory")
-def db_session_factory(
-    testapp,
-) -> Callable[..., _GeneratorContextManager[Session, None, None]]:
+@pytest.fixture(name="db_session_factory", scope="session")
+def db_session_factory() -> Callable[
+    ..., _GeneratorContextManager[Session, None, None]
+]:
     from beets_flask.database import db_session_factory
+    from beets_flask.database.setup import _reset_database, _setup_factory
 
+    _setup_factory()
+    _reset_database()
     return db_session_factory
 
 
@@ -83,11 +112,7 @@ def db_session(db_session_factory):
 def beets_lib() -> Generator[BeetsLibrary, None, None]:
     import beets.library
 
-    from beets_flask.config.beets_config import refresh_config
-
     lib = beets.library.Library(path=os.environ["BEETSDIR"] + "/library.db")
-
-    refresh_config()
 
     # Copy test audio data
     source = Path(__file__).parent / "data" / "audio"
@@ -117,10 +142,10 @@ def beets_lib_item(**kwargs):
         artist="the artist",
         albumartist="the album artist",
         album="the album",
-        genre="the genre",
-        lyricist="the lyricist",
-        composer="the composer",
-        arranger="the arranger",
+        genres=["the genre1", "another genre"],
+        lyricists=["the lyricist"],
+        composers=["the composer"],
+        arrangers=["the arranger"],
         grouping="the grouping",
         year=1,
         month=2,
@@ -133,11 +158,9 @@ def beets_lib_item(**kwargs):
         comments="the comments",
         path=os.environ["HOME"] + "/audio/test.mp3",
     )
-    default_kwargs.update(kwargs)
 
     i = beets.library.Item(
-        None,
-        **default_kwargs,
+        **{**default_kwargs, **kwargs},
     )
     return i
 
@@ -153,7 +176,7 @@ def beets_lib_album(**kwargs):
     default_kwargs = dict(
         album="the album",
         albumartist="the album artist",
-        genre="the genre",
+        genres=["the genre1", "another genre"],
         year=1,
         month=2,
         day=3,
@@ -166,8 +189,7 @@ def beets_lib_album(**kwargs):
     default_kwargs.update(kwargs)
 
     a = beets.library.Album(
-        db=None,
-        **default_kwargs,
+        **{**default_kwargs, **kwargs},
     )
     return a
 
@@ -197,3 +219,70 @@ def local_redis(monkeypatch):
     yield
     log.debug("Unmocking beets_flask.redis")
     monkeypatch.undo()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_tag_album():
+    """Fixture that monkeypatches beets tag_album to use cached lookups.
+
+    Caches MusicBrainz lookups in ``/tmp/beets_lookup_cache_<version>/`` so
+    they survive across test runs but are keyed by beets version.
+
+    We must patch both ``beets.autotag.tag_album`` (the public API) and
+    ``beets.importer.tasks.tag_album`` (where the actual call site lives,
+    imported directly from ``beets.autotag.match``, bypassing the public API).
+    """
+    import beets
+    import beets.importer.tasks as tasks_mod
+
+    # Persistent cache in /tmp, keyed by beets version
+    cache_dir = Path(f"/tmp/beets_lookup_cache_{beets.__version__}")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save originals from both patched locations.
+    # beeets.importer.tasks imports tag_album directly from
+    # beets.autotag.match (not via beets.autotag), so we must
+    # patch that module's attribute too.  Use setattr to avoid
+    # pyright reportPrivateImportUsage on the re-imported name.
+    _original_autotag = autotag.tag_album
+    _original_tasks = getattr(tasks_mod, "tag_album")
+
+    def _cached_tag_album(
+        source: Source,
+        search_artist: str | None = None,
+        search_name: str | None = None,
+        search_ids: list[str] = [],
+    ):
+        # Compute stable hash from items and search parameters
+        m = hashlib.md5()
+        for item in source.items:
+            m.update(item.path)
+        if search_artist:
+            m.update(search_artist.encode("utf-8"))
+        if search_name:
+            m.update(search_name.encode("utf-8"))
+        for search_id in search_ids:
+            m.update(search_id.encode("utf-8"))
+        items_hash = m.hexdigest()[:8]
+
+        cache_file = cache_dir / f"lookup_{items_hash}.pickle"
+        if cache_file.exists():
+            log.debug(f"Using cached lookup from {cache_file}")
+            with open(cache_file, "rb") as f:
+                return pickle.load(f)
+
+        # Real lookup on cache miss
+        res = _tag_album(source, search_artist, search_name, search_ids)
+        with open(cache_file, "wb") as f:
+            pickle.dump(res, f)
+        return res
+
+    # Patch both locations so the wrapper intercepts all call paths
+    autotag.tag_album = _cached_tag_album
+    setattr(tasks_mod, "tag_album", _cached_tag_album)
+
+    yield cache_dir
+
+    # Restore originals
+    autotag.tag_album = _original_autotag
+    setattr(tasks_mod, "tag_album", _original_tasks)

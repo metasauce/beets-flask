@@ -10,7 +10,6 @@ from beets_flask.importer.states import SessionState
 from .conftest import (
     VALID_PATHS,
     album_path_absolute,
-    use_mock_tag_album,
 )
 
 log = logging.getLogger(__name__)
@@ -26,7 +25,6 @@ def test_generate_lookup():
     """
     for path in VALID_PATHS:
         p = Path(__file__).parent.parent.parent / "data" / "audio" / path
-        use_mock_tag_album(str(p))
 
         state = SessionState(p)
         session = PreviewSession(state)
@@ -45,15 +43,14 @@ def test_album_exists(album_paths: list[Path]):
 
 
 class TestPreviewSessions:
-    def get_state(self, path: str):
+    async def get_state(self, path: str):
         p = album_path_absolute(path)
         self.session = PreviewSession(SessionState(p))
-        use_mock_tag_album(str(p))
-        return self.session.run_sync()
+        return await self.session.run_async()
 
     @pytest.mark.parametrize("path", VALID_PATHS)
-    def test_candidates_url(self, path):
-        state = self.get_state(path)
+    async def test_candidates_url(self, path):
+        state = await self.get_state(path)
         for task in state.task_states:
             for candidate in task.candidate_states:
                 if candidate.id.startswith("asis"):

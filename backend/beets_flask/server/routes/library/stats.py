@@ -1,14 +1,16 @@
-from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict, cast
+from __future__ import annotations
 
-from quart import Blueprint, g, jsonify
+import asyncio
+from pathlib import Path
+from typing import TypedDict
+
+from quart import Blueprint, jsonify
 
 from beets_flask.config import get_config
-from beets_flask.disk import dir_size
+from beets_flask.dir_size import dir_size
+from beets_flask.importer.types import BEETS_DB_MULTI_VALUE_DELIMITER
 
-if TYPE_CHECKING:
-    # For type hinting the global g object
-    from . import g
+from . import g
 
 stats_bp = Blueprint("stats", __name__)
 
@@ -23,7 +25,7 @@ class LibraryStats(TypedDict):
     genres: int  # Num Genres
     labels: int  # Num Labels
 
-    size: int  # bytes of the library folder
+    size: int | None  # bytes of the library folder, None while unknown
     lastItemAdded: int | None  # UTC timestamp
     lastItemModified: int | None  # UTC timestamp
     runtime: int  # seconds
@@ -33,33 +35,54 @@ class LibraryStats(TypedDict):
 async def stats():
     """Get library statistics."""
 
-    config = get_config()
+    config_dir = get_config().data.directory
 
     with g.lib.transaction() as tx:
         album_stats = tx.query(
-            "SELECT COUNT(*), COUNT(DISTINCT genre), COUNT(DISTINCT label), COUNT(DISTINCT albumartist) FROM albums"
+            "SELECT COUNT(*), COUNT(DISTINCT label), "
+            "COUNT(DISTINCT albumartist) FROM albums"
         )
         items_stats = tx.query(
             "SELECT COUNT(*), MAX(added), MAX(mtime), SUM(length) FROM items"
         )
 
-    lib_path = cast(str, config["directory"].get(str))
+        genre_rows = tx.query("""
+            SELECT DISTINCT TRIM(genres) AS genres
+            FROM albums
+            WHERE genres IS NOT NULL AND TRIM(genres) != ''
+        """)
+        genres = sorted(
+            {
+                g.strip()
+                for row in genre_rows
+                for g in row["genres"].split(BEETS_DB_MULTI_VALUE_DELIMITER)
+                if g.strip()
+            }
+        )
+
+    # A response waits at most two seconds for the du walk. The walk keeps
+    # running, so the next request can return the size.
+    try:
+        async with asyncio.timeout(2):
+            size = await dir_size(Path(config_dir))
+    except TimeoutError:
+        size = None
 
     ret: LibraryStats = {
-        "libraryPath": str(config["directory"].as_str()),
+        "libraryPath": str(config_dir),
         "items": items_stats[0][0],
         "albums": album_stats[0][0],
-        "artists": album_stats[0][3],
-        "genres": album_stats[0][1],
-        "labels": album_stats[0][2],
-        "size": dir_size(Path(lib_path)),
+        "artists": album_stats[0][2],
+        "genres": len(genres),
+        "labels": album_stats[0][1],
+        "size": size,
         "lastItemAdded": (
             round(items_stats[0][1] * 1000) if items_stats[0][1] is not None else None
         ),
         "lastItemModified": (
             round(items_stats[0][2] * 1000) if items_stats[0][2] is not None else None
         ),
-        "runtime": items_stats[0][3] or 0,
+        "runtime": items_stats[0][3] if items_stats[0][3] is not None else 0,
     }
 
     return jsonify(ret)

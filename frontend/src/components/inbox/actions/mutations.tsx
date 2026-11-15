@@ -17,6 +17,10 @@ import { EnqueueKind } from '@/pythonTypes';
 
 import { InboxCardContext, useInboxCardContext } from '../cards/inboxCard';
 import {
+    FileUploadContextType,
+    useFileUploadContext,
+} from '../fileUpload/context';
+import {
     FolderSelectionContext,
     useFolderSelectionContext,
 } from '../folderSelectionContext';
@@ -26,6 +30,7 @@ export function useActionMutation(action: Action) {
     const selectionContext = useFolderSelectionContext();
     const inboxContext = useInboxCardContext();
     const terminalContext = useTerminalContext();
+    const uploadContext = useFileUploadContext();
     const navigate = useNavigate();
 
     const [options, mutationArgs] = actionMutationOptionsAndArgs(
@@ -33,6 +38,7 @@ export function useActionMutation(action: Action) {
         socket,
         selectionContext,
         inboxContext,
+        uploadContext,
         terminalContext,
         navigate
     );
@@ -56,6 +62,7 @@ function actionMutationOptionsAndArgs<T = unknown>(
     socket: StatusSocket | null,
     selectionContext: FolderSelectionContext,
     inboxContext: InboxCardContext,
+    uploadContext: FileUploadContextType,
     terminalContext: TerminalContextI,
     navigate: UseNavigateResult<string>
 ): [UseMutationOptions<unknown, APIError, T>, T] {
@@ -157,6 +164,15 @@ function actionMutationOptionsAndArgs<T = unknown>(
                     escape: options?.escape ?? true, // default to escaping paths
                 } as T,
             ];
+        case 'upload':
+            return [
+                uploadDialogMutationOptions as UseMutationOptions<
+                    unknown,
+                    APIError,
+                    T
+                >,
+                { ...uploadContext, inboxFolder: inboxContext.folder } as T,
+            ];
         case 'import_terminal':
             return [
                 importTerminalMutationOptions as UseMutationOptions<
@@ -211,6 +227,22 @@ const copyPathMutationOptions: UseMutationOptions<
     },
 };
 
+const uploadDialogMutationOptions: UseMutationOptions<
+    unknown,
+    APIError,
+    FileUploadContextType & { inboxFolder: InboxCardContext['folder'] }
+> = {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    mutationFn: async ({ setUploadTargetDir, setOpenDialog, inboxFolder }) => {
+        // keep the suggested name consistent with the one used in dropzone
+        setUploadTargetDir(
+            inboxFolder.full_path +
+                `/upload_${formatDate(new Date(), '%Y%m%d_%H%M%S')}`
+        );
+        setOpenDialog(true);
+    },
+};
+
 function _escapePathForBash(path: string) {
     // escaping path is fishy, but this seems to be the best compromise
     // https://stackoverflow.com/questions/1779858/how-do-i-escape-a-string-for-a-shell-command-in-node
@@ -232,7 +264,7 @@ const importTerminalMutationOptions: UseMutationOptions<
         }
 
         terminalContext.clearInput();
-        let text = '';
+        let text: string;
         const importId = 'cli-' + Math.random().toString(36).slice(2, 16);
         const importDate = formatDate(new Date(), '%Y%m%d_%H%M%S');
         const selectedPaths = selected.paths.map(_escapePathForBash);

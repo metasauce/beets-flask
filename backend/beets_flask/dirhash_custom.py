@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import os
 from hashlib import md5
 from pathlib import Path
-from re import Pattern
+from typing import TYPE_CHECKING
 
-from cachetools import Cache
+if TYPE_CHECKING:
+    from re import Pattern
+
+    from cachetools import Cache
 
 
 def dirhash_c(
@@ -25,6 +30,7 @@ def dirhash_c(
     filter_regex: re.Pattern, optional
         When calculating checksum contributon for files, only consider
         those that match the provided pattern.
+
     """
     if isinstance(dirname, Path):
         dirname = str(dirname.resolve())
@@ -89,4 +95,4 @@ def archive_hash(
     return hash.digest()
 
 
-__all__ = ["dirhash_c", "archive_hash"]
+__all__ = ["archive_hash", "dirhash_c"]

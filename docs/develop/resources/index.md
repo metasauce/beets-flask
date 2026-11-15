@@ -9,6 +9,7 @@ Feel free to open an issue or a pull request if you have any suggestions or ques
 ```{toctree}
 docker.md
 documentation.md
+extensions.md
 frontend.md
 backend.md
 macos.md

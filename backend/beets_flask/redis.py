@@ -1,13 +1,22 @@
+from __future__ import annotations
+
 import asyncio
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
-from redis import Redis
+import redis
 from rq import Queue
-from rq.job import Job
+
+if TYPE_CHECKING:
+    from rq.job import Job
 
 # Setup redis connection
-redis_conn = Redis()
+if os.environ.get("REDIS_URL"):
+    redis_conn = redis.from_url(os.environ["REDIS_URL"])
+else:
+    redis_conn = redis.Redis()
 
 # Init our different queues
 preview_queue = Queue("preview", connection=redis_conn, default_timeout=600)
@@ -40,6 +49,7 @@ async def wait_for_job_results(
     -------
     Any
         The result of the job.
+
     """
 
     start_time = time.time()
@@ -62,9 +72,9 @@ async def wait_for_job_results(
 
 
 __all__ = [
-    "queues",
     "import_queue",
     "preview_queue",
+    "queues",
     "redis_conn",
     "wait_for_job_results",
 ]

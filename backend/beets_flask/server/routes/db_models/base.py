@@ -1,21 +1,23 @@
-from collections.abc import Sequence
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from quart import Blueprint, request
 from sqlalchemy import select
 
 from beets_flask.database import db_session_factory
 from beets_flask.database.models.base import Base
-from beets_flask.server.routes.exception import InvalidUsageException
+from beets_flask.server.routes.exception import InvalidUsageError
 from beets_flask.server.utility import pop_query_param
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 __all__ = ["ModelAPIBlueprint"]
 
 T = TypeVar("T", bound=Base)
 
 
-class ModelAPIBlueprint(Generic[T]):
+class ModelAPIBlueprint[T: Base]:
     """Generic API blueprint for a model.
 
     Any database model can be used with this blueprint. Allows
@@ -75,9 +77,7 @@ class ModelAPIBlueprint(Generic[T]):
         with db_session_factory() as session:
             item = self.model.get_by(self.model.id == id, session=session)
             if not item:
-                raise InvalidUsageException(
-                    f"Item with id {id} not found", status_code=404
-                )
+                raise InvalidUsageError(f"Item with id {id} not found", status_code=404)
 
             return item.to_dict()
 
@@ -111,7 +111,7 @@ def _cursor_from_string(cursor: str | None) -> tuple[datetime, str] | None:
     return datetime.fromisoformat(c[0]), c[1]
 
 
-def _get_n_with_cursor(
+def _get_n_with_cursor[T: Base](
     model: type[T], cursor: tuple[datetime, str] | None = None, n_items: int = 50
 ):
     """Seek pagination for all items in the database.

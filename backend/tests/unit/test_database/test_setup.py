@@ -1,21 +1,17 @@
-from collections.abc import Callable
-from contextlib import _GeneratorContextManager
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from beets_flask.database.models.states import FolderInDb
-from beets_flask.database.setup import _reset_database, with_db_session
+from beets_flask.database.setup import _reset_database
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from contextlib import _GeneratorContextManager
 
-def test_with_db_session_decorator(testapp):
-    # Needs the testapp
-
-    @with_db_session
-    def sample_function(session=None):
-        return session is not None
-
-    assert sample_function() is True
+    from sqlalchemy.orm import Session
 
 
 def test_reset(

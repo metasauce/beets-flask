@@ -25,7 +25,7 @@ export default function useQueryParamsState(
     // initialize on mount to current url, or passed init state
     const [value, setValue] = useState<string | null>(() => {
         // Parse query parameter value from the URL
-        const searchParams = new URLSearchParams(location.search as string);
+        const searchParams = new URLSearchParams(location.search);
         const paramValue = searchParams.get(param);
 
         return paramValue !== null

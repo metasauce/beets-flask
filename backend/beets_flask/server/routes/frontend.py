@@ -13,9 +13,9 @@ async def reverse_proxy(path):
     """Link to vite resources."""
     # not include assets
     if (
-        not "assets" in path
-        and not "logo_beets.png" in path
-        and not "logo_flask.png" in path
+        "assets" not in path
+        and "logo_beets.png" not in path
+        and "logo_flask.png" not in path
         and not path.startswith("favicon.ico")
     ):
         path = "index.html"

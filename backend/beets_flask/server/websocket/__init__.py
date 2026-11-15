@@ -1,8 +1,16 @@
+from __future__ import annotations
+
 import os
-from collections.abc import Callable
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import socketio
+from eyconf.validation import ConfigurationError, MultiConfigurationError
+
+from beets_flask.config import get_config
+from beets_flask.logger import log
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 old_on = socketio.AsyncServer.on
 
@@ -15,7 +23,10 @@ class TypedAsyncServer(socketio.AsyncServer):
 if os.environ.get("PYTEST_CURRENT_TEST", ""):
     client_manager = None
 else:
-    client_manager = socketio.AsyncRedisManager("redis://")
+    client_manager = socketio.AsyncRedisManager(
+        os.environ.get("REDIS_URL", "redis://"),
+        redis_options={"socket_timeout": None},
+    )
 
 sio: TypedAsyncServer = cast(
     TypedAsyncServer,
@@ -34,7 +45,23 @@ def register_socketio(app):
 
     # Register all socketio namespaces
     from .status import register_status
-    from .terminal import register_tmux
 
-    register_tmux()
     register_status()
+
+    terminal_enabled = True
+    try:
+        terminal_enabled = get_config().data.gui.terminal.enabled
+    except (MultiConfigurationError, ConfigurationError):
+        # We don't want to let the exception propagate here as it won't
+        # reach the frontend.
+        # We call the get_config function later in a route, which will
+        # propagate errors to the frontend.
+        log.debug("Encountered config error. Will raise on next call to get_config()")
+
+    if terminal_enabled:
+        log.info("Setting up Web-Terminal")
+        from .terminal import register_tmux
+
+        register_tmux()
+    else:
+        log.info("Web-Terminal is disabled, skipping setup")

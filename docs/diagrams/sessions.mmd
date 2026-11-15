@@ -1,0 +1,42 @@
+flowchart LR
+
+    BeetsImportSession
+    BaseSession
+    subgraph Preview Queue
+        PreviewSession["`
+            __PreviewSession__
+            _enqueue_preview()_
+            _enqueue_import_auto()_
+        `"]
+        AddCandidatesSession["`
+            __AddCandidatesSession__
+            _enqueue_preview_add_candidates()_
+        `"]
+    end
+
+    subgraph Import Queue
+        ImportSession["`
+            __ImportSession__
+            _enqueue_import_candidate()_
+        `"]
+        BootlegImportSession["`
+            __BootlegImportSession__
+            _enqueue_import_bootleg()_
+        `"]
+        AutoImportSession["`
+            __AutoImportSession__
+            _enqueue_import_auto()_
+        `"]
+        UndoSession["`
+            __UndoSession__
+            _enqueue_import_undo()_
+        `"]
+    end
+
+    BeetsImportSession --> BaseSession
+    BaseSession --> PreviewSession
+    BaseSession --> ImportSession
+    BaseSession --> UndoSession
+    PreviewSession --> AddCandidatesSession
+    ImportSession --> BootlegImportSession
+    ImportSession --> AutoImportSession

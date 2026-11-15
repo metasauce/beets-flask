@@ -1,0 +1,29 @@
+flowchart LR
+    subgraph Beets
+        direction TB
+        LS[BeetsImportSession]
+        LT[BeetsImportTask]
+        LC["BeetsAlbumMatch | BeetsTrackMatch"]
+    end
+
+
+    subgraph BeetsFlask
+        direction TB
+        LF["Folder | Archive"]
+        SS[SessionState]
+        ST[TaskState]
+        SC[CandidateState]
+    end
+
+    subgraph BeetsFlask Database
+        direction TB
+        DF[(FolderInDb)]
+        DS[(SessionStateInDb)]
+        DT[(TaskStateInDb)]
+        DC[(CandidateStateInDb)]
+    end
+
+    LF --> DF
+    LS --> SS --> DS
+    LT --> ST --> DT
+    LC --> SC --> DC

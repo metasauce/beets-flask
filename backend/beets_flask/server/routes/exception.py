@@ -13,10 +13,10 @@ from werkzeug.exceptions import HTTPException
 
 from beets_flask import log
 from beets_flask.server.exceptions import (
-    ApiException,
-    IntegrityException,
-    InvalidUsageException,
-    NotFoundException,
+    ApiError,
+    IntegrityError,
+    InvalidUsageError,
+    NotFoundError,
     SerializedException,
 )
 
@@ -35,8 +35,8 @@ async def handle_not_implemented(error):
     )
 
 
-@error_bp.app_errorhandler(ApiException)
-async def handle_api_exception(exc: ApiException):
+@error_bp.app_errorhandler(ApiError)
+async def handle_api_exception(exc: ApiError):
     """Api exceptions can set their own status code.
 
     see ../exception.py for more details.
@@ -115,22 +115,22 @@ async def handle_generic_error(exc: Exception):
 # Api exceptions
 @error_bp.route("/error/api", methods=["GET"])
 async def error():
-    raise ApiException("This is a bad request")
+    raise ApiError("This is a bad request")
 
 
 @error_bp.route("/error/invalidUsage", methods=["GET"])
 async def invalid_usage():
-    raise InvalidUsageException("This is a bad request")
+    raise InvalidUsageError("This is a bad request")
 
 
 @error_bp.route("/error/notFound", methods=["GET"])
 async def not_found():
-    raise NotFoundException("This is a not found error")
+    raise NotFoundError("This is a not found error")
 
 
 @error_bp.route("/error/integrity", methods=["GET"])
 async def integrity():
-    raise IntegrityException("This is an integrity error")
+    raise IntegrityError("This is an integrity error")
 
 
 # Generic exceptions

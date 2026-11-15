@@ -25,7 +25,30 @@ export interface SerializedProgressState {
 export interface Search {
     search_ids: Array<string>;
     search_artist: null | string;
-    search_album: null | string;
+    search_name: null | string;
+}
+
+export interface MusicInfo {
+    type: 'album' | 'item' | 'track';
+    artist: null | string;
+    album: null | string;
+    data_url: null | string;
+    data_source: null | string;
+    year: null | number;
+    genres: Array<string> | null;
+    media: null | string;
+}
+
+export interface MinimalSession {
+    session_id: string;
+    folder_hash: string;
+    best_candidate: MinimalBestCandidateInfo;
+}
+
+export interface MinimalBestCandidateInfo {
+    data_source: string;
+    distance: number;
+    duplicates: Array<number>;
 }
 
 export interface LibraryStats {
@@ -35,7 +58,7 @@ export interface LibraryStats {
     artists: number;
     genres: number;
     labels: number;
-    size: number;
+    size: null | number;
     lastItemAdded: null | number;
     lastItemModified: null | number;
     runtime: number;
@@ -54,7 +77,7 @@ export interface InboxStats {
     path: string;
     tagged_via_gui: number;
     imported_via_gui: number;
-    size: number;
+    size: null | number;
     nFiles: number;
     last_created: Date | null;
 }
@@ -74,6 +97,56 @@ export interface Folder extends FileSystemItem {
 export interface FileSystemUpdate {
     exc: SerializedException | null;
     event: 'file_system_update';
+}
+
+export interface MatchSectionSchema {
+    strong_rec_thresh: number;
+    medium_rec_thresh: number;
+}
+
+export interface ImportDuplicateKeys {
+    album: Array<string> | string;
+    item: Array<string> | string;
+}
+
+export interface ImportSection {
+    duplicate_action: 'ask' | 'keep' | 'merge' | 'remove' | 'skip';
+    move: 'False';
+    copy: 'True';
+    duplicate_keys: ImportDuplicateKeys;
+}
+
+export interface BeetsSchema {
+    gui: BeetsFlaskSchema;
+    directory: string;
+    ignore: Array<string>;
+    plugins: Array<string>;
+    import_: ImportSection;
+    match: MatchSectionSchema;
+}
+
+export interface TerminalSectionSchema {
+    enabled: boolean;
+    start_path: string;
+}
+
+export interface LibrarySectionSchema {
+    readonly: boolean;
+    artist_separators: Array<string>;
+}
+
+export interface InboxSectionSchema {
+    ignore: '_use_beets_ignore' | Array<string>;
+    debounce_before_autotag: number;
+    temp_dir: string;
+    folders: Record<string, InboxFolderSchema>;
+}
+
+export interface BeetsFlaskSchema {
+    inbox: InboxSectionSchema;
+    library: LibrarySectionSchema;
+    terminal: TerminalSectionSchema;
+    num_preview_workers: number;
 }
 
 export interface Archive extends FileSystemItem {
@@ -106,7 +179,7 @@ export interface AlbumResponseExpanded {
     albumartist: string;
     year: number;
     added: Date;
-    genre: string;
+    genres: Array<string>;
     label: string;
     sources: Array<AlbumSource>;
     items: Array<ItemResponse>;
@@ -121,7 +194,7 @@ export interface AlbumResponse {
     albumartist: string;
     year: number;
     added: Date;
-    genre: string;
+    genres: Array<string>;
     label: string;
     sources: Array<AlbumSource>;
 }
@@ -178,6 +251,13 @@ export interface SerializedException {
     message: string;
     description?: null | string;
     trace?: null | string;
+}
+
+export interface InboxFolderSchema {
+    path: string;
+    name: string;
+    auto_threshold: null | number;
+    autotag: 'auto' | 'bootleg' | 'off' | 'preview';
 }
 
 export interface Metadata {
@@ -263,7 +343,7 @@ export interface ItemResponse {
     album_id: number;
     isrc?: string;
     size: number;
-    genre: string;
+    genres: Array<string>;
     label: string;
     samplerate: number;
     bitrate: number;
@@ -280,17 +360,6 @@ export interface ItemResponse {
     added: number;
     catalognum: string;
     sources: Array<ItemSource>;
-}
-
-export interface MusicInfo {
-    type: 'album' | 'item' | 'track';
-    artist: null | string;
-    album: null | string;
-    data_url: null | string;
-    data_source: null | string;
-    year: null | number;
-    genre: null | string;
-    media: null | string;
 }
 
 export interface ItemInfo extends MusicInfo {

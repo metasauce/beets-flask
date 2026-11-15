@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import os
 import shutil
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from beets_flask.disk import Folder
 
 from ..test_flows import SendStatusMockMixin
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestDeleteEndpoint(SendStatusMockMixin):
@@ -112,8 +117,8 @@ class TestDeleteEndpoint(SendStatusMockMixin):
         data = await response.get_json()
 
         assert response.status_code == 400
-        assert data["type"] == "InvalidUsageException"
-        assert (
-            data["message"]
-            == "Folder hash does not match the current folder hash! Please refresh your hashes before deleting!"
+        assert data["type"] == "InvalidUsageError"
+        assert data["message"] == (
+            "Folder hash does not match the current folder hash! "
+            "Please refresh your hashes before deleting!"
         )

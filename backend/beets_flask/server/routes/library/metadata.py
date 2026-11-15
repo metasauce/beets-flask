@@ -3,19 +3,22 @@
 TODO: Allow to modify metadata or let ppl apply beets changes for a library item.
 """
 
+from __future__ import annotations
+
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from beets import util as beets_util
-from quart import Blueprint, g
+from quart import Blueprint
 from tinytag import TinyTag
 
-from beets_flask.server.exceptions import IntegrityException, NotFoundException
+from beets_flask.server.exceptions import IntegrityError, NotFoundError
+
+from . import g
 
 if TYPE_CHECKING:
     # For type hinting the global g object
-    from . import g
+    from pathlib import Path
 
 
 metadata_bp = Blueprint("metadata", __name__)
@@ -31,14 +34,12 @@ async def item_metadata(item_id: int):
     # it is also used in artwork.py
     item = g.lib.get_item(item_id)
     if not item:
-        raise NotFoundException(
-            f"Item with beets_id:'{item_id}' not found in beets db."
-        )
+        raise NotFoundError(f"Item with beets_id:'{item_id}' not found in beets db.")
 
     # File path
     item_path = beets_util.syspath(item.path)
     if not os.path.exists(item_path):
-        raise IntegrityException(
+        raise IntegrityError(
             f"Item file '{item_path}' does not exist for item beets_id:'{item_id}'."
         )
 
@@ -55,7 +56,7 @@ async def file_metadata(filepath: str):
     filepath = bytes.fromhex(filepath).decode("utf-8")
 
     if not os.path.exists(filepath):
-        raise NotFoundException(f"File '{filepath}' does not exist.")
+        raise NotFoundError(f"File '{filepath}' does not exist.")
 
     return _get_metadata(filepath)
 

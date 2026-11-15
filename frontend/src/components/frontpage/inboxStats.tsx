@@ -72,8 +72,8 @@ function InboxCardView({ stats }: { stats: InboxStats }) {
 }
 
 function InboxTable({ stats }: { stats: InboxStats }) {
-    const size = stats.size ?? 0;
     const files = stats.nFiles ?? 0;
+    const size = stats.size;
 
     return (
         <table className="table-info text-gray-100 text-sm">
@@ -95,14 +95,14 @@ function InboxTable({ stats }: { stats: InboxStats }) {
                     <td>files</td>
                 </tr>
                 <tr>
-                    <td>{_to_mb(size)} </td>
-                    <td>mb</td>
+                    <td>
+                        {size === null
+                            ? 'unknown'
+                            : Math.round(size / 1024 / 1024)}
+                    </td>
+                    <td>{size === null ? '' : 'mb'}</td>
                 </tr>
             </tbody>
         </table>
     );
-}
-
-function _to_mb(bytes: number) {
-    return Math.round(bytes / 1024 / 1024);
 }

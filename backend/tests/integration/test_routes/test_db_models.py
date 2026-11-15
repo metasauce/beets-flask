@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from beets import autotag, importer
-from quart.typing import TestClientProtocol as Client
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from beets_flask.database.models.states import FolderInDb, SessionStateInDb
 from beets_flask.importer.states import SessionState
 from tests.conftest import beets_lib_item
+from tests.mixins.database import IsolatedDBMixin
 from tests.unit.test_importer.test_states import get_album_match
+
+if TYPE_CHECKING:
+    from quart.typing import TestClientProtocol as Client
+    from sqlalchemy.orm import Session
 
 
 @pytest.fixture
@@ -48,7 +54,7 @@ async def session_in_db(db_session_factory, import_task, tmpdir_factory):
         db_session.commit()
 
 
-class TestSessionEndpoint:
+class TestSessionEndpoint(IsolatedDBMixin):
     """Test the end to end functionality of the model endpoints.
 
     We automatically generate the endpoints for the sqlalchemy models. Thus we also

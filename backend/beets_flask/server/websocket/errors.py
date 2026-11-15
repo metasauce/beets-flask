@@ -1,13 +1,14 @@
-"""Similar to the routes/errors.py file, this file contains error handling logic for the websocket routes.
+"""Error handling logic for the websocket routes (like routes/errors.py).
 
-We parse all exceptions to a common format and return them to the client for handling.
+All exceptions are parsed to a common format and returned to the client
+for handling.
 """
 
 from __future__ import annotations
 
 import functools
-from collections.abc import Awaitable, Callable
 from typing import (
+    TYPE_CHECKING,
     NotRequired,
     ParamSpec,
     TypedDict,
@@ -15,6 +16,11 @@ from typing import (
 )
 
 from beets_flask import log
+
+from . import sio
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 
 class WebSocketErrorDict(TypedDict):
@@ -29,7 +35,7 @@ Params = ParamSpec("Params")
 ReturnType = TypeVar("ReturnType")
 
 
-def sio_catch_exception(
+def sio_catch_exception[**Params, ReturnType](
     func: Callable[Params, Awaitable[ReturnType]],
 ) -> Callable[Params, Awaitable[ReturnType | WebSocketErrorDict]]:
     """Parse exceptions to a common format for websocket routes.
@@ -71,17 +77,12 @@ def _error_parser(e: Exception) -> WebSocketErrorDict:
     return d
 
 
-__all__ = ["sio_catch_exception", "WebSocketErrorDict"]
-
-
-"""Allow to throw the errors in a testing
-environment. This is useful for testing
-the error handling on the frontend side.
-"""
-from . import sio
+__all__ = ["WebSocketErrorDict", "sio_catch_exception"]
 
 
 @sio.on("test_generic_exc", namespace="/test")
 @sio_catch_exception
+# This is only used in a testing environment to trigger errors
+# on the frontend side.
 def test_generic_exc(sid):
     raise Exception("Exception message")

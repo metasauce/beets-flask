@@ -3,6 +3,8 @@
 Makes it possible to query and expose items to the frontend.
 """
 
+from typing import TYPE_CHECKING
+
 from beets.ui import _open_library
 from quart import Blueprint, g
 
@@ -23,8 +25,6 @@ library_bp.register_blueprint(stats_bp)
 library_bp.register_blueprint(artists_bp)
 library_bp.register_blueprint(metadata_bp)
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from beets.library import Library
     from quart.ctx import _AppCtxGlobals
@@ -41,7 +41,7 @@ async def attach_library():
 
     This allows to reuse an open library for each request in the same thread.
     """
-    config = get_config()
+    config = get_config().beets_config
     # we will need to see if keeping the db open from each thread is what we want,
     # the importer may want to write.
     if not hasattr(g, "lib") or g.lib is None:

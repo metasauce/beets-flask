@@ -6,7 +6,6 @@ This allows us to keep track of the import state and communicate it to the front
 from __future__ import annotations
 
 import itertools
-from collections.abc import Callable, Generator
 from datetime import datetime
 from functools import wraps
 from inspect import isgenerator
@@ -21,7 +20,6 @@ from typing import (
 
 from beets import library, plugins
 from beets.importer import (
-    Action,
     ImportTask,
     SentinelImportTask,
 )
@@ -35,14 +33,16 @@ from beets.util import pipeline as beets_pipeline
 
 from beets_flask import log
 from beets_flask.server.exceptions import (
-    NoCandidatesFoundException,
-    NotImportedException,
+    NoCandidatesFoundError,
+    NotImportedError,
 )
 
 from .progress import Progress, ProgressState
-from .types import BeetsImportTask
+from .types import BeetsDuplicateAction, BeetsImportAction, BeetsImportTask
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+
     from beets_flask.importer.session import (
         AutoImportSession,
         BaseSession,
@@ -101,7 +101,8 @@ def skip_until(
             prev_progress = session.state.upsert_task(task).progress
             if prev_progress > progress:
                 log.debug(
-                    f"Skipping {progress} for {task} because task progress {prev_progress=}"
+                    "Skipping "
+                    f"{progress} for {task} because task progress {prev_progress=}"
                 )
                 return task
 
@@ -152,11 +153,12 @@ def set_progress(
 
     @set_progress(
         Progress.LOOKING_UP_CANDIDATES,
-        on_Error={NoCandidatesFoundException: Progress.PREVIEW_COMPLETED}
+        on_Error={NoCandidatesFoundError: Progress.PREVIEW_COMPLETED}
     )
     def lookup_candidates(session: BaseSessionNew, task: ImportTask):
         pass
     ```
+
     """
 
     def decorator(
@@ -200,7 +202,7 @@ class StageOrder(dict):
     ):
         """Append a stage to the Order."""
 
-        name = name or str(getattr(stage, "__name__", f"unknown_stage"))
+        name = name or str(getattr(stage, "__name__", "unknown_stage"))
         if name in self.keys():
             raise ValueError(f"Stage with name {name} already exists.")
 
@@ -215,10 +217,10 @@ class StageOrder(dict):
     ):
         """Insert a stage after or before another specific stage."""
 
-        if after is None and before is None or (after and before):
+        if (after is None and before is None) or (after and before):
             raise ValueError("Either `after` or `before` must be specified.")
 
-        name = name or str(getattr(stage, "__name__", f"unknown_stage"))
+        name = name or str(getattr(stage, "__name__", "unknown_stage"))
         if name in self.keys():
             raise ValueError(f"Stage with name {name} already exists.")
 
@@ -246,7 +248,7 @@ Task = TypeVar(
 )  # task
 
 
-def stage(
+def stage[*Arg, Task: BeetsImportTask, Ret](
     func: Callable[[*Arg, Task], Ret | None],
 ):
     """Decorate a function to become a simple stage.
@@ -273,23 +275,25 @@ def stage(
         task: Task | Ret | Generator[Task] | None = None
         while True:
             if isgenerator(task):
+                # isgenerator() narrows the type to Generator[object], but
+                # these are the tasks we are forwarding downstream.
                 for t in task:
-                    task = yield t
+                    task = yield cast(Task, t)
             else:
                 task = yield cast(
-                    Task | None | Ret, task
+                    Task | Ret | None, task
                 )  # wait for send to arrive. the first next() always returns None
             # yield task, call func which gives new task, yield new task in next()
             task = cast(Task, task)  # Slightly hacky, but we know task is a Task here
-            task = func(*(args + (task,)))
+            task = func(*((*args, task)))
 
     return coro
 
 
-def mutator_stage(
+def mutator_stage[*Arg, Task: BeetsImportTask, Ret](
     func: Callable[[*Arg, Task], Ret], name: str | None = None
 ) -> Callable[[*Arg], Generator[Ret | Task | None, Task, None]]:
-    """Decorate a function that manipulates items in a coroutine to become a simple stage.
+    """Decorate a mutator function so it becomes a simple stage.
 
     Yields a task and waits until the next task is sent to it.
 
@@ -310,10 +314,11 @@ def mutator_stage(
     ) -> Generator[Ret | Task | None, Task, None]:
         task = None
         while True:
-            task = yield task  # wait for send to arrive. the first next() always returns None
+            # wait for send to arrive. the first next() always returns None
+            task = yield task
             # perform function on task, and in next() send the same, modified task
             # funcs prob. modify task in place?
-            func(*(args + (task,)))
+            func(*((*args, task)))
 
     return coro
 
@@ -331,7 +336,7 @@ def read_tasks(
     Adapted closely from beets, but we do not need/support resuming and skipping
     """
 
-    log.debug(f"Reading files")
+    log.debug("Reading files")
 
     # Our Skip-check usually uses Progress, but here we do not have progress yet
     # We want to catch the case when we resume a session,
@@ -371,8 +376,7 @@ def group_albums(
     session: BaseSession,
     task: ImportTask,
 ) -> beets_pipeline.MultiMessage:
-    """
-    Groups items of the task into albums using their metadata.
+    """Groups items of the task into albums using their metadata.
 
     The groups are identified using artist and album fields.
 
@@ -404,25 +408,22 @@ def group_albums(
 @skip_until(Progress.LOOKING_UP_CANDIDATES)
 @set_progress(
     Progress.LOOKING_UP_CANDIDATES,
-    on_error={NoCandidatesFoundException: Progress.PREVIEW_COMPLETED},
+    on_error={NoCandidatesFoundError: Progress.PREVIEW_COMPLETED},
 )
 def lookup_candidates(
     session: BaseSession,
     task: ImportTask,
 ):
-    """Performing the initial MusicBrainz lookup for an album.
+    """Performing the initial lookup for an album.
 
-    We tweaks this from upstream beets to not
-    call `task.lookup_candidates()` but instead `session.lookup_candidates(task)`,
-    with some extra logic
+    We tweaks this from upstream beets to not call `task.lookup_candidates()` but
+    instead `session.lookup_candidates(task)` with some extra logic.
 
-    This is more consistent, as it allows the logic
-    to be modified by each kind of session.
+    This is more convinient, as it allows us to modify logic the logic by each kind
+    of session.
 
-    Calls `task.lookup_candidates()`,
+    `session.lookup_candidates` calls `task.lookup_candidates`,
     which sets attributes of the task:
-        - cur_artist   # metadata in file
-        - cur_album
         - candidates
         - rec
     """
@@ -485,7 +486,7 @@ def user_query(
     # TODO: Import as singletons i.e. task.choice_flag is action.TRACKS
 
     # As albums: group items by albums and create task for each album
-    if task.choice_flag is Action.ALBUMS:
+    if task.choice_flag is BeetsImportAction.ALBUMS:
         log.warning("This should never run via beets-flask!")
         return _extend_pipeline(
             [task],
@@ -500,7 +501,7 @@ def user_query(
     # as it only calls the sessions method, anyway.
     session.resolve_duplicate(task, found_duplicates)
 
-    if task.should_merge_duplicates:
+    if task.duplicate_action is BeetsDuplicateAction.MERGE:
         # Create a new task for tagging the current items
         # and duplicates together
         duplicate_items = task.duplicate_items(session.lib)
@@ -550,7 +551,7 @@ def plugin_stage(
 @skip_until(Progress.MATCH_THRESHOLD)
 @set_progress(
     Progress.MATCH_THRESHOLD,
-    on_error={NotImportedException: Progress.PREVIEW_COMPLETED},
+    on_error={NotImportedError: Progress.PREVIEW_COMPLETED},
 )
 def match_threshold(
     session: AutoImportSession,
@@ -580,7 +581,7 @@ def manipulate_files(
     finalizes each task.
     """
     if not task.skip:
-        if task.should_remove_duplicates:
+        if task.duplicate_action is BeetsDuplicateAction.REMOVE:
             task.remove_duplicates(session.lib)
 
         if session.config["copy"]:
@@ -600,11 +601,13 @@ def manipulate_files(
         else:
             log.warning(
                 "Beets-flask does not yet support other import modes than 'copy'. "
-                + "Please consider updating your config."
+                "Please consider updating your config."
             )
             operation = MoveOperation.COPY
 
-        task.manipulate_files(session, operation, write=session.config["write"])
+        task.manipulate_files(
+            session, operation, write=session.config["write"].get(bool)
+        )
 
     # Progress, cleanup, and event.
     task.finalize(session)
@@ -683,12 +686,11 @@ def _apply_choice(session: ImportSession, task: ImportTask):
 
 
 __all__ = [
-    "read_tasks",
     "group_albums",
-    "lookup_candidates",
     "identify_duplicates",
-    "user_query",
-    "plugin_stage",
+    "lookup_candidates",
     "manipulate_files",
-    "mark_tasks_completed",
+    "plugin_stage",
+    "read_tasks",
+    "user_query",
 ]

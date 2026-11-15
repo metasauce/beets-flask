@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import os
 from abc import ABC
-from collections import namedtuple
 from functools import cached_property
 from typing import TYPE_CHECKING
-from unittest import mock
 
 import pytest
+
+from beets_flask.config import get_config
 
 if TYPE_CHECKING:
     from beets_flask.importer.types import BeetsLibrary
@@ -39,7 +39,7 @@ class IsolatedDBMixin(ABC):
         _reset_database()
 
     @pytest.fixture(autouse=True, scope="class")
-    def setup_database(self, testapp):
+    def setup_database(self, db_session_factory):
         """
         Automatically reset the database before and after ALL tests in this class.
 
@@ -71,21 +71,32 @@ class IsolatedBeetsLibraryMixin(ABC):
     def setup_beetslib(
         self,
     ):
-        """Automatically reset the beets library before and after ALL tests in this class."""
-        import beets.library
+        """Automatically reset the beets library before and after ALL
+        tests in this class."""
+        import shutil
+        from pathlib import Path
 
-        from beets_flask.config.beets_config import refresh_config
+        import beets.library
 
         try:
             os.remove(os.environ["BEETSDIR"] + "/library.db")
         except OSError:
             pass
-        lib = beets.library.Library(
+        beets.library.Library(
             path=os.environ["BEETSDIR"] + "/library.db",
             directory=os.environ["BEETSDIR"] + "/imported",
         )
-        config = refresh_config()
-        config["directory"] = os.environ["BEETSDIR"] + "/imported"
+        config = get_config().reload()
+        config.data.directory = os.environ["BEETSDIR"] + "/imported"
+        config.commit_to_beets()
+
+        # Copy test audio data so computed properties (has_cover_art, etc.)
+        # that read from disk can access the backing files.
+        audio_src = Path(__file__).parent.parent / "data" / "audio"
+        audio_dest = Path(os.environ["HOME"]) / "audio"
+        audio_dest.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(audio_src, audio_dest, dirs_exist_ok=True)
+
         # Reset the beets library to a clean state
         yield
         print("Resetting beets library to a clean state...")
@@ -100,17 +111,12 @@ class IsolatedBeetsLibraryMixin(ABC):
         """Return the beets library instance."""
         import beets.library
 
-        from beets_flask.config.beets_config import refresh_config
-
         lib = beets.library.Library(
             path=os.environ["BEETSDIR"] + "/library.db",
             directory=os.environ["BEETSDIR"] + "/imported",
         )
-        refresh_config()
+        config = get_config().reload()
+        config.data.directory = os.environ["BEETSDIR"] + "/imported"
+        config.commit_to_beets()
 
-        # mock needed for the library to be available in the resources endpoints
-        with mock.patch(
-            "beets_flask.server.routes.library.resources.g",
-            namedtuple("g", ["lib", "config"])(lib, None),  # type: ignore[call-arg, arg-type]
-        ):
-            return lib
+        return lib

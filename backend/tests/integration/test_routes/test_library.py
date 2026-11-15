@@ -3,15 +3,21 @@ Currently still requires a beets library with some content in
 the default location of the user.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 from unittest import mock
 from urllib.parse import quote_plus
 
 import pytest
-from beets.library import Album
-from quart.typing import TestClientProtocol as Client
 
+from beets_flask.config import get_config
 from tests.conftest import beets_lib_album, beets_lib_item
 from tests.mixins.database import IsolatedBeetsLibraryMixin
+
+if TYPE_CHECKING:
+    from beets.library import Album
+    from quart.typing import TestClientProtocol as Client
 
 # ----------------------------------- Artist --------------------------------- #
 
@@ -23,8 +29,8 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
     from the beets library via the API.
     """
 
-    artists = ["Basstripper", "Beta", "Foo; Bar,Baz"]
-    expected_artists = [
+    artists: ClassVar[list[str]] = ["Basstripper", "Beta", "Foo; Bar,Baz"]
+    expected_artists: ClassVar[list[str]] = [
         "Basstripper",
         "Beta",
         "Foo",
@@ -32,7 +38,7 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
         "Baz",
     ]  # Artists should be split by semicolon
 
-    _albums: list[Album] = []
+    _albums: ClassVar[list[Album]] = []
 
     @pytest.fixture(autouse=True)
     def albums(self):  # type: ignore
@@ -101,7 +107,7 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
             assert data[0]["albumartist"] == artist, "Data artist does not match artist"
 
     async def test_separator(self, client: Client):
-        """Test the GET request to retrieve a specific artist with a separator in the name.
+        """Test the GET request to retrieve an artist with a separator in the name.
 
         Should return the artist even if the name contains a separator.
         """
@@ -113,7 +119,8 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
             "Data artist does not match requested artist with separator"
         )
 
-        # Order of the artists should not matter, so we can also test with a different order
+        # Order of the artists should not matter, so we can also test
+        # with a different order
         response = await client.get("/api_v1/library/artists/Foo; Baz")
         data = await response.get_json()
         assert response.status_code == 200, "Response status code is not 200"
@@ -127,15 +134,15 @@ class TestArtistsEndpoint(IsolatedBeetsLibraryMixin):
 
     async def test_no_separators(self, client: Client):
         # Validate that the logic works if no separators are defined
-        from beets_flask.config.beets_config import refresh_config
 
-        config = refresh_config()
-        config["gui"]["artist_separators"] = []
+        config = get_config()
+        config.reload()
+        config.data.gui.library.artist_separators = []
 
         # Mock artist_seperators
         with mock.patch(
-            "beets_flask.server.routes.library.artists.ARTIST_SEPARATORS",
-            [],
+            "beets_flask.server.routes.library.artists.artist_separators",
+            lambda: [],
         ):
             response = await client.get("/api_v1/library/artists/Foo; Bar")
             data = await response.get_json()
@@ -187,15 +194,15 @@ class TestAlbumsPagination(IsolatedBeetsLibraryMixin):
     @pytest.fixture(autouse=True)
     def albums(self):  # type: ignore
         """Fixture to add albums to the beets library before running tests."""
-        nAlbums = 100
+        n_albums = 100
         if len(self.beets_lib.albums()) == 0:
-            for i in range(nAlbums):
-                artist = "Even" if i % 2 == 0 else f"Odd"
+            for i in range(n_albums):
+                artist = "Even" if i % 2 == 0 else "Odd"
                 a = beets_lib_album(albumartist=f"{artist}", album=f"Album {i}")
                 self.beets_lib.add(a)
                 self.beets_lib.add(beets_lib_item(artist=f"{artist}", album_id=a.id))
 
-        assert len(self.beets_lib.albums()) == nAlbums
+        assert len(self.beets_lib.albums()) == n_albums
 
     async def test_get_albums(self, client: Client):
         """Test the GET request to retrieve all albums with pagination.
@@ -296,7 +303,7 @@ class TestAlbumsPagination(IsolatedBeetsLibraryMixin):
             - The returned data contains the expected number of albums.
             - The albums match the query.
         """
-        response = await client.get(f"/api_v1/library/albums/Even?n_items=100")
+        response = await client.get("/api_v1/library/albums/Even?n_items=100")
         data = await response.get_json()
         assert response.status_code == 200, "Response status code is not 200"
         assert "albums" in data, "Items are not provided in the response"
@@ -341,15 +348,15 @@ class TestItemsPagination(IsolatedBeetsLibraryMixin):
     @pytest.fixture(autouse=True)
     def items(self):  # type: ignore
         """Fixture to add items to the beets library before running tests."""
-        nItems = 100
+        n_items = 100
         if len(self.beets_lib.items()) == 0:
-            for i in range(nItems):
-                artist = "Even" if i % 2 == 0 else f"Odd"
+            for i in range(n_items):
+                artist = "Even" if i % 2 == 0 else "Odd"
                 self.beets_lib.add(
                     beets_lib_item(artist=f"{artist}", album=f"Album {i}")
                 )
 
-        assert len(self.beets_lib.items()) == nItems
+        assert len(self.beets_lib.items()) == n_items
 
     async def test_get_items(self, client: Client):
         """Test the GET request to retrieve all items with pagination.

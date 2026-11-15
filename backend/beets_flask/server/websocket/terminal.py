@@ -8,9 +8,12 @@ Notes on tmux:
     `docker exec -it beets-flask /usr/bin/tmux attach-session -t beets-socket-term`
 - We send the whole current pane (window) content to the client, and resend when it
 changes.
-- **Currently, trailing whitespaces get stripped**. I did not manage to get a real live-representation of the input line, including trailing whitespaces. `pane.capture_pane()` uses under the hood: `pane.cmd(*["capture-pane", "-p"]).stdout`
-and we might want to play around with -T -N -J -e
-https://www.man7.org/linux/man-pages/man1/tmux.1.html
+- **Currently, trailing whitespaces get stripped**. I did not manage to get a
+  real live-representation of the input line, including trailing whitespaces.
+  `pane.capture_pane()` uses under the hood:
+  `pane.cmd(*["capture-pane", "-p"]).stdout` and we might want to play around
+  with -T -N -J -e
+  https://www.man7.org/linux/man-pages/man1/tmux.1.html
 - If we want to prepare commands client side before sending the finished command, cf.:
 https://stackoverflow.com/questions/44447473/how-to-make-xterm-js-accept-input
 
@@ -42,16 +45,18 @@ def register_tmux():
     global session, window, pane, server
 
     if server is None:
-        server = libtmux.Server()
+        server = libtmux.Server(socket_name="beets-flask")
 
     try:
-        abs_path_lib = str(get_config()["gui"]["terminal"]["start_path"].as_str())
-    except:
+        abs_path_lib = get_config().data.gui.terminal.start_path
+    except Exception:
         abs_path_lib = "/repo"
 
     try:
         session = server.new_session(
-            session_name="beets-socket-term", start_directory=abs_path_lib
+            session_name="beets-socket-term",
+            start_directory=abs_path_lib,
+            window_command="/usr/bin/bash",
         )
     except LibTmuxException:  # DuplicateSessionName
         session = server.sessions.get(session_name="beets-socket-term")  # type: ignore
@@ -70,7 +75,7 @@ def is_session_alive():
             return True
         else:
             return False
-    except:
+    except Exception:
         return False
 
 
@@ -120,7 +125,9 @@ async def emit_output_continuously(sleep_seconds=1):
                 prev = current
                 prev_x, prev_y = x, y
                 # log.debug(f"emitting {current} at {x} {y}")
-                # log.debug("\n\t".join(_get_scrollback_buffer(10)) + f"\n>>> {current}")
+                # log.debug(
+                #     "\n\t".join(_get_scrollback_buffer(10)) + f"\n>>> {current}"
+                # )
             elif x != prev_x or y != prev_y:
                 await sio.emit(
                     "ptyCursorPosition", {"x": x, "y": y}, namespace="/terminal"
@@ -146,12 +153,13 @@ def _get_scrollback_buffer(lines: int = 500) -> list[str]:
 
     Parameters
     ----------
-        pane: The tmux pane object.
-        lines: Number of scrollback lines to fetch (default: 500).
+    lines : int
+        Number of scrollback lines to fetch (default: 500).
 
     Returns
     -------
         List of strings representing the scrollback buffer.
+
     """
     try:
         # Capture the last `lines` from scrollback (excluding the current screen)

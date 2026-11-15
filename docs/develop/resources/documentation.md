@@ -8,6 +8,10 @@ You may build the documentation locally with.
 # Install the requirements
 cd backend
 pip install -e .[docs]
+
+# Optionally, create ER-Diargrams
+make diagrams
+
 # Build the documentation
 cd ../docs
 make html

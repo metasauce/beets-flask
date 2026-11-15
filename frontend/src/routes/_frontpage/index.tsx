@@ -1,10 +1,11 @@
-import { BookOpenIcon, BugIcon, GithubIcon } from 'lucide-react';
+import { BookOpenIcon, BugIcon } from 'lucide-react';
 import { Box, Link, Typography, useTheme } from '@mui/material';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { inboxStatsQueryOptions } from '@/api/inbox';
 import { libraryStatsQueryOptions } from '@/api/library';
+import { GithubIcon } from '@/components/common/icons';
 import { Link as InternalLink } from '@/components/common/link';
 import { PageWrapper } from '@/components/common/page';
 import {
@@ -210,7 +211,7 @@ function Footer() {
                 <Typography variant="caption">&nbsp;Documentation</Typography>
             </Link>
             <Link
-                href="https://github.com/pSpitzner/beets-flask"
+                href="https://github.com/metasauce/beets-flask"
                 target="_blank"
                 variant="body2"
             >
@@ -218,7 +219,7 @@ function Footer() {
                 <Typography variant="caption">&nbsp;GitHub</Typography>
             </Link>
             <Link
-                href="https://github.com/pSpitzner/beets-flask/issues/new"
+                href="https://github.com/metasauce/beets-flask/issues/new"
                 target="_blank"
                 variant="body2"
             >

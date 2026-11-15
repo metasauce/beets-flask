@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import json
+from array import array
 from typing import Any
 
 from sqlalchemy import types
@@ -31,7 +34,8 @@ class DictType(types.TypeDecorator):
         if not len(allowed_types_v) == 0:
             if not all(isinstance(v, allowed_types_v) for v in value.values()):
                 raise ValueError(
-                    f"Value must be a dict with values of type {allowed_types_v}. Got: {value.values()}"
+                    "Value must be a dict with values of type "
+                    f"{allowed_types_v}. Got: {value.values()}"
                 )
 
         if not all(isinstance(k, self.allowed_keys_types) for k in value.keys()):
@@ -65,3 +69,34 @@ class StrDictType(DictType):
 
     allowed_keys_types = (str,)
     allowed_values_types = (str,)
+
+
+class FloatListType(types.TypeDecorator):
+    """Stores a list[float] as binary using array.array ('d' = float64)."""
+
+    impl = types.LargeBinary
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: list[float] | None, dialect: Any
+    ) -> bytes | None:
+        if value is None:
+            return None
+        if not isinstance(value, list):
+            raise ValueError("Value must be a list")
+        if not all(isinstance(v, int | float) for v in value):
+            raise ValueError(f"All values must be float, got: {value}")
+        arr = array("d", value)
+        return arr.tobytes()
+
+    def process_result_value(
+        self, value: bytes | None, dialect: Any
+    ) -> list[float] | None:
+        if value is None:
+            return None
+        arr = array("d")
+        arr.frombytes(value)
+        return arr.tolist()
+
+    def copy(self, **kw: Any) -> FloatListType:
+        return self.__class__()

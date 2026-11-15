@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Self
 from uuid import uuid4
 
-import pytz
 from sqlalchemy import LargeBinary, select
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -19,7 +18,7 @@ from sqlalchemy.sql import func
 
 from beets_flask.logger import log
 
-from .types import DictType, IntDictType, StrDictType
+from .types import DictType, FloatListType, IntDictType, StrDictType
 
 
 class Base(DeclarativeBase):
@@ -31,6 +30,7 @@ class Base(DeclarativeBase):
             dict[int, int]: IntDictType,
             dict[str, str]: StrDictType,
             dict[str, Any]: DictType,
+            list[float]: FloatListType,
         }
     )
 
@@ -49,7 +49,8 @@ class Base(DeclarativeBase):
         close_after = False
         if session is None:
             log.debug(
-                "No session provided, you will not be able to make changes to the database."
+                "No session provided, you will not be able to make changes "
+                "to the database."
             )
             close_after = True
             from beets_flask.database.setup import session_factory
@@ -71,7 +72,8 @@ class Base(DeclarativeBase):
         close_after = False
         if session is None:
             log.debug(
-                "No session provided, you will not be able to make changes to the database."
+                "No session provided, you will not be able to make changes "
+                "to the database."
             )
             close_after = True
             from beets_flask.database.setup import session_factory
@@ -115,6 +117,6 @@ class Base(DeclarativeBase):
         # Seems a bit hacky but is the only way to ensure that
         # datetime objects are timezone-aware after deserialization
         if self.created_at and self.created_at.tzinfo is None:
-            self.created_at = self.created_at.replace(tzinfo=pytz.UTC)
+            self.created_at = self.created_at.replace(tzinfo=UTC)
         if self.updated_at and self.updated_at.tzinfo is None:
-            self.updated_at = self.updated_at.replace(tzinfo=pytz.UTC)
+            self.updated_at = self.updated_at.replace(tzinfo=UTC)

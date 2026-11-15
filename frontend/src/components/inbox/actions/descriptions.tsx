@@ -8,6 +8,8 @@ export function getActionDescription(action: Action | Action['name']): string {
             return 'Retag the selected album(s) this includes fetching candidates from your configured metadata sources.';
         case 'undo':
             return 'Allows you to undo imports, this will remove the imported album(s) from your library.';
+        case 'upload':
+            return 'Open an overlay to select files for upload into the current inbox.';
         case 'import_bootleg':
             return 'Import album without using a candidate, this is useful where online metadata is not available, such as bootlegs or dubs.';
         case 'import_best':

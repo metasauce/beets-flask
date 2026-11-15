@@ -2,7 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 
 import { itemQueryOptions } from '@/api/library';
-import { Identifier } from '@/components/library/itemold';
+import { Identifiers } from '@/components/library/identifier';
 
 export const Route = createFileRoute(
     '/library/(resources)/item/$itemId/identifier'
@@ -16,5 +16,5 @@ function RouteComponent() {
         itemQueryOptions(params.itemId, false)
     );
 
-    return <Identifier item={item} />;
+    return <Identifiers sources={item.sources} />;
 }

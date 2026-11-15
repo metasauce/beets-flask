@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -13,7 +12,6 @@ from typing import (
 
 from beets.ui import _open_library
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
 from beets_flask.config import get_config
 from beets_flask.database import db_session_factory
@@ -35,11 +33,10 @@ from beets_flask.importer.session import (
     UndoSession,
     delete_from_beets,
 )
-from beets_flask.importer.types import DuplicateAction
 from beets_flask.logger import log
 from beets_flask.redis import import_queue, preview_queue
 from beets_flask.server.exceptions import (
-    InvalidUsageException,
+    InvalidUsageError,
     exception_as_return_value,
 )
 from beets_flask.server.websocket.status import (
@@ -51,13 +48,17 @@ from beets_flask.server.websocket.status import (
 from .job import ExtraJobMeta, _set_job_meta
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from rq.job import Job
     from rq.queue import Queue
+    from sqlalchemy.orm import Session
+
+    from beets_flask.importer.types import BeetsDuplicateAction
 
 
 def emit_update_on_job_change(job, connection, result, *args, **kwargs):
-    """
-    Callback for rq enqueue functions to emit a job status update via websocket.
+    """Callback for rq enqueue functions to emit a job status update via websocket.
 
     See https://python-rq.org/docs/#success-callback
     """
@@ -91,7 +92,7 @@ P = ParamSpec("P")  # Parameters
 R = TypeVar("R")  # Return
 
 
-def _enqueue(
+def _enqueue[**P](
     queue: Queue,
     f: Callable[P, Any | Awaitable[Any]],
     *args: P.args,
@@ -121,8 +122,9 @@ class EnqueueKind(Enum):
     IMPORT_AUTO = "import_auto"
     IMPORT_UNDO = "import_undo"
     IMPORT_BOOTLEG = "import_bootleg"
-    # Bootlegs are essentially asis, but does not mean to just import the asis candidate,
-    # it has its own session that also groups albums, and skips previews.
+    # Bootlegs are essentially asis, but does not mean to just import the
+    # asis candidate, it has its own session that also groups albums, and
+    # skips previews.
 
     _AUTO_IMPORT = "_auto_import"
     _AUTO_PREVIEW = "_auto_preview"
@@ -135,6 +137,7 @@ class EnqueueKind(Enum):
         ----------
         kind : str
             The string to convert.
+
         """
         try:
             return cls[kind.upper()]
@@ -166,6 +169,7 @@ async def enqueue(
     kwargs : dict
         Additional arguments to pass to the worker functions. Depend on the kind,
         use with care.
+
     """
     if extra_meta is None:
         extra_meta = ExtraJobMeta()
@@ -184,7 +188,7 @@ async def enqueue(
         case EnqueueKind.IMPORT_UNDO:
             job = enqueue_import_undo(hash, path, extra_meta, **kwargs)
         case _:
-            raise InvalidUsageException(f"Unknown kind {kind}")
+            raise InvalidUsageError(f"Unknown kind {kind}")
 
     log.debug(f"Enqueued {job.id=} {job.meta=}")
 
@@ -200,7 +204,7 @@ def enqueue_preview(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs) ->
     autotag: bool | None = kwargs.pop("autotag", None)
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException("EnqueueKind.PREVIEW does not accept any kwargs.")
+        raise InvalidUsageError("EnqueueKind.PREVIEW does not accept any kwargs.")
     job = _enqueue(preview_queue, run_preview, hash, path, group_albums, autotag)
     _set_job_meta(job, hash, path, EnqueueKind.PREVIEW, extra_meta)
     return job
@@ -209,18 +213,18 @@ def enqueue_preview(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs) ->
 def enqueue_preview_add_candidates(
     hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
 ) -> Job:
-    # May contain search_ids, search_artist, search_album
+    # May contain search_ids, search_artist, search_name
     # As always to allow task mapping
 
     search: TaskIdMappingArg[Search | Literal["skip"]] = kwargs.pop("search", None)
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.PREVIEW_ADD_CANDIDATES only accepts the following kwargs: "
-            + "search"
+            "search"
         )
 
     if search is None:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.PREVIEW_ADD_CANDIDATES requires a search kwarg."
         )
 
@@ -241,8 +245,7 @@ def enqueue_preview_add_candidates(
 def enqueue_import_candidate(
     hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
 ) -> Job:
-    """
-    Imports a candidate that has been fetched in a preview session.
+    """Imports a candidate that has been fetched in a preview session.
 
     Kwargs
     ------
@@ -250,7 +253,8 @@ def enqueue_import_candidate(
         A valid candidate id for a candidate that has been fetched in a preview
         session.
         None stands for best, is resolved in the session.
-        additionally, if a dict is provided, it maps from task_id to candidate, and dupicate action, respectively.
+        additionally, if a dict is provided, it maps from task_id to
+        candidate, and duplicate action, respectively.
     duplicate_actions
         See candidate_id.
     TODO: Also allowed: "asis" (no exact match needed, there is only one
@@ -258,14 +262,14 @@ def enqueue_import_candidate(
     """
 
     candidate_ids: TaskIdMappingArg[CandidateChoice] = kwargs.pop("candidate_ids", None)
-    duplicate_actions: TaskIdMappingArg[DuplicateAction] = kwargs.pop(
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction] = kwargs.pop(
         "duplicate_actions", None
     )
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.IMPORT only accepts the following kwargs: "
-            + "candidate_ids, duplicate_actions."
+            "candidate_ids, duplicate_actions."
         )
 
     # TODO: Validation: lookup candidates exits
@@ -276,17 +280,18 @@ def enqueue_import_candidate(
         # TODO: along with validation:
         # we need a special flag as task_id that stands for "do this for all tasks"
         # used along with candidate_ids length == 1.
-        # then, only run the fallback auto-import for the args coming from gui import button
+        # then, only run the fallback auto-import for the args coming from
+        # gui import button
 
         # If the user did not specify a candidate_id, we assume they want the best
         # candidate.
         with db_session_factory() as db_session:
             _get_live_state_by_folder(hash, path, db_session)
             # raises if no state found
-    except:
+    except Exception:
         log.info(
             f"No previous session state fround for {hash=} {path=} "
-            + "switching to auto-import"
+            "switching to auto-import"
         )
         return enqueue_import_auto(hash, path, extra_meta)
 
@@ -303,8 +308,7 @@ def enqueue_import_candidate(
 
 
 def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs):
-    """
-    Enqueue an automatic import.
+    """Enqueue an automatic import.
 
     Auto jobs first generate a preview (if needed) and then run an import, which always
     imports the best candidate - but only if the preview is good enough (as specified
@@ -318,14 +322,14 @@ def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
     group_albums: bool | None = kwargs.pop("group_albums", None)
     autotag: bool | None = kwargs.pop("autotag", None)
     import_threshold: float | None = kwargs.pop("import_threshold", None)
-    duplicate_actions: TaskIdMappingArg[DuplicateAction] = kwargs.pop(
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction] = kwargs.pop(
         "duplicate_actions", None
     )
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             "EnqueueKind.IMPORT_AUTO only accepts the following kwargs: "
-            + "group_albums, autotag, import_threshold, duplicate_actions."
+            "group_albums, autotag, import_threshold, duplicate_actions."
         )
 
     # We only assign the on_success callback (likely coming
@@ -360,9 +364,8 @@ def enqueue_import_undo(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
     delete_files: bool = kwargs.pop("delete_files", True)
 
     if len(kwargs.keys()) > 0:
-        raise InvalidUsageException(
-            "EnqueueKind.IMPORT_UNDO only accepts the following kwargs: "
-            + "delete_files."
+        raise InvalidUsageError(
+            "EnqueueKind.IMPORT_UNDO only accepts the following kwargs: delete_files."
         )
 
     job = _enqueue(
@@ -429,6 +432,7 @@ async def run_preview(
         If None: get value from beets config.
     autotag : bool | None
         Whether to look up metadata online. If None: get value from beets config.
+
     """
 
     log.info(f"Preview task on {hash=} {path=}")
@@ -438,7 +442,7 @@ async def run_preview(
         if hash != f_on_disk.hash:
             log.warning(
                 f"Folder content has changed since the job was scheduled for {path}. "
-                + f"Using new content ({f_on_disk.hash}) instead of {hash}"
+                f"Using new content ({f_on_disk.hash}) instead of {hash}"
             )
 
         # here, in preview, we always want to start from a fresh state
@@ -452,17 +456,24 @@ async def run_preview(
         try:
             await p_session.run_async()
         finally:
-            # Get max revision for this folder hash
-            stmt = select(func.max(SessionStateInDb.folder_revision)).where(
-                SessionStateInDb.folder_hash == hash,
-            )
-            max_rev = db_session.execute(stmt).scalar_one_or_none()
-            new_rev = 0 if max_rev is None else max_rev + 1
-            s_state_indb = SessionStateInDb.from_live_state(p_session.state)
-            s_state_indb.folder_revision = new_rev
+            # A folder without any media files does not produce tasks and thus
+            # no meaningful session. Skip persisting it, otherwise the folder
+            # shows up with a misleading "not started" status.
+            if len(p_session.state.task_states) == 0:
+                log.debug(f"No tasks read from {path}, not persisting preview session.")
+            else:
+                # Get max revision for this folder hash
+                stmt = select(func.max(SessionStateInDb.folder_revision)).where(
+                    SessionStateInDb.folder_hash == hash,
+                )
+                max_rev = db_session.execute(stmt).scalar_one_or_none()
+                new_rev = 0 if max_rev is None else max_rev + 1
 
-            db_session.merge(s_state_indb)
-            db_session.commit()
+                s_state_indb = SessionStateInDb.from_live_state(p_session.state)
+                s_state_indb.folder_revision = new_rev
+
+                db_session.merge(s_state_indb)
+                db_session.commit()
 
     log.info(f"Preview done. {hash=} {path=}")
     return
@@ -480,9 +491,14 @@ async def run_preview_add_candidates(
 
     Parameters
     ----------
+    hash : str
+        The folder hash of the session to add candidates to.
+    path : str
+        The folder path of the session to add candidates to.
     search : dict[str, Search]
-        A dictionary of task ids to search dicts. No value or none skips the search
-        for this task.
+        A dictionary of task ids to search dicts. No value or none skips
+        the search for this task.
+
     """
     log.info(f"Add preview candidates task on {hash=}")
 
@@ -510,16 +526,22 @@ async def run_import_candidate(
     hash: str,
     path: str,
     candidate_ids: TaskIdMappingArg[CandidateChoice],
-    duplicate_actions: TaskIdMappingArg[DuplicateAction],
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction],
 ):
     """Imports a candidate that has been fetched in a preview session.
 
     Parameters
     ----------
-    candidate_id : optional
-        If candidate_id is none the best candidate is used.
-    duplicate_action : optional
-        If duplicate_action is none, the default action from the config is used.
+    hash : str
+        The folder hash of the session to import.
+    path : str
+        The folder path of the session to import.
+    candidate_ids : TaskIdMappingArg[CandidateChoice]
+        If None, the best candidate is used. Maps task ids to candidate ids
+        or import choices.
+    duplicate_actions : TaskIdMappingArg[BeetsDuplicateAction]
+        If None, the default action from the config is used.
+
     """
     log.info(f"Import task on {hash=} {path=}")
 
@@ -549,7 +571,7 @@ async def run_import_auto(
     hash: str,
     path: str,
     import_threshold: float | None,
-    duplicate_actions: TaskIdMappingArg[DuplicateAction],
+    duplicate_actions: TaskIdMappingArg[BeetsDuplicateAction],
 ):
     log.info(f"Auto Import task on {hash=} {path=}")
 
@@ -621,7 +643,7 @@ def _get_live_state_by_folder(
     if hash != f_on_disk.hash:
         log.warning(
             f"Folder content has changed since the job was scheduled for {path}. "
-            + f"Using new content ({f_on_disk.hash}) instead of {hash}"
+            f"Using new content ({f_on_disk.hash}) instead of {hash}"
         )
 
     s_state_indb = SessionStateInDb.get_by_hash_and_path(
@@ -638,9 +660,9 @@ def _get_live_state_by_folder(
 
     if s_state_indb is None:
         # TODO: rq error handling
-        raise InvalidUsageException(
+        raise InvalidUsageError(
             f"No session state found for {path=} {hash=} "
-            + f"fresh_hash_on_disk={f_on_disk}, this should not happen."
+            f"fresh_hash_on_disk={f_on_disk}, this should not happen."
         )
 
     log.debug(f"Using existing session state for {path=}")
@@ -655,6 +677,6 @@ def _get_live_state_by_folder(
 
 
 def delete_items(task_ids: list[str], delete_files: bool = True):
-    lib = _open_library(get_config())
+    lib = _open_library(get_config().beets_config)
     for task_id in task_ids:
         delete_from_beets(task_id, delete_files=delete_files, lib=lib)

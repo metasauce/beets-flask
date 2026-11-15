@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC
-from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
 from uuid import uuid4 as uuid
 
-import beets.ui.commands as uicommands
 from beets import importer
 from beets.ui import _open_library
 from beets.util import bytestring_path, get_most_common_tags
@@ -23,9 +21,6 @@ from beets_flask.importer.progress import (
     ProgressState,
     SerializedProgressState,
 )
-from beets_flask.importer.types import DuplicateAction
-from beets_flask.server.exceptions import SerializedException
-from beets_flask.utility import capture_stdout_stderr
 
 from .types import (
     AlbumInfo,
@@ -33,6 +28,7 @@ from .types import (
     BeetsAlbumInfo,
     BeetsAlbumMatch,
     BeetsDistance,
+    BeetsImportAction,
     BeetsImportTask,
     BeetsItem,
     BeetsLibrary,
@@ -41,6 +37,12 @@ from .types import (
     ItemInfo,
     TrackInfo,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from beets_flask.importer.types import BeetsDuplicateAction
+    from beets_flask.server.exceptions import SerializedException
 
 
 class BaseState(ABC):
@@ -107,12 +109,12 @@ class SessionState(BaseState):
 
     def __repr__(self) -> str:
         return (
-            f"SessionState:\n"
-            + f" * id={self.id}\n"
-            + f" * folder_path={self.folder_path}\n"
-            + f" * folder_hash={self.folder_hash}\n"
-            + f" * task_states={[ts.id for ts in self.task_states]}\n"
-            + f" * progress={self.progress}"
+            "SessionState:\n"
+            f" * id={self.id}\n"
+            f" * folder_path={self.folder_path}\n"
+            f" * folder_hash={self.folder_hash}\n"
+            f" * task_states={[ts.id for ts in self.task_states]}\n"
+            f" * progress={self.progress}"
         )
 
     @property
@@ -232,9 +234,10 @@ class SessionState(BaseState):
 class TaskState(BaseState):
     """State representation of a beets ImportTask.
 
-    In the frontend, a selection of the available candidates in the task may be needed
-    from the user. Exposes some (typed) attributes of the task (e.g. toppath, paths, items)
-    Has a list of associated CandidateStates, that represent `matches` in beets.
+    In the frontend, a selection of the available candidates in the task
+    may be needed from the user. Exposes some (typed) attributes of the task
+    (e.g. toppath, paths, items). Has a list of associated CandidateStates,
+    that represent `matches` in beets.
     """
 
     progress: ProgressState
@@ -249,7 +252,7 @@ class TaskState(BaseState):
     # User choices and user input in interactive Session
     # None if no choice has been made yet
     # (or the frontend has not marked the default selection)
-    duplicate_action: DuplicateAction | None = None
+    duplicate_action: BeetsDuplicateAction | None = None
 
     def __init__(
         self,
@@ -259,18 +262,20 @@ class TaskState(BaseState):
         # we might run into inconsistencies here, if candidates of the task
         # change. but I do not know when or why they would.
         self.task = task
-        self.candidate_states = [CandidateState(c, self) for c in self.task.candidates]
+        self.candidate_states = [
+            CandidateState(c, self) for c in (self.task.candidates or [])
+        ]
         self.progress = ProgressState()
 
     def __repr__(self) -> str:
         return (
-            f"TaskState:\n"
-            + f" * id={self.id}\n"
-            + f" * candidate_states={[ts.id for ts in self.candidate_states]}\n"
-            + f" * chosen_candidate_state_id={self.chosen_candidate_state_id}\n"
-            + f" * progress={self.progress}\n"
-            + f" * completed={self.completed}\n"
-            + f" * toppath={self.toppath}\n"
+            "TaskState:\n"
+            f" * id={self.id}\n"
+            f" * candidate_states={[ts.id for ts in self.candidate_states]}\n"
+            f" * chosen_candidate_state_id={self.chosen_candidate_state_id}\n"
+            f" * progress={self.progress}\n"
+            f" * completed={self.completed}\n"
+            f" * toppath={self.toppath}\n"
         )
 
     @property
@@ -278,7 +283,7 @@ class TaskState(BaseState):
         self,
     ) -> Sequence[BeetsAlbumMatch | BeetsTrackMatch]:
         """Task candidates, i.e. possible matches to choose from."""
-        return self.task.candidates
+        return self.task.candidates or []
 
     @property
     def asis_candidate_id(self) -> str:
@@ -296,11 +301,11 @@ class TaskState(BaseState):
         insert_at: int = 0,
     ) -> list[CandidateState]:
         """Add new candidates to the selection state."""
-        if len(self.task.candidates) == 0 or len(self.candidate_states) == 0:
+        if len(self.candidates) == 0 or len(self.candidate_states) == 0:
             insert_at = 0
 
         # task.candidates is a sequence and thus immutable
-        _ = list(self.task.candidates)
+        _ = list(self.candidates)
         _[insert_at:insert_at] = candidates
         self.task.candidates = _
 
@@ -310,7 +315,7 @@ class TaskState(BaseState):
 
     def get_candidate_state_by_id(self, id: str) -> CandidateState | None:
         """Get candidate state by id."""
-        for c in self.candidate_states + [self.asis_candidate]:
+        for c in [*self.candidate_states, self.asis_candidate]:
             if c.id == id:
                 return c
         return None
@@ -369,11 +374,11 @@ class TaskState(BaseState):
         return best
 
     @property
-    def choice_flag(self) -> importer.tasks.Action | None:
+    def choice_flag(self) -> BeetsImportAction | None:
         return self.task.choice_flag
 
     @choice_flag.setter
-    def choice_flag(self, value: importer.tasks.Action | None):
+    def choice_flag(self, value: BeetsImportAction | None):
         self.task.choice_flag = value
 
     @property
@@ -381,9 +386,9 @@ class TaskState(BaseState):
         """Current metadata of the task.
 
         This is the metadata of the music files on disk.
-        (In a beets context, cur_artist and cur_album)
+        TODO: We should migrate to use likelies directly since it is typed now.
         """
-        likelies, _ = get_most_common_tags(self.items)
+        likelies = get_most_common_tags(self.items)
         return Metadata(**{k: str(v) for k, v in likelies.items()})  # type: ignore[typeddict-item]
 
     # ---------------------------------------------------------------------------- #
@@ -396,8 +401,8 @@ class TaskState(BaseState):
             candidates=[c.serialize() for c in self.candidate_states],
             asis_candidate=self.asis_candidate.serialize(),
             current_metadata=self.current_metadata,
-            # TODO: maybe we can merge current_metadata (which is cur_artist/album in
-            # old beets) into the asis_candidate
+            # TODO: maybe we can merge current_metadata (which is derived from
+            # `task.source`) into the asis_candidate
             chosen_candidate_id=self.chosen_candidate_state_id,
             duplicate_action=self.duplicate_action,
             completed=self.completed,
@@ -423,8 +428,7 @@ class TaskState(BaseState):
 
 @dataclass(init=False)
 class CandidateState(BaseState):
-    """
-    State representation of a single candidate (match) for an import task.
+    """State representation of a single candidate (match) for an import task.
 
     Can represent an album (self.type == "album") or a track (self.type == "track").
     Keeps a reference to the associated SelectionState, so we can access the beets task.
@@ -439,36 +443,26 @@ class CandidateState(BaseState):
     # Reference upwards
     task_state: TaskState
 
-    _mapping: dict[int, int]  # index mapping from items to tracks
-
     def __init__(
         self,
         match: BeetsAlbumMatch | BeetsTrackMatch,
         task_state: TaskState,
-        mapping: dict[int, int] | None = None,
     ) -> None:
         super().__init__()
         self.match = match
         self.duplicate_ids = []  # checked and set by session
         self.task_state = task_state
 
-        # current_mapping is dynamic and looks at the match to generate integer / index mapping
-        # this can cause problems, when loading a previously imported candidate from the db
-        # as, in this case, the mapping is wrong and _index_mapping will fail.
-        # we take care of this by manually overwriting when constructing from the db.
-        self._mapping = mapping or self.current_mapping
-
     def __repr__(self) -> str:
         return (
-            f"CandidateState:\n"
-            + f" * id={self.id}\n"
-            + f" * match={self.match.info.album}\n"
-            + f" * task_state_id={self.task_state.id}\n"
-            + f" * distance={self.distance}\n"
-            + f" * penalties={self.penalties}\n"
-            + f" * {len(self.items)=}\n"
-            + f" * {len(self.tracks)=}\n"
-            + f" * mapping={self.mapping}\n"
+            "CandidateState:\n"
+            f" * id={self.id}\n"
+            f" * match={self.match.info.album}\n"
+            f" * task_state_id={self.task_state.id}\n"
+            f" * distance={self.distance}\n"
+            f" * penalties={self.penalties}\n"
+            f" * {len(self.items)=}\n"
+            f" * {len(self.tracks)=}\n"
         )
 
     @property
@@ -480,24 +474,9 @@ class CandidateState(BaseState):
         else:
             raise ValueError("Unknown type")
 
-    @property
-    def diff_preview(self) -> str:
-        """Diff preview of the match to the current meta data."""
-        out, err, _ = capture_stdout_stderr(
-            uicommands.show_change,
-            self.task_state.task.cur_artist,
-            self.task_state.task.cur_album,
-            self.match,
-        )
-        res = out.lstrip("\n")
-        if len(err) > 0:
-            res += f"\n\nError: {err}"
-        return res
-
     @classmethod
     def asis_candidate(cls, task_state: TaskState) -> CandidateState:
-        """
-        Alternate constructor for an asis import option.
+        """Alternate constructor for an asis import option.
 
         We mock the album match to display
         current meta data in the frontend.
@@ -506,10 +485,9 @@ class CandidateState(BaseState):
         items: list[BeetsItem] = task_state.task.items
 
         # FIXME: we do this lookup twice, once here and once in current_metadata
+        info: dict[str, Any] = {}
         if len(items) > 0:
-            info, _ = get_most_common_tags(items)
-        else:
-            info = {}
+            info = get_most_common_tags(items)
         info["data_source"] = "asis"
         info["data_url"] = f"file://{task_state.toppath}"
 
@@ -521,13 +499,17 @@ class CandidateState(BaseState):
                 val = getattr(item, key)
                 if val is not None and val != "":
                     kwargs[key] = val
-            # tracks use index, items use track, and beets diff preview crashes without index
+            # tracks use index, items use track, and beets diff preview
+            # crashes without index
             kwargs["index"] = item.track or 0
             return kwargs
 
         tracks = [BeetsTrackInfo(**_generate_kwargs(i)) for i in items]
 
-        match = BeetsAlbumMatch(
+        # This is a hacky workaround to not trigger the event for album creation...
+        from beets_flask.database.mapper.match import AlbumMatchMapper
+
+        match = AlbumMatchMapper.create_without_event(
             distance=BeetsDistance(),
             info=BeetsAlbumInfo(
                 tracks=tracks,
@@ -537,6 +519,7 @@ class CandidateState(BaseState):
             extra_tracks=[],
             mapping={i: tracks[idx] for idx, i in enumerate(items)},
         )
+
         candidate = cls(match=match, task_state=task_state)
         candidate.id = task_state.asis_candidate_id
         # As the asis candidate state is not maintained we not to
@@ -546,22 +529,6 @@ class CandidateState(BaseState):
         return candidate
 
     # --------------------- Helper to lift / unnset from match to -------------------- #
-    @property
-    def cur_artist(self) -> str:
-        """Current artist, usually the meta data of the music files.
-
-        Named to be consistent with beets.
-        """
-        return str(self.task_state.task.cur_artist)
-
-    @property
-    def cur_album(self) -> str:
-        """Current album, usually the meta data of the music files.
-
-        Named to be consistent with beets.
-        """
-        return str(self.task_state.task.cur_album)
-
     @property
     def artist(self) -> str | None:
         """Artist of the match."""
@@ -649,22 +616,6 @@ class CandidateState(BaseState):
         """Returns True if this is an "as is" candidate."""
         return self.id.startswith("asis-")
 
-    @property
-    def mapping(self) -> dict[int, int]:
-        return self._mapping
-
-    @property
-    def current_mapping(self) -> dict[int, int]:
-        """Get the current mapping from items to tracks, calculated from the match."""
-        if isinstance(self.match, BeetsAlbumMatch):
-            return _index_mapping(
-                self.match.mapping,
-                self.items,
-                self.tracks,
-            )
-
-        raise ValueError("Current mapping only available for album matches.")
-
     # ------------------------------------ utility ----------------------------------- #
 
     def identify_duplicates(self, lib: BeetsLibrary | None = None) -> list[BeetsAlbum]:
@@ -672,10 +623,11 @@ class CandidateState(BaseState):
 
         Copy of beets' `task.find_duplicates` but works on any candidates' match.
 
-        # FIXME: Tracks are not checked for duplicates. Tbh noone cares about tracks anyways
+        # FIXME: Tracks are not checked for duplicates. Tbh noone cares
+        # about tracks anyways
         """
         if lib is None:
-            lib = _open_library(get_config())
+            lib = _open_library(get_config().beets_config)
 
         info = self.match.info.copy()
         info["albumartist"] = info["artist"]
@@ -689,7 +641,7 @@ class CandidateState(BaseState):
         tmp_album = BeetsAlbum(lib, **info)
         keys: list[str] = cast(
             list[str],
-            get_config()["import"]["duplicate_keys"]["album"].as_str_seq() or [],
+            get_config().data.import_.duplicate_keys.album or [],
         )
         dup_query = tmp_album.duplicates_query(keys)
 
@@ -706,7 +658,8 @@ class CandidateState(BaseState):
                 duplicates.append(album)
 
         # Write duplicates information!
-        self.duplicate_ids = [d.id for d in duplicates]
+        # TODO: Me should migrate duplicate ids from str to int
+        self.duplicate_ids = [str(d.id) for d in duplicates if d.id is not None]
 
         return duplicates
 
@@ -723,29 +676,26 @@ class CandidateState(BaseState):
         # we lift the match.info to reduce nesting in the frontend.
         info: TrackInfo | AlbumInfo
         tracks: list[TrackInfo]
-        mapping: dict[int, int] = {}
+        mapping: dict[int, int]
 
-        if isinstance(self.match.info, BeetsTrackInfo):
+        if isinstance(self.match, BeetsTrackMatch):
             # This hardly ever happens, we might support this more in the future
             info = TrackInfo.from_beets(self.match.info)
             tracks = [TrackInfo.from_beets(self.match.info)]
-        elif isinstance(self.match.info, BeetsAlbumInfo):
+            mapping = {}
+        elif isinstance(self.match, BeetsAlbumMatch):
             info = AlbumInfo.from_beets(self.match.info)
-
             # Map beets types to our types, allows serialization magic
             tracks = [TrackInfo.from_beets(track) for track in self.match.info.tracks]
-
-            # mapping = _index_mapping(
-            #     self.match.mapping,  # type: ignore
-            #     self.items,
-            #     self.tracks,
-            # )
-            mapping = self.mapping
-
+            mapping = _index_mapping(
+                self.match.mapping,
+                self.items,
+                self.tracks,
+            )
         else:
             raise ValueError(f"Unknown type of matchinfo {type(self.match.info)}")
 
-        res = SerializedCandidateState(
+        return SerializedCandidateState(
             **super().serialize(),
             penalties=self.penalties,
             duplicate_ids=self.duplicate_ids,
@@ -756,8 +706,6 @@ class CandidateState(BaseState):
             mapping=mapping,
         )
 
-        return res
-
 
 def _index_mapping(
     mapping: dict[BeetsItem, BeetsTrackInfo],
@@ -766,8 +714,8 @@ def _index_mapping(
 ) -> dict[int, int]:
     """Helper to create an index mapping from items to tracks.
 
-    the mapping of a beets albummatch uses objects, but we don not want
-    to send them over redundantly. convert to an index mapping,
+    The mapping of a beets albummatch uses objects, but we dont want
+    to send them over redundantly. Convert to an index mapping,
     where first index is in self.items, and second is in self.match.info.tracks
 
     This is used to serialize the mapping of a candidate state.
@@ -796,7 +744,6 @@ def _index_mapping(
         tdxs.append(found_tdx)
 
     if None in idxs or None in tdxs:
-        # breakpoint()
         raise ValueError(
             f"Index mapping failed: {idxs=} {tdxs=} {len(items)=} {len(tracks)=}"
         )
@@ -877,16 +824,19 @@ class SerializedCandidateState(SerializedBaseState):
 
     info: TrackInfo | ItemInfo | AlbumInfo
 
-    # Mapping from items to tracks index based
+    # We need a way to reconstruct the AlbumMatch.mapping in the frontend
+    # Without sending duplicate objects. we opted for index based mapping
+    # for the transfer layer
+    # TODO: Might make sense to use ids here and adjust the frontend
     mapping: dict[int, int]
     tracks: list[TrackInfo]
 
 
 __all__ = [
-    "SessionState",
-    "TaskState",
     "CandidateState",
+    "SerializedCandidateState",
     "SerializedSessionState",
     "SerializedTaskState",
-    "SerializedCandidateState",
+    "SessionState",
+    "TaskState",
 ]
