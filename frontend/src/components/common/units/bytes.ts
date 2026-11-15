@@ -1,5 +1,5 @@
-export function humanizeBytes(bytes?: number): string {
-    if (bytes === undefined) return 'unknown';
+export function humanizeBytes(bytes?: number | null): string {
+    if (bytes === undefined || bytes === null || bytes < 0) return 'unknown';
 
     const units = ['bytes', 'kb', 'mb', 'gb', 'tb'];
     if (bytes === 0) return '0 bytes';

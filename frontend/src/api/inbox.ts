@@ -4,7 +4,7 @@
  * /api_v1/inbox
  */
 
-import { UseMutationOptions } from '@tanstack/react-query';
+import { queryOptions, UseMutationOptions } from '@tanstack/react-query';
 
 import type { FileSystemItem, Folder, InboxStats } from '@/pythonTypes';
 
@@ -72,18 +72,25 @@ export const inboxFolderQueryOptions = (path: string, hash?: string) => ({
 });
 
 // Some stats about the inbox(es)
-export const inboxStatsQueryOptions = () => ({
-    queryKey: ['inbox', 'stats'],
-    staleTime: Infinity,
-    queryFn: async () => {
-        const response = await fetch(`/inbox/stats`);
-        const dat = (await response.json()) as InboxStats[];
-        dat.forEach((d) => {
-            d.last_created = d.last_created ? new Date(d.last_created) : null;
-        });
-        return dat;
-    },
-});
+export const inboxStatsQueryOptions = () =>
+    queryOptions({
+        queryKey: ['inbox', 'stats'],
+        staleTime: Infinity,
+        queryFn: async () => {
+            const response = await fetch(`/inbox/stats`);
+            const dat = (await response.json()) as InboxStats[];
+            dat.forEach((d) => {
+                d.last_created = d.last_created
+                    ? new Date(d.last_created)
+                    : null;
+            });
+            return dat;
+        },
+        // Sizes are computed in the background on the server; keep asking
+        // until they are known.
+        refetchInterval: (query) =>
+            query.state.data?.some((d) => d.size === null) ? 4000 : false,
+    });
 
 /* -------------------------------- Mutations ------------------------------- */
 // Here for reference, not used yet but we might need it in the future

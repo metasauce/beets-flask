@@ -28,6 +28,17 @@ export interface Search {
     search_name: null | string;
 }
 
+export interface MusicInfo {
+    type: 'album' | 'item' | 'track';
+    artist: null | string;
+    album: null | string;
+    data_url: null | string;
+    data_source: null | string;
+    year: null | number;
+    genres: Array<string> | null;
+    media: null | string;
+}
+
 export interface MinimalSession {
     session_id: string;
     folder_hash: string;
@@ -47,7 +58,7 @@ export interface LibraryStats {
     artists: number;
     genres: number;
     labels: number;
-    size: number;
+    size: null | number;
     lastItemAdded: null | number;
     lastItemModified: null | number;
     runtime: number;
@@ -66,7 +77,7 @@ export interface InboxStats {
     path: string;
     tagged_via_gui: number;
     imported_via_gui: number;
-    size: number;
+    size: null | number;
     nFiles: number;
     last_created: Date | null;
 }
@@ -349,17 +360,6 @@ export interface ItemResponse {
     added: number;
     catalognum: string;
     sources: Array<ItemSource>;
-}
-
-export interface MusicInfo {
-    type: 'album' | 'item' | 'track';
-    artist: null | string;
-    album: null | string;
-    data_url: null | string;
-    data_source: null | string;
-    year: null | number;
-    genres: Array<string> | null;
-    media: null | string;
 }
 
 export interface ItemInfo extends MusicInfo {
