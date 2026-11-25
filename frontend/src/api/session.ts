@@ -401,14 +401,17 @@ async function waitForJobUpdate({
     const matchedRefs = new Set<string>();
     const matches: JobStatusUpdate[] = [];
 
-    const promiseTimeout = new Promise<never>((_, reject) => {
+    // The job update only arrives once the job has finished. With a backlog in
+    // the queue that can take far longer than the timeout although the job was
+    // enqueued fine. That is not an error: resolve with what arrived so far and
+    // let the folder status (websocket) report the progress from here on.
+    const promiseTimeout = new Promise<JobStatusUpdate[]>((resolve) => {
         setTimeout(() => {
             socket.off('job_status_update', handleUpdate);
-            reject(
-                new Error(
-                    'Timeout: Waiting for a job update took longer than 30 seconds'
-                )
+            console.warn(
+                `Job still queued or running after ${timeout / 1000}s, no longer waiting for it`
             );
+            resolve(matches);
         }, timeout);
     });
 
