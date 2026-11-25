@@ -460,3 +460,37 @@ def test_from_path_ignores_nested_items(tmpdir):
         assert any(
             os.path.basename(c.full_path) == "normal_file.txt" for c in folder.walk()
         )
+
+
+def test_from_path_skips_subdir_deleted_during_walk(tmpdir):
+    """A subdir deleted while the tree is being built is skipped.
+
+    os.walk(topdown=False) lists a directory's subdirs first and descends into
+    them afterwards. If a subdir is removed in between (e.g. an inbox folder
+    deleted while a slow tree build runs), os.walk silently skips it, but it is
+    still in its parent's dirnames. That used to raise a KeyError and fail the
+    whole inbox tree.
+    """
+    base = Path(tmpdir)
+    (base / "album").mkdir()
+    (base / "album" / "track.mp3").touch()
+    doomed = base / "doomed"
+    doomed.mkdir()
+    (doomed / "track.mp3").touch()
+
+    real_scandir = os.scandir
+
+    def scandir_deleting_doomed(path="."):
+        # Delete `doomed` just as os.walk tries to descend into it.
+        # (shutil.rmtree itself calls scandir with file descriptors.)
+        if not isinstance(path, int) and os.fspath(path) == str(doomed):
+            if doomed.exists():
+                shutil.rmtree(doomed)
+        return real_scandir(path)
+
+    with mock.patch("os.scandir", side_effect=scandir_deleting_doomed):
+        folder = Folder.from_path(base, subdirs=True)
+
+    names = {os.path.basename(c.full_path) for c in folder.children}
+    assert "album" in names
+    assert "doomed" not in names
