@@ -237,6 +237,8 @@ def enqueue_preview_add_candidates(
         hash,
         path,
         search=search,
+        # User-initiated: run before the automated backlog.
+        at_front=True,  # type: ignore
     )
     _set_job_meta(job, hash, path, EnqueueKind.PREVIEW_ADD_CANDIDATES, extra_meta)
     return job
@@ -302,6 +304,8 @@ def enqueue_import_candidate(
         path,
         candidate_ids=candidate_ids,
         duplicate_actions=duplicate_actions,
+        # User-initiated: run before the automated backlog.
+        at_front=True,  # type: ignore
     )
     _set_job_meta(job, hash, path, EnqueueKind.IMPORT_CANDIDATE, extra_meta)
     return job
@@ -355,7 +359,15 @@ def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
 
 
 def enqueue_import_bootleg(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs):
-    job = _enqueue(import_queue, run_import_bootleg, hash, path, **kwargs)
+    # User-initiated: run before the automated backlog.
+    job = _enqueue(
+        import_queue,
+        run_import_bootleg,
+        hash,
+        path,
+        at_front=True,  # type: ignore
+        **kwargs,
+    )
     _set_job_meta(job, hash, path, EnqueueKind.IMPORT_BOOTLEG, extra_meta)
     return job
 
@@ -374,6 +386,8 @@ def enqueue_import_undo(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
         hash,
         path,
         delete_files=delete_files,
+        # User-initiated: run before the automated backlog.
+        at_front=True,  # type: ignore
     )
     _set_job_meta(job, hash, path, EnqueueKind.IMPORT_UNDO, extra_meta)
     return job
