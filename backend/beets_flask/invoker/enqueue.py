@@ -20,7 +20,7 @@ from beets_flask.database.models.states import (
     SessionState,
     SessionStateInDb,
 )
-from beets_flask.importer.progress import FolderStatus
+from beets_flask.importer.progress import FolderStatus, Progress
 from beets_flask.importer.session import (
     AddCandidatesSession,
     AutoImportSession,
@@ -332,12 +332,22 @@ def enqueue_import_auto(hash: str, path: str, extra_meta: ExtraJobMeta, **kwargs
             "group_albums, autotag, import_threshold, duplicate_actions."
         )
 
-    # We only assign the on_success callback (likely coming
-    # via a kwarg) to the second job!
-    job1 = preview_queue.enqueue(
-        run_preview, hash, path, group_albums=group_albums, autotag=autotag, **kwargs
-    )
-    _set_job_meta(job1, hash, path, EnqueueKind._AUTO_PREVIEW, extra_meta)
+    # A finished preview of the same folder content already holds the candidates.
+    # Looking them up again costs a full autotag run per folder. Options that
+    # change the preview still get a fresh one.
+    job1 = None
+    if group_albums is not None or autotag is not None or not _has_fresh_preview(hash):
+        # We only assign the on_success callback (likely coming
+        # via a kwarg) to the second job!
+        job1 = preview_queue.enqueue(
+            run_preview,
+            hash,
+            path,
+            group_albums=group_albums,
+            autotag=autotag,
+            **kwargs,
+        )
+        _set_job_meta(job1, hash, path, EnqueueKind._AUTO_PREVIEW, extra_meta)
     job2 = _enqueue(
         import_queue,
         run_import_auto,
@@ -634,6 +644,23 @@ async def run_import_undo(hash: str, path: str, delete_files: bool):
             db_session.commit()
 
     log.info(f"Import Undo done. {hash=} {path=}")
+
+
+def _has_fresh_preview(hash: str) -> bool:
+    """Whether the latest session for this folder hash is an untouched preview.
+
+    Only an exact hash match counts (no fallback to the path), so a preview of
+    older folder content is never reused. Sessions that failed, or that an
+    import has already worked on, do not count either.
+    """
+    with db_session_factory() as db_session:
+        s_state_indb = SessionStateInDb.get_by_hash_and_path(
+            hash=hash, path=None, db_session=db_session
+        )
+        if s_state_indb is None or s_state_indb.exc is not None:
+            return False
+        progress = s_state_indb.to_live_state().progress.progress
+        return progress == Progress.PREVIEW_COMPLETED
 
 
 def _get_live_state_by_folder(
