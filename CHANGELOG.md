@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `import_auto` no longer runs a second preview when the folder already has a finished preview for the same content. It imports from the existing candidates instead. A fresh preview is still generated if there is none, if the content changed, if an import was already attempted, or if `group_albums` / `autotag` are passed.
+
 ## [2.0.0] - 26-11-15
 
 ### ⚠️ Breaking Changes ⚠️

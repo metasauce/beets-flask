@@ -776,6 +776,96 @@ class TestImportAuto(SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryM
         assert len(self.beets_lib.albums()) == 1
 
 
+class TestImportAutoReusesPreview(
+    SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryMixin
+):
+    """Enqueueing an auto-import must not redo a preview that already exists.
+
+    Automation that previews first and enqueues `import_auto` later (e.g. once
+    a folder has finished syncing) otherwise pays for every lookup twice.
+    """
+
+    @pytest.fixture()
+    def path(self) -> Path:
+        return album_path_absolute(VALID_PATHS[0])
+
+    @pytest.fixture()
+    def queues(self, monkeypatch):
+        """Non-eager queues, so that enqueued jobs stay inspectable."""
+        import sys
+
+        from fakeredis import FakeStrictRedis
+        from rq import Queue
+
+        # `beets_flask.invoker.enqueue` is shadowed by the function of that name.
+        enqueue_module = sys.modules["beets_flask.invoker.enqueue"]
+        conn = FakeStrictRedis()
+        preview = Queue("preview", is_async=True, connection=conn)
+        imp = Queue("import", is_async=True, connection=conn)
+        monkeypatch.setattr(enqueue_module, "preview_queue", preview)
+        monkeypatch.setattr(enqueue_module, "import_queue", imp)
+        return enqueue_module, preview, imp
+
+    async def _preview(self, db_session: Session, path: Path) -> str:
+        await run_preview("obsolete_hash", str(path), group_albums=None, autotag=None)
+        stmt = select(SessionStateInDb).order_by(SessionStateInDb.created_at.desc())
+        state = db_session.execute(stmt).scalar()
+        assert state is not None
+        return state.folder_hash
+
+    async def test_no_preview_yet(self, queues, path: Path):
+        enqueue_module, preview, imp = queues
+        job = enqueue_module.enqueue_import_auto(Folder.from_path(path).hash, path, {})
+        assert preview.count == 1
+        assert job.get_status() == "deferred"
+        assert imp.count == 0
+
+    async def test_existing_preview_is_reused(
+        self, queues, db_session: Session, path: Path
+    ):
+        enqueue_module, preview, imp = queues
+        hash = await self._preview(db_session, path)
+
+        job = enqueue_module.enqueue_import_auto(hash, str(path), {})
+        assert preview.count == 0
+        assert job.get_status() == "queued"
+        assert imp.count == 1
+
+    async def test_preview_options_force_a_new_preview(
+        self, queues, db_session: Session, path: Path
+    ):
+        enqueue_module, preview, _ = queues
+        hash = await self._preview(db_session, path)
+
+        enqueue_module.enqueue_import_auto(hash, str(path), {}, group_albums=True)
+        assert preview.count == 1
+
+    async def test_preview_of_other_content_is_not_reused(
+        self, queues, db_session: Session, path: Path
+    ):
+        enqueue_module, preview, _ = queues
+        await self._preview(db_session, path)
+
+        enqueue_module.enqueue_import_auto("hash_of_changed_content", str(path), {})
+        assert preview.count == 1
+
+    async def test_used_preview_is_not_reused(
+        self, queues, db_session: Session, path: Path
+    ):
+        """After an import attempt (here: rejected by the threshold), start over."""
+        enqueue_module, preview, _ = queues
+        hash = await self._preview(db_session, path)
+        await run_import_auto(
+            hash,
+            str(path),
+            import_threshold=0.0,
+            duplicate_actions={"*": BeetsDuplicateAction.REMOVE},
+        )
+
+        enqueue_module.enqueue_import_auto(hash, str(path), {})
+        assert preview.count == 1
+
+
 class TestImportAutoFails(
     SendStatusMockMixin, IsolatedDBMixin, IsolatedBeetsLibraryMixin
 ):
