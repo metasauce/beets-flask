@@ -27,6 +27,7 @@ import {
 import { Archive, Folder, FolderStatus } from '@/pythonTypes';
 
 import { InboxActions } from '../actions/buttons';
+import { LazyMount } from '../lazyMount';
 
 /** Context for easier use of inbox card related variables child
  * components.
@@ -249,6 +250,9 @@ function InboxCardHeader() {
     );
 }
 
+/** Height of a collapsed folder row, used for rows that are not mounted yet. */
+const ESTIMATED_ROW_HEIGHT = 32;
+
 function InboxCardContent() {
     const {
         folder: inbox,
@@ -261,21 +265,27 @@ function InboxCardContent() {
             <GridWrapper config={gridTemplateColumns}>
                 {/* Only show inner folders */}
                 <InboxGridHeader inboxFolderConfig={folderConfig} />
+                {/* Rows are only mounted while they are near the viewport,
+                    an inbox may contain thousands of folders. */}
                 {inbox.children.map((child) => {
                     if (child.type === 'directory') {
                         return (
-                            <FolderComponent
+                            <LazyMount
                                 key={child.hash}
-                                folder={child as Folder}
-                            />
+                                estimatedHeight={ESTIMATED_ROW_HEIGHT}
+                            >
+                                <FolderComponent folder={child as Folder} />
+                            </LazyMount>
                         );
                     }
                     if (child.type === 'archive') {
                         return (
-                            <ArchiveComponent
+                            <LazyMount
                                 key={child.hash}
-                                archive={child}
-                            />
+                                estimatedHeight={ESTIMATED_ROW_HEIGHT}
+                            >
+                                <ArchiveComponent archive={child} />
+                            </LazyMount>
                         );
                     }
                 })}

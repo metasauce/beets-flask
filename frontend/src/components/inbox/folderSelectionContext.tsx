@@ -1,4 +1,10 @@
-import { createContext, useCallback, useContext, useState } from 'react';
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useMemo,
+    useState,
+} from 'react';
 
 import { Archive, Folder } from '@/pythonTypes';
 
@@ -40,7 +46,7 @@ export function FolderSelectionProvider({
         paths: Folder['full_path'][];
     }>({ hashes: [], paths: [] });
 
-    const toggleSelect = (folder: Folder | Archive) => {
+    const toggleSelect = useCallback((folder: Folder | Archive) => {
         setSelected((selected) => {
             if (selected.hashes.includes(folder.hash)) {
                 const idx = selected.hashes.indexOf(folder.hash);
@@ -59,27 +65,35 @@ export function FolderSelectionProvider({
                 };
             }
         });
-    };
+    }, []);
 
     const isSelected = useCallback(
         (folder: Folder | Archive) => selected.hashes.includes(folder.hash),
         [selected]
     );
 
-    const deselectAll = () => setSelected({ hashes: [], paths: [] });
+    const deselectAll = useCallback(
+        () => setSelected({ hashes: [], paths: [] }),
+        []
+    );
 
     const nSelected = selected.hashes.length;
 
+    // Stable value: consumers only re-render when the selection changes,
+    // not whenever the provider's parent re-renders.
+    const value = useMemo(
+        () => ({
+            nSelected,
+            toggleSelect,
+            isSelected,
+            selected,
+            deselectAll,
+        }),
+        [nSelected, toggleSelect, isSelected, selected, deselectAll]
+    );
+
     return (
-        <FoldersContext.Provider
-            value={{
-                nSelected,
-                toggleSelect,
-                isSelected,
-                selected,
-                deselectAll,
-            }}
-        >
+        <FoldersContext.Provider value={value}>
             {children}
         </FoldersContext.Provider>
     );
