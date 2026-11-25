@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The inbox tree no longer fails with a `KeyError` (HTTP 500) when a folder is deleted while the tree is being built. `os.walk` skips a subfolder it can no longer enter, but the subfolder was still looked up from its parent.
+
 ## [2.0.0] - 26-11-15
 
 ### ⚠️ Breaking Changes ⚠️

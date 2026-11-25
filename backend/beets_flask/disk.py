@@ -148,10 +148,13 @@ class Folder(FileSystemItem):
             )
 
             # As we iterate from bottom to top, we can access the elements from
-            # the lookup table as they are already created
+            # the lookup table as they are already created. A subdir that
+            # os.walk listed but could not descend into (deleted in the
+            # meantime, or unreadable) was never yielded, so skip it.
             children: list[FileSystemItem] = [
                 lookup[os.path.join(dirpath, sub_dir)]
                 for sub_dir in os_sorted(_dirnames)
+                if os.path.join(dirpath, sub_dir) in lookup
             ]
 
             # Add all files to children
