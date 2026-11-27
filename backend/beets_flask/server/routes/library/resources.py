@@ -501,7 +501,15 @@ class PaginatedQuery(Query, Sort):
         self.table = table
 
     def clause(self) -> tuple[str | None, Sequence[Any]]:
-        """Return the SQL clause and values for the query."""
+        """Return the SQL clause and values for the query.
+
+        The page is selected by id in a subquery that carries the ORDER BY and
+        LIMIT. beets wraps the WHERE clause in a `SELECT items.* ... GROUP BY id`
+        subquery and only sorts and limits its result, so with the LIMIT in
+        `order_clause` every matching row with all its columns is read, twice
+        (once more for the flexible attributes). With the id subquery only the
+        rows of the page are read, and an index on the order column applies.
+        """
 
         if self._sub_query:
             # If there is a sub-query, use it to filter the results
@@ -511,15 +519,15 @@ class PaginatedQuery(Query, Sort):
             vs = ()
 
         cc, cv = self.cursor.causes()
-        return f"({cs}) AND ({cc})", list(vs) + list(cv)
+        page = (
+            f"SELECT id FROM {self.table} WHERE ({cs}) AND ({cc}) "
+            f"ORDER BY {self.cursor.order_by_clause()} LIMIT ?"
+        )
+        return f"{self.table}.id IN ({page})", [*vs, *cv, self.n_items]
 
     def order_clause(self) -> str:
-        """Order by added date and id descending."""
-        sub_sort = self._sub_query[1] if self._sub_query else None
-        cursor_order = self.cursor.order_by_clause()
-        if sub_sort:
-            return f"{cursor_order} LIMIT {self.n_items}"
-        return f"{cursor_order} LIMIT {self.n_items}"
+        """Order the page the same way it was selected in `clause`."""
+        return self.cursor.order_by_clause()
 
     def match(self, obj: Model) -> bool:  # type: ignore
         return isinstance(obj, Item) or isinstance(obj, Album)
@@ -619,6 +627,9 @@ class ItemSource(TypedDict):
 source_prefixes = ["mb", "spotify", "tidal", "discogs"]
 
 
+_DISK_IO_FIELDS = {"filesize", "has_cover_art"}
+
+
 def _repr_item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseMinimal:
     if not item:
         raise NotFoundError("Item not found")
@@ -637,8 +648,11 @@ def _repr_item(item: Item | None, minimal=False) -> ItemResponse | ItemResponseM
             "isrc",
         ]
     else:
-        # Use all keys, except filesize which would trigger disk io.
-        keys = [k for k in item.keys(computed=True) if k != "filesize"] + ["name"]
+        # Use all keys, except computed fields that trigger disk io:
+        # filesize stats the file, has_cover_art (beets >= 2.14) parses the
+        # whole audio file including embedded images.
+        keys = [k for k in item.keys(computed=True) if k not in _DISK_IO_FIELDS]
+        keys.append("name")
 
         # Check data source prefixes:
         # plugins such as spotify, tidal, discogs add a prefix to the id,
