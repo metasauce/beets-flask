@@ -6,7 +6,7 @@ from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 from uuid import uuid4 as uuid
 
 from beets import importer
@@ -639,10 +639,12 @@ class CandidateState(BaseState):
         # Construct a query to find duplicates with this metadata. We
         # use a temporary Album object to generate any computed fields.
         tmp_album = BeetsAlbum(lib, **info)
-        keys: list[str] = cast(
-            list[str],
-            get_config().data.import_.duplicate_keys.album or [],
-        )
+        keys = get_config().data.import_.duplicate_keys.album or []
+        if isinstance(keys, str):
+            # beets' space-delimited form, e.g. "albumartist album". Iterating
+            # the string would build a query from single letters that matches
+            # every album in the library.
+            keys = keys.split()
         dup_query = tmp_album.duplicates_query(keys)
 
         # Re-Importing: Don't count albums with the same files as duplicates.
